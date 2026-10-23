@@ -1,5 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 
 import {
   createRound,
@@ -37,7 +38,7 @@ const COLORS = {
 const CLAW_TOP_Y = 3.05
 const CLAW_LOW_Y = 0.88
 const CHUTE = { x: -1.42, z: 0.96 }
-const PRIZE_START = { x: 0.58, y: 0.34, z: -0.18 }
+const PRIZE_START = { x: 0.58, y: 0.42, z: -0.18 }
 
 export class ClawMachineGame {
   private readonly scene = new THREE.Scene()
@@ -63,7 +64,7 @@ export class ClawMachineGame {
   private running = false
   private lastPublishedSecond = -1
   private lastPhase: RoundPhase = 'aiming'
-  private orbit: OrbitState = { yaw: 0.68, pitch: 0.3 }
+  private orbit: OrbitState = { yaw: 0.5, pitch: 0.3 }
   private orbitRadius = 10
   private cameraDrag?: { pointerId: number; x: number; y: number }
 
@@ -76,10 +77,10 @@ export class ClawMachineGame {
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.18
+    this.renderer.toneMappingExposure = 1.3
 
     this.scene.background = null
-    this.scene.fog = new THREE.Fog(COLORS.navy, 8, 15)
+    this.scene.fog = new THREE.Fog(COLORS.navy, 13, 23)
     this.camera.position.set(5.9, 4.6, 7.8)
     this.camera.lookAt(0, 1.6, 0)
 
@@ -279,7 +280,7 @@ export class ClawMachineGame {
   }
 
   private addLights(): void {
-    this.scene.add(new THREE.HemisphereLight(0xd8f4ff, 0x101c30, 2.55))
+    this.scene.add(new THREE.HemisphereLight(0xe7fbff, 0x172b3d, 3.15))
 
     const key = new THREE.DirectionalLight(0xffffff, 3.2)
     key.position.set(3, 7, 4)
@@ -294,25 +295,43 @@ export class ClawMachineGame {
     const aqua = new THREE.PointLight(COLORS.aqua, 28, 7)
     aqua.position.set(2.5, 3.2, -1.5)
     this.scene.add(aqua)
+
+    const cabinetFill = new THREE.RectAreaLight(0xfff7eb, 8.5, 4.1, 2.7)
+    cabinetFill.position.set(0, 3.42, 0.15)
+    cabinetFill.rotation.x = -Math.PI / 2
+    this.scene.add(cabinetFill)
   }
 
   private addCabinet(): void {
-    const frameMaterial = new THREE.MeshStandardMaterial({
-      color: 0xf4f1e9,
-      emissive: 0x182b38,
-      emissiveIntensity: 0.12,
-      roughness: 0.24,
-      metalness: 0.38,
+    const frameMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0xfbf9f2,
+      emissive: 0x6c7880,
+      emissiveIntensity: 0.1,
+      roughness: 0.22,
+      metalness: 0.24,
+      clearcoat: 0.72,
+      clearcoatRoughness: 0.22,
     })
-    const baseMaterial = new THREE.MeshStandardMaterial({ color: 0x172e49, roughness: 0.28, metalness: 0.56 })
-    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x315f70, roughness: 0.38, metalness: 0.18 })
+    const baseMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0x172e49,
+      roughness: 0.3,
+      metalness: 0.52,
+      clearcoat: 0.42,
+      clearcoatRoughness: 0.32,
+    })
+    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x4b7180, roughness: 0.36, metalness: 0.16 })
     const glassMaterial = new THREE.MeshPhysicalMaterial({
-      color: 0xc8f4f2,
+      color: 0xf1ffff,
       transparent: true,
-      opacity: 0.1,
-      roughness: 0.08,
+      opacity: 0.035,
+      roughness: 0.06,
       metalness: 0,
-      transmission: 0.35,
+      transmission: 0,
+      thickness: 0.06,
+      clearcoat: 1,
+      clearcoatRoughness: 0.08,
+      ior: 1.45,
+      depthWrite: false,
       side: THREE.DoubleSide,
     })
 
@@ -322,13 +341,13 @@ export class ClawMachineGame {
     this.scene.add(floor)
     this.addStaticCollider({ x: 2.3, y: 0.08, z: 1.675 }, { x: 0, y: -0.08, z: 0 })
 
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(4.75, 0.22, 3.5), frameMaterial)
+    const roof = new THREE.Mesh(new RoundedBoxGeometry(4.75, 0.22, 3.5, 3, 0.06), frameMaterial)
     roof.position.y = 3.75
     this.scene.add(roof)
 
     for (const x of [-2.28, 2.28]) {
       for (const z of [-1.62, 1.62]) {
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.14, 3.7, 0.14), frameMaterial)
+        const post = new THREE.Mesh(new RoundedBoxGeometry(0.17, 3.7, 0.17, 3, 0.045), frameMaterial)
         post.position.set(x, 1.83, z)
         this.scene.add(post)
       }
@@ -338,36 +357,71 @@ export class ClawMachineGame {
       size: [number, number, number],
       position: [number, number, number],
       color: number,
+      normal: [number, number, number],
     ): void => {
+      const channelSize: [number, number, number] = size.map((value) => value + 0.045) as [number, number, number]
+      const glowSize: [number, number, number] = size.map((value) => value < 0.12 ? value * 1.9 : value) as [number, number, number]
+      const channel = new THREE.Mesh(
+        new RoundedBoxGeometry(...channelSize, 2, 0.025),
+        new THREE.MeshStandardMaterial({ color: 0x17212b, roughness: 0.26, metalness: 0.82 }),
+      )
+      channel.position.set(...position)
+
+      const offsetPosition: [number, number, number] = [
+        position[0] + normal[0] * 0.07,
+        position[1] + normal[1] * 0.07,
+        position[2] + normal[2] * 0.07,
+      ]
+      const lightColor = new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.34)
       const strip = new THREE.Mesh(
-        new THREE.BoxGeometry(...size),
-        new THREE.MeshStandardMaterial({
-          color,
+        new RoundedBoxGeometry(...size, 3, 0.018),
+        new THREE.MeshPhysicalMaterial({
+          color: lightColor,
           emissive: color,
-          emissiveIntensity: 4.5,
-          roughness: 0.16,
-          metalness: 0.08,
+          emissiveIntensity: 3.4,
+          roughness: 0.18,
+          metalness: 0,
+          transmission: 0.26,
+          clearcoat: 1,
+          clearcoatRoughness: 0.1,
           toneMapped: false,
         }),
       )
-      strip.position.set(...position)
-      this.scene.add(strip)
+      strip.position.set(...offsetPosition)
+
+      const glow = new THREE.Mesh(
+        new RoundedBoxGeometry(...glowSize, 2, 0.02),
+        new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: 0.16,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          toneMapped: false,
+        }),
+      )
+      glow.position.set(
+        offsetPosition[0] + normal[0] * 0.022,
+        offsetPosition[1] + normal[1] * 0.022,
+        offsetPosition[2] + normal[2] * 0.022,
+      )
+      this.scene.add(channel, strip, glow)
     }
 
-    addLightStrip([0.055, 3.34, 0.055], [-2.18, 1.84, 1.705], COLORS.aqua)
-    addLightStrip([0.055, 3.34, 0.055], [2.18, 1.84, 1.705], COLORS.pink)
-    addLightStrip([0.055, 3.34, 0.055], [-2.18, 1.84, -1.655], COLORS.pink)
-    addLightStrip([0.055, 3.34, 0.055], [2.18, 1.84, -1.655], COLORS.aqua)
-    addLightStrip([2.08, 0.055, 0.055], [-1.08, 3.62, 1.705], COLORS.pink)
-    addLightStrip([2.08, 0.055, 0.055], [1.08, 3.62, 1.705], COLORS.aqua)
-    addLightStrip([0.055, 0.055, 3.08], [-2.305, 3.62, 0], COLORS.pink)
-    addLightStrip([0.055, 0.055, 3.08], [2.305, 3.62, 0], COLORS.aqua)
-    addLightStrip([2.08, 0.045, 0.055], [-1.08, 0.08, 1.705], COLORS.aqua)
-    addLightStrip([2.08, 0.045, 0.055], [1.08, 0.08, 1.705], COLORS.pink)
+    addLightStrip([0.055, 3.34, 0.055], [-2.18, 1.84, 1.705], COLORS.aqua, [0, 0, 1])
+    addLightStrip([0.055, 3.34, 0.055], [2.18, 1.84, 1.705], COLORS.pink, [0, 0, 1])
+    addLightStrip([0.055, 3.34, 0.055], [-2.18, 1.84, -1.655], COLORS.pink, [0, 0, -1])
+    addLightStrip([0.055, 3.34, 0.055], [2.18, 1.84, -1.655], COLORS.aqua, [0, 0, -1])
+    addLightStrip([2.08, 0.055, 0.055], [-1.08, 3.62, 1.705], COLORS.pink, [0, 0, 1])
+    addLightStrip([2.08, 0.055, 0.055], [1.08, 3.62, 1.705], COLORS.aqua, [0, 0, 1])
+    addLightStrip([0.055, 0.055, 3.08], [-2.305, 3.62, 0], COLORS.pink, [-1, 0, 0])
+    addLightStrip([0.055, 0.055, 3.08], [2.305, 3.62, 0], COLORS.aqua, [1, 0, 0])
+    addLightStrip([2.08, 0.045, 0.055], [-1.08, 0.08, 1.705], COLORS.aqua, [0, 0, 1])
+    addLightStrip([2.08, 0.045, 0.055], [1.08, 0.08, 1.705], COLORS.pink, [0, 0, 1])
 
-    const leftGlow = new THREE.PointLight(COLORS.aqua, 12, 3.6)
+    const leftGlow = new THREE.PointLight(COLORS.aqua, 10, 3.6)
     leftGlow.position.set(-2.12, 2, 2)
-    const rightGlow = new THREE.PointLight(COLORS.pink, 12, 3.6)
+    const rightGlow = new THREE.PointLight(COLORS.pink, 10, 3.6)
     rightGlow.position.set(2.12, 2, 2)
     this.scene.add(leftGlow, rightGlow)
 
@@ -398,7 +452,7 @@ export class ClawMachineGame {
     chuteFrame.position.set(CHUTE.x, 0.05, CHUTE.z)
     this.scene.add(chuteFrame)
 
-    const plinth = new THREE.Mesh(new THREE.BoxGeometry(4.9, 0.68, 3.65), baseMaterial)
+    const plinth = new THREE.Mesh(new RoundedBoxGeometry(4.9, 0.68, 3.65, 4, 0.12), baseMaterial)
     plinth.position.y = -0.5
     plinth.castShadow = true
     this.scene.add(plinth)
@@ -410,8 +464,8 @@ export class ClawMachineGame {
     frontPanel.position.set(0, -0.48, 1.86)
     this.scene.add(frontPanel)
 
-    addLightStrip([1.82, 0.055, 0.04], [-1.02, -0.32, 1.91], COLORS.pink)
-    addLightStrip([1.82, 0.055, 0.04], [1.02, -0.32, 1.91], COLORS.aqua)
+    addLightStrip([1.82, 0.055, 0.04], [-1.02, -0.32, 1.91], COLORS.pink, [0, 0, 1])
+    addLightStrip([1.82, 0.055, 0.04], [1.02, -0.32, 1.91], COLORS.aqua, [0, 0, 1])
 
     const badge = new THREE.Mesh(
       new THREE.BoxGeometry(0.5, 0.2, 0.025),
@@ -477,25 +531,52 @@ export class ClawMachineGame {
         .setAngularDamping(0.6),
     )
     this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(0.28, 0.28, 0.28).setRestitution(0.15).setFriction(0.8),
+      RAPIER.ColliderDesc.cuboid(0.36, 0.36, 0.36).setRestitution(0.15).setFriction(0.8),
       body,
     )
 
     const mesh = new THREE.Group()
     const box = new THREE.Mesh(
-      new THREE.BoxGeometry(0.56, 0.56, 0.56),
-      new THREE.MeshStandardMaterial({ color: COLORS.pink, roughness: 0.36, metalness: 0.08 }),
+      new RoundedBoxGeometry(0.72, 0.72, 0.72, 4, 0.055),
+      new THREE.MeshBasicMaterial({
+        color: COLORS.pink,
+        toneMapped: false,
+      }),
     )
     box.castShadow = true
     box.receiveShadow = true
     mesh.add(box)
 
-    const ribbonMaterial = new THREE.MeshStandardMaterial({ color: COLORS.warm, roughness: 0.3, metalness: 0.35 })
-    const ribbonX = new THREE.Mesh(new THREE.BoxGeometry(0.59, 0.08, 0.15), ribbonMaterial)
-    const ribbonZ = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.08, 0.59), ribbonMaterial)
-    ribbonX.position.y = 0.27
-    ribbonZ.position.y = 0.27
-    mesh.add(ribbonX, ribbonZ)
+    const clearShell = new THREE.Mesh(
+      new RoundedBoxGeometry(0.75, 0.75, 0.75, 4, 0.06),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffe8ee,
+        transparent: true,
+        opacity: 0.22,
+        roughness: 0.12,
+        metalness: 0,
+        transmission: 0.32,
+        clearcoat: 1,
+        clearcoatRoughness: 0.08,
+        depthWrite: false,
+      }),
+    )
+    mesh.add(clearShell)
+
+    const ribbonMaterial = new THREE.MeshStandardMaterial({
+      color: COLORS.warm,
+      emissive: COLORS.warm,
+      emissiveIntensity: 0.16,
+      roughness: 0.3,
+      metalness: 0.24,
+    })
+    const ribbonX = new THREE.Mesh(new RoundedBoxGeometry(0.75, 0.09, 0.18, 2, 0.025), ribbonMaterial)
+    const ribbonZ = new THREE.Mesh(new RoundedBoxGeometry(0.18, 0.09, 0.75, 2, 0.025), ribbonMaterial)
+    ribbonX.position.y = 0.35
+    ribbonZ.position.y = 0.35
+    const prizeGlow = new THREE.PointLight(COLORS.pink, 2.8, 2.2)
+    prizeGlow.position.y = 0.45
+    mesh.add(ribbonX, ribbonZ, prizeGlow)
     this.scene.add(mesh)
 
     return { body, mesh }
@@ -569,7 +650,9 @@ export class ClawMachineGame {
     const height = Math.max(1, canvas.clientHeight)
     this.renderer.setSize(width, height, false)
     this.camera.aspect = width / height
-    this.orbitRadius = height > width ? 12 : 10.2
+    this.orbitRadius = this.camera.aspect < 1
+      ? THREE.MathUtils.clamp(6.7 / this.camera.aspect, 12.7, 14.5)
+      : 10.2
     this.applyCameraOrbit()
     this.camera.updateProjectionMatrix()
   }
