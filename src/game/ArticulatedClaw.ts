@@ -29,6 +29,14 @@ const FINGER_PATH = [
   new THREE.Vector3(0.22, -1.08, 0),
 ] as const
 
+const FINGER_VISUAL_PATH = [
+  new THREE.Vector3(0, 0, 0),
+  new THREE.Vector3(0.17, -0.24, 0),
+  new THREE.Vector3(0.29, -0.69, 0),
+  new THREE.Vector3(0.285, -0.92, 0),
+  new THREE.Vector3(0.19, -1.055, 0),
+] as const
+
 interface FingerAssembly {
   body: RAPIER.RigidBody
   joint: RAPIER.RevoluteImpulseJoint
@@ -50,7 +58,7 @@ export class ArticulatedClaw {
   private readonly headBody: RAPIER.RigidBody
   private readonly headVisual: THREE.Group
   private readonly cableVisual: THREE.Mesh
-  private readonly sliderVisual: THREE.Mesh
+  private readonly sliderVisual: THREE.Group
   private readonly linkageVisuals: THREE.Mesh[] = []
   private readonly fingers: FingerAssembly[] = []
   private cableJoint: RAPIER.ImpulseJoint
@@ -106,23 +114,15 @@ export class ArticulatedClaw {
     this.cableVisual.castShadow = true
     this.root.add(this.cableVisual)
 
-    this.sliderVisual = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.09, 0.11, 0.2, 18),
-      new THREE.MeshPhysicalMaterial({
-        color: 0xcdd4df,
-        metalness: 0.9,
-        roughness: 0.2,
-        clearcoat: 0.7,
-      }),
-    )
-    this.sliderVisual.castShadow = true
+    this.sliderVisual = this.createSliderVisual()
     this.root.add(this.sliderVisual)
 
+    const linkageMaterial = this.createChromeMaterial(0xb8c0ca, 0.19)
     for (let index = 0; index < 3; index += 1) {
       this.fingers.push(this.createFinger(index))
       const rod = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.018, 0.018, 1, 10),
-        cableMaterial,
+        new THREE.CylinderGeometry(0.012, 0.012, 1, 12),
+        linkageMaterial,
       )
       rod.castShadow = true
       this.linkageVisuals.push(rod)
@@ -354,7 +354,7 @@ export class ArticulatedClaw {
         .applyAxisAngle(new THREE.Vector3(0, 1, 0), (index * Math.PI * 2) / 3)
         .applyQuaternion(this.headVisual.quaternion)
         .add(this.headVisual.position)
-      const knuckle = new THREE.Vector3(0.32, -0.42, 0)
+      const knuckle = new THREE.Vector3(0.17, -0.24, 0)
         .applyQuaternion(finger.visual.quaternion)
         .add(finger.visual.position)
       this.positionRod(this.linkageVisuals[index]!, sliderAnchor, knuckle)
@@ -376,32 +376,90 @@ export class ArticulatedClaw {
 
   private createHeadVisual(): THREE.Group {
     const group = new THREE.Group()
-    const chrome = new THREE.MeshPhysicalMaterial({
-      color: 0xdde3ec,
-      metalness: 0.92,
-      roughness: 0.16,
-      clearcoat: 0.8,
-      clearcoatRoughness: 0.12,
+    const chrome = this.createChromeMaterial(0xcbd2da, 0.16)
+    const brushedChrome = this.createChromeMaterial(0x9ea7b2, 0.28)
+    const darkSteel = new THREE.MeshStandardMaterial({
+      color: 0x252a31,
+      metalness: 0.88,
+      roughness: 0.24,
     })
-    const cap = new THREE.Mesh(
-      new THREE.CylinderGeometry(HEAD_RADIUS, HEAD_RADIUS * 1.08, 0.24, 28),
+
+    const coupler = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.044, 0.05, 0.075, 20),
+      darkSteel,
+    )
+    coupler.position.y = 0.145
+    group.add(coupler)
+
+    const cableNut = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.062, 0.056, 0.055, 8),
+      brushedChrome,
+    )
+    cableNut.position.y = 0.095
+    group.add(cableNut)
+
+    const upperCap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.085, 0.112, 0.065, 24),
       chrome,
     )
-    cap.castShadow = true
-    group.add(cap)
+    upperCap.position.y = 0.04
+    group.add(upperCap)
 
-    const collar = new THREE.Mesh(
-      new THREE.TorusGeometry(0.12, 0.026, 10, 28),
-      new THREE.MeshStandardMaterial({
-        color: 0x3d4651,
-        metalness: 0.84,
-        roughness: 0.26,
-      }),
+    const housing = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.112, 0.12, 0.12, 28),
+      brushedChrome,
     )
-    collar.rotation.x = Math.PI / 2
-    collar.position.y = -0.08
-    collar.castShadow = true
-    group.add(collar)
+    housing.position.y = -0.055
+    group.add(housing)
+
+    const lowerHub = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.088, 0.075, 0.08, 24),
+      chrome,
+    )
+    lowerHub.position.y = -0.155
+    group.add(lowerHub)
+
+    for (const y of [0, -0.115]) {
+      const collar = new THREE.Mesh(
+        new THREE.TorusGeometry(y > -0.05 ? 0.108 : 0.087, 0.009, 8, 28),
+        darkSteel,
+      )
+      collar.rotation.x = Math.PI / 2
+      collar.position.y = y
+      group.add(collar)
+    }
+
+    for (let index = 0; index < 3; index += 1) {
+      const angle = (index * Math.PI * 2) / 3
+      const bracket = new THREE.Mesh(
+        new THREE.BoxGeometry(0.085, 0.07, 0.055),
+        chrome,
+      )
+      bracket.position.set(
+        0.095 * Math.cos(angle),
+        -0.137,
+        -0.095 * Math.sin(angle),
+      )
+      bracket.rotation.y = angle
+      group.add(bracket)
+
+      const bolt = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.022, 0.022, 0.01, 16),
+        darkSteel,
+      )
+      bolt.rotation.z = Math.PI / 2
+      bolt.rotation.y = angle
+      bolt.position.set(
+        0.127 * Math.cos(angle),
+        -0.138,
+        -0.127 * Math.sin(angle),
+      )
+      group.add(bolt)
+    }
+
+    group.traverse((child) => {
+      if (child instanceof THREE.Mesh) child.castShadow = true
+    })
     return group
   }
 
@@ -474,39 +532,134 @@ export class ArticulatedClaw {
 
   private createFingerVisual(): THREE.Group {
     const group = new THREE.Group()
-    const chrome = new THREE.MeshPhysicalMaterial({
-      color: 0xe2e6ed,
-      metalness: 0.96,
-      roughness: 0.14,
-      clearcoat: 0.85,
+    const chrome = this.createChromeMaterial(0xd5d9df, 0.15)
+    const brushedChrome = this.createChromeMaterial(0xaab2bd, 0.27)
+    const darkSteel = new THREE.MeshStandardMaterial({
+      color: 0x30353d,
+      metalness: 0.85,
+      roughness: 0.3,
     })
-    const curve = new THREE.CatmullRomCurve3(
-      FINGER_PATH.map((point) => point.clone()),
+
+    const pivot = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.062, 0.062, 0.14, 18),
+      darkSteel,
+    )
+    pivot.rotation.x = Math.PI / 2
+    group.add(pivot)
+
+    for (const z of [-0.035, 0.035]) {
+      const start = FINGER_VISUAL_PATH[0]!.clone().setZ(z)
+      const end = FINGER_VISUAL_PATH[1]!.clone().setZ(z)
+      group.add(this.createRod(start, end, 0.016, chrome, 10))
+    }
+
+    const bladeCurve = new THREE.CatmullRomCurve3(
+      FINGER_VISUAL_PATH.slice(1).map((point) => point.clone()),
       false,
       'centripetal',
     )
-    const blade = new THREE.Mesh(new THREE.TubeGeometry(curve, 28, 0.04, 9), chrome)
-    blade.castShadow = true
+    const blade = new THREE.Mesh(
+      new THREE.TubeGeometry(bladeCurve, 28, 0.019, 9),
+      brushedChrome,
+    )
     group.add(blade)
 
-    const hinge = new THREE.Mesh(new THREE.SphereGeometry(0.075, 18, 12), chrome)
-    hinge.castShadow = true
-    group.add(hinge)
+    const shoulder = FINGER_VISUAL_PATH[1]!
+    const sleeve = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.043, 0.043, 0.095, 16),
+      darkSteel,
+    )
+    sleeve.rotation.x = Math.PI / 2
+    sleeve.position.copy(shoulder)
+    group.add(sleeve)
 
-    const tip = FINGER_PATH[FINGER_PATH.length - 1]!
+    const bolt = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.021, 0.021, 0.104, 14),
+      chrome,
+    )
+    bolt.rotation.x = Math.PI / 2
+    bolt.position.copy(shoulder)
+    group.add(bolt)
+
+    const tip = FINGER_VISUAL_PATH[FINGER_VISUAL_PATH.length - 1]!
     const pad = new THREE.Mesh(
-      new THREE.BoxGeometry(0.15, 0.055, 0.105),
+      new THREE.BoxGeometry(0.105, 0.035, 0.072),
       new THREE.MeshStandardMaterial({
-        color: 0x727984,
-        metalness: 0.82,
-        roughness: 0.28,
+        color: 0x343942,
+        metalness: 0.22,
+        roughness: 0.58,
       }),
     )
     pad.position.copy(tip)
-    pad.rotation.z = -0.38
-    pad.castShadow = true
+    pad.rotation.z = -0.48
     group.add(pad)
+
+    group.traverse((child) => {
+      if (child instanceof THREE.Mesh) child.castShadow = true
+    })
     return group
+  }
+
+  private createSliderVisual(): THREE.Group {
+    const group = new THREE.Group()
+    const chrome = this.createChromeMaterial(0xc7ced7, 0.18)
+    const darkSteel = new THREE.MeshStandardMaterial({
+      color: 0x282d34,
+      metalness: 0.86,
+      roughness: 0.26,
+    })
+
+    const piston = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.034, 0.034, 0.24, 16),
+      chrome,
+    )
+    piston.position.y = 0.08
+    group.add(piston)
+
+    const yoke = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.085, 0.095, 0.075, 24),
+      chrome,
+    )
+    yoke.position.y = -0.055
+    group.add(yoke)
+
+    const band = new THREE.Mesh(
+      new THREE.TorusGeometry(0.085, 0.011, 8, 24),
+      darkSteel,
+    )
+    band.rotation.x = Math.PI / 2
+    band.position.y = -0.04
+    group.add(band)
+
+    group.traverse((child) => {
+      if (child instanceof THREE.Mesh) child.castShadow = true
+    })
+    return group
+  }
+
+  private createChromeMaterial(color: number, roughness: number): THREE.MeshPhysicalMaterial {
+    return new THREE.MeshPhysicalMaterial({
+      color,
+      metalness: 0.94,
+      roughness,
+      clearcoat: 0.7,
+      clearcoatRoughness: 0.12,
+    })
+  }
+
+  private createRod(
+    start: THREE.Vector3,
+    end: THREE.Vector3,
+    radius: number,
+    material: THREE.Material,
+    radialSegments: number,
+  ): THREE.Mesh {
+    const rod = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius, radius, 1, radialSegments),
+      material,
+    )
+    this.positionRod(rod, start, end)
+    return rod
   }
 
   private positionRod(
