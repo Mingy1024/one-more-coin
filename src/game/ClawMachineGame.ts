@@ -9,9 +9,11 @@ import {
   type RoundState,
 } from './round'
 import { dragOrbit, orbitPosition, type OrbitState } from './orbit'
+import { banterFor, type BanterLine } from './banter'
 
 export interface GameSnapshot {
   attempts: number
+  banter: BanterLine
   canGrab: boolean
   isReady: boolean
   result?: 'won' | 'lost'
@@ -57,6 +59,7 @@ export class ClawMachineGame {
   private clawPosition = { x: 0, z: 0.05 }
   private cycleStart = { x: 0, z: 0 }
   private carried = false
+  private lastGrabSucceeded = false
   private running = false
   private lastPublishedSecond = -1
   private lastPhase: RoundPhase = 'aiming'
@@ -116,6 +119,7 @@ export class ClawMachineGame {
 
   grab(): void {
     if (this.round.phase !== 'aiming') return
+    this.lastGrabSucceeded = false
     this.cycleStart = { ...this.clawPosition }
     this.round = stepRound(this.round, { type: 'GRAB' })
     this.lastPhase = 'aiming'
@@ -133,6 +137,7 @@ export class ClawMachineGame {
     this.round = createRound()
     this.lastPhase = 'aiming'
     this.carried = false
+    this.lastGrabSucceeded = false
     this.clawPosition = { x: 0, z: 0.05 }
     this.prize.body.setBodyType(RAPIER.RigidBodyType.Dynamic, true)
     this.prize.body.setGravityScale(1, true)
@@ -234,6 +239,7 @@ export class ClawMachineGame {
     if (distance > 0.75 || position.y > 0.7) return
 
     this.carried = true
+    this.lastGrabSucceeded = true
     this.prize.body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true)
     this.prize.body.setGravityScale(0, true)
   }
@@ -484,6 +490,12 @@ export class ClawMachineGame {
   private publishSnapshot(): void {
     this.onSnapshot({
       attempts: this.round.attempts,
+      banter: banterFor({
+        attempts: this.round.attempts,
+        carried: this.carried || this.lastGrabSucceeded,
+        phase: this.round.phase,
+        timeLeft: this.round.timeLeft,
+      }),
       canGrab: this.round.phase === 'aiming',
       isReady: this.round.phase === 'ready',
       result: this.round.phase === 'won' || this.round.phase === 'lost' ? this.round.phase : undefined,

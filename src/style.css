@@ -250,6 +250,67 @@ button:focus-visible {
   pointer-events: none;
 }
 
+.banter-card {
+  position: absolute;
+  z-index: 4;
+  bottom: max(184px, calc(env(safe-area-inset-bottom) + 176px));
+  left: 50%;
+  display: flex;
+  width: min(360px, calc(100% - 32px));
+  min-height: 62px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 13px;
+  color: #eef8ff;
+  background: rgba(7, 16, 31, 0.86);
+  border: 1px solid rgba(255, 215, 124, 0.28);
+  border-radius: 14px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+  transform: translateX(-50%);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+.banter-card.is-entering {
+  animation: banter-pop 280ms ease-out;
+}
+
+.banter-emoji {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  font-size: 21px;
+  background: rgba(255, 215, 124, 0.12);
+  border-radius: 10px;
+}
+
+.banter-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.banter-copy strong {
+  color: #ffd77c;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.banter-copy > span {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+@keyframes banter-pop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px) scale(0.98);
+  }
+}
+
 .joystick-wrap {
   display: grid;
   justify-items: center;
@@ -488,6 +549,11 @@ button:focus-visible {
   .view-hint {
     display: none;
   }
+
+  .banter-card {
+    bottom: 72px;
+    width: min(430px, calc(100% - 300px));
+  }
 }
 
 @media (max-height: 620px) and (orientation: landscape) {
@@ -495,6 +561,11 @@ button:focus-visible {
     top: 72px;
     grid-template-columns: 1fr 1.1fr;
     width: min(500px, calc(100% - 160px));
+  }
+
+  .banter-card {
+    bottom: 112px;
+    min-height: 52px;
   }
 
   .controls {

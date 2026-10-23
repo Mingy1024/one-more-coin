@@ -10,11 +10,16 @@ const grabButton = requireElement<HTMLButtonElement>('grab-button')
 const startButton = requireElement<HTMLButtonElement>('start-button')
 const startPanel = requireElement<HTMLElement>('start-panel')
 const gameControls = requireElement<HTMLElement>('game-controls')
+const banterCard = requireElement<HTMLElement>('banter-card')
+const banterEmoji = requireElement<HTMLElement>('banter-emoji')
+const banterSpeaker = requireElement<HTMLElement>('banter-speaker')
+const banterText = requireElement<HTMLElement>('banter-text')
 const restartButton = requireElement<HTMLButtonElement>('restart-button')
 const resultModal = requireElement<HTMLElement>('result-modal')
 const resultIcon = requireElement<HTMLElement>('result-icon')
 const resultTitle = requireElement<HTMLElement>('result-title')
 const resultCopy = requireElement<HTMLElement>('result-copy')
+let lastBanter = ''
 
 const game = await ClawMachineGame.create(canvas, updateHud)
 
@@ -120,14 +125,22 @@ function updateHud(snapshot: GameSnapshot): void {
   gameControls.classList.toggle('is-locked', snapshot.isReady)
   gameControls.setAttribute('aria-disabled', String(snapshot.isReady))
 
+  const banterKey = `${snapshot.banter.speaker}:${snapshot.banter.text}`
+  if (banterKey !== lastBanter) {
+    banterEmoji.textContent = snapshot.banter.emoji
+    banterSpeaker.textContent = snapshot.banter.speaker
+    banterText.textContent = snapshot.banter.text
+    banterCard.classList.remove('is-entering')
+    requestAnimationFrame(() => banterCard.classList.add('is-entering'))
+    lastBanter = banterKey
+  }
+
   if (snapshot.result) {
     resultModal.hidden = false
     const won = snapshot.result === 'won'
     resultIcon.textContent = won ? '★' : '↻'
     resultTitle.textContent = won ? '成功夾到了！' : '差一點點！'
-    resultCopy.textContent = won
-      ? '禮物已安全抵達取物口。'
-      : '時間到了，調整角度再試一次。'
+    resultCopy.textContent = snapshot.banter.text
   }
 }
 
