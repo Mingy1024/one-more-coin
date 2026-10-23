@@ -388,12 +388,12 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 4px; }
 @keyframes achievement-flash { from { opacity: 1; } to { opacity: 0; } }
 
 .result-modal { position: absolute; z-index: 10; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(5, 14, 26, 0.76); }
-.result-panel { width: min(100%, 370px); padding: 30px 24px 24px; text-align: center; color: var(--ink); background: var(--plastic); border: 4px solid white; border-radius: 10px; box-shadow: 0 0 0 3px #2c455c, 0 28px 70px rgba(0, 0, 0, 0.55); }
+.result-panel { width: min(100%, 370px); padding: 30px 24px 24px; text-align: center; color: #f5fbff; background: linear-gradient(180deg, #1b314a, #102238); border: 4px solid #dfe9ee; border-radius: 10px; box-shadow: 0 0 0 3px #2c455c, -4px 0 0 var(--aqua), 4px 0 0 var(--coral), 0 28px 70px rgba(0, 0, 0, 0.55); }
 .result-icon { display: grid; width: 64px; height: 64px; margin: 0 auto 14px; place-items: center; color: var(--ink); font-size: 34px; background: var(--coin); border: 3px solid white; border-radius: 50%; box-shadow: 0 0 0 3px #b6830d; }
-.eyebrow { margin: 0 0 6px; color: #496174; font-size: 10px; font-weight: 800; }
+.eyebrow { margin: 0 0 6px; color: #81dcee; font-size: 10px; font-weight: 800; }
 .result-panel h1 { margin: 0; font-size: clamp(27px, 8vw, 38px); line-height: 1.2; }
-.result-panel > p:not(.eyebrow) { margin: 10px 0 24px; color: #52697a; font-size: 14px; }
-.result-panel > .result-spend { margin: -12px 0 22px; color: #ad2852; font-size: 12px; font-weight: 900; }
+.result-panel > p:not(.eyebrow) { margin: 10px 0 24px; color: #adc2d2; font-size: 14px; }
+.result-panel > .result-spend { margin: -12px 0 22px; color: var(--coin); font-size: 12px; font-weight: 900; }
 .result-panel button { width: 100%; padding: 14px 20px; color: #07202b; font-weight: 900; border: 2px solid #eaffff; border-radius: 5px; background: var(--aqua); box-shadow: inset 0 -5px 0 #23a8c7, 0 4px 0 #146c83; cursor: pointer; }
 
 @media (max-width: 359px) {
