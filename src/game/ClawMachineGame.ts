@@ -28,7 +28,7 @@ interface Prize {
 
 const COLORS = {
   aqua: 0x42c9e8,
-  navy: 0x0d1b2e,
+  navy: 0x18384c,
   pink: 0xef5f83,
   violet: 0x6f89e8,
   warm: 0xffd65a,
@@ -78,7 +78,7 @@ export class ClawMachineGame {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.18
 
-    this.scene.background = new THREE.Color(COLORS.navy)
+    this.scene.background = null
     this.scene.fog = new THREE.Fog(COLORS.navy, 8, 15)
     this.camera.position.set(5.9, 4.6, 7.8)
     this.camera.lookAt(0, 1.6, 0)
@@ -297,13 +297,19 @@ export class ClawMachineGame {
   }
 
   private addCabinet(): void {
-    const frameMaterial = new THREE.MeshStandardMaterial({ color: 0xd8e2e8, roughness: 0.3, metalness: 0.48 })
-    const baseMaterial = new THREE.MeshStandardMaterial({ color: 0x142a42, roughness: 0.3, metalness: 0.68 })
-    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x1c3854, roughness: 0.42, metalness: 0.25 })
+    const frameMaterial = new THREE.MeshStandardMaterial({
+      color: 0xf4f1e9,
+      emissive: 0x182b38,
+      emissiveIntensity: 0.12,
+      roughness: 0.24,
+      metalness: 0.38,
+    })
+    const baseMaterial = new THREE.MeshStandardMaterial({ color: 0x172e49, roughness: 0.28, metalness: 0.56 })
+    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x315f70, roughness: 0.38, metalness: 0.18 })
     const glassMaterial = new THREE.MeshPhysicalMaterial({
-      color: 0xbceeff,
+      color: 0xc8f4f2,
       transparent: true,
-      opacity: 0.12,
+      opacity: 0.1,
       roughness: 0.08,
       metalness: 0,
       transmission: 0.35,
@@ -327,6 +333,43 @@ export class ClawMachineGame {
         this.scene.add(post)
       }
     }
+
+    const addLightStrip = (
+      size: [number, number, number],
+      position: [number, number, number],
+      color: number,
+    ): void => {
+      const strip = new THREE.Mesh(
+        new THREE.BoxGeometry(...size),
+        new THREE.MeshStandardMaterial({
+          color,
+          emissive: color,
+          emissiveIntensity: 4.5,
+          roughness: 0.16,
+          metalness: 0.08,
+          toneMapped: false,
+        }),
+      )
+      strip.position.set(...position)
+      this.scene.add(strip)
+    }
+
+    addLightStrip([0.055, 3.34, 0.055], [-2.18, 1.84, 1.705], COLORS.aqua)
+    addLightStrip([0.055, 3.34, 0.055], [2.18, 1.84, 1.705], COLORS.pink)
+    addLightStrip([0.055, 3.34, 0.055], [-2.18, 1.84, -1.655], COLORS.pink)
+    addLightStrip([0.055, 3.34, 0.055], [2.18, 1.84, -1.655], COLORS.aqua)
+    addLightStrip([2.08, 0.055, 0.055], [-1.08, 3.62, 1.705], COLORS.pink)
+    addLightStrip([2.08, 0.055, 0.055], [1.08, 3.62, 1.705], COLORS.aqua)
+    addLightStrip([0.055, 0.055, 3.08], [-2.305, 3.62, 0], COLORS.pink)
+    addLightStrip([0.055, 0.055, 3.08], [2.305, 3.62, 0], COLORS.aqua)
+    addLightStrip([2.08, 0.045, 0.055], [-1.08, 0.08, 1.705], COLORS.aqua)
+    addLightStrip([2.08, 0.045, 0.055], [1.08, 0.08, 1.705], COLORS.pink)
+
+    const leftGlow = new THREE.PointLight(COLORS.aqua, 12, 3.6)
+    leftGlow.position.set(-2.12, 2, 2)
+    const rightGlow = new THREE.PointLight(COLORS.pink, 12, 3.6)
+    rightGlow.position.set(2.12, 2, 2)
+    this.scene.add(leftGlow, rightGlow)
 
     const back = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 3.55), glassMaterial)
     back.position.set(0, 1.82, -1.58)
@@ -355,17 +398,32 @@ export class ClawMachineGame {
     chuteFrame.position.set(CHUTE.x, 0.05, CHUTE.z)
     this.scene.add(chuteFrame)
 
-    const platform = new THREE.Mesh(new THREE.CylinderGeometry(3.8, 4.4, 0.7, 48), baseMaterial)
-    platform.position.y = -0.52
-    this.scene.add(platform)
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(4.9, 0.68, 3.65), baseMaterial)
+    plinth.position.y = -0.5
+    plinth.castShadow = true
+    this.scene.add(plinth)
 
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(3.1, 0.035, 10, 80),
-      new THREE.MeshBasicMaterial({ color: COLORS.violet }),
+    const frontPanel = new THREE.Mesh(
+      new THREE.BoxGeometry(4.35, 0.42, 0.08),
+      new THREE.MeshStandardMaterial({ color: 0x284961, roughness: 0.32, metalness: 0.42 }),
     )
-    ring.rotation.x = Math.PI / 2
-    ring.position.y = -0.14
-    this.scene.add(ring)
+    frontPanel.position.set(0, -0.48, 1.86)
+    this.scene.add(frontPanel)
+
+    addLightStrip([1.82, 0.055, 0.04], [-1.02, -0.32, 1.91], COLORS.pink)
+    addLightStrip([1.82, 0.055, 0.04], [1.02, -0.32, 1.91], COLORS.aqua)
+
+    const badge = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, 0.2, 0.025),
+      new THREE.MeshStandardMaterial({
+        color: COLORS.warm,
+        emissive: COLORS.warm,
+        emissiveIntensity: 0.45,
+        roughness: 0.3,
+      }),
+    )
+    badge.position.set(0, -0.53, 1.915)
+    this.scene.add(badge)
   }
 
   private createClaw(): THREE.Mesh {
