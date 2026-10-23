@@ -44,7 +44,7 @@ const nextPhase: Partial<Record<RoundPhase, RoundPhase>> = {
   lifting: 'returning',
   returning: 'releasing',
   releasing: 'resetting',
-  resetting: 'aiming',
+  resetting: 'lost',
 }
 
 export function createRound(durationSeconds = 30): RoundState {

@@ -50,7 +50,7 @@ export function banterFor(context: BanterContext): BanterLine {
       : line('朋友群', '🎉', '花多少先不要問，至少真的夾到了。')
   }
 
-  return line('機台', '🫡', '歡迎下次繼續證明自己。')
+  return line('機台', '🫡', '本局結束，再投 10 元繼續證明自己。')
 }
 
 function line(speaker: string, emoji: string, text: string): BanterLine {

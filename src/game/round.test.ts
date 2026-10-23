@@ -17,7 +17,7 @@ describe('claw machine round', () => {
     expect(round.phase).toBe('aiming')
   })
 
-  it('runs one full grab cycle and returns control to the player', () => {
+  it('ends the paid round after one full grab cycle, even when time remains', () => {
     let round = stepRound(createRound(30), { type: 'START' })
 
     round = stepRound(round, { type: 'GRAB' })
@@ -27,9 +27,9 @@ describe('claw machine round', () => {
       round = stepRound(round, { type: 'TICK', deltaSeconds: 1 / 30 })
     }
 
-    expect(round.phase).toBe('aiming')
+    expect(round.phase).toBe('lost')
     expect(round.attempts).toBe(1)
-    expect(round.timeLeft).toBeLessThan(30)
+    expect(round.timeLeft).toBeGreaterThan(0)
   })
 
   it('leaves enough breathing room for the player to follow the grab sequence', () => {
@@ -40,7 +40,7 @@ describe('claw machine round', () => {
     expect(round.phase).not.toBe('aiming')
 
     round = stepRound(round, { type: 'TICK', deltaSeconds: 2 })
-    expect(round.phase).toBe('aiming')
+    expect(round.phase).toBe('lost')
   })
 
   it('ignores a second grab while the claw is busy', () => {

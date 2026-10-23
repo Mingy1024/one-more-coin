@@ -571,7 +571,7 @@ function statusForPhase(phase: RoundPhase): string {
     releasing: '放開禮物！',
     resetting: '夾爪準備歸位',
     won: '成功！禮物到手了',
-    lost: '時間到，再挑戰一次吧',
+    lost: '本局結束，請重新投幣再挑戰',
   }
   return messages[phase]
 }
