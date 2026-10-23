@@ -1,20 +1,22 @@
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 
+import { linkagePose } from './clawLinkage'
+
 const HEAD_RADIUS = 0.15
 const HEAD_HALF_HEIGHT = 0.12
 const HINGE_RADIUS = 0.1
 const HINGE_Y = -0.14
-const CLOSED_ANGLE = -0.32
-const OPEN_ANGLE = 0.18
+const CLOSED_ANGLE = -0.25
+const OPEN_ANGLE = 0.45
 const MIN_CABLE_LENGTH = 0.25
 
 const FINGER_PATH = [
   new THREE.Vector3(0, 0, 0),
   new THREE.Vector3(0.24, -0.4, 0),
   new THREE.Vector3(0.32, -0.7, 0),
-  new THREE.Vector3(0.2, -0.94, 0),
-  new THREE.Vector3(0.08, -1.04, 0),
+  new THREE.Vector3(0.31, -0.94, 0),
+  new THREE.Vector3(0.22, -1.08, 0),
 ] as const
 
 interface FingerAssembly {
@@ -43,6 +45,7 @@ export class ArticulatedClaw {
   private readonly fingers: FingerAssembly[] = []
   private cableJoint: RAPIER.ImpulseJoint
   private cableLength: number
+  private sliderLocalY = -0.3
 
   constructor(
     world: RAPIER.World,
@@ -64,6 +67,7 @@ export class ArticulatedClaw {
     this.headBody = world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(options.x, options.headY, options.z)
+        .setAdditionalMass(0.82)
         .setLinearDamping(0.42)
         .setAngularDamping(0.72)
         .setCcdEnabled(true),
@@ -149,6 +153,7 @@ export class ArticulatedClaw {
   setOpening(opening: number): void {
     const amount = THREE.MathUtils.clamp(opening, 0, 1)
     const target = THREE.MathUtils.lerp(CLOSED_ANGLE, OPEN_ANGLE, amount)
+    this.sliderLocalY = linkagePose(amount).sliderY - 0.1
     for (const finger of this.fingers) {
       finger.joint.configureMotorPosition(target, 34, 4.8)
       finger.joint.setMotorMaxForce(12)
@@ -161,12 +166,30 @@ export class ArticulatedClaw {
 
   reset(x: number, z: number, cableLength: number): void {
     const anchor = this.gantryBody.translation()
+    const headY = anchor.y - cableLength
     this.gantryBody.setTranslation({ x, y: anchor.y, z }, true)
     this.setCableLength(cableLength)
-    this.headBody.setTranslation({ x, y: anchor.y - cableLength, z }, true)
+    this.headBody.setTranslation({ x, y: headY, z }, true)
     this.headBody.setLinvel({ x: 0, y: 0, z: 0 }, true)
     this.headBody.setAngvel({ x: 0, y: 0, z: 0 }, true)
     this.headBody.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true)
+    this.fingers.forEach((finger, index) => {
+      const angle = (index * Math.PI * 2) / 3
+      finger.body.setTranslation({
+        x: x + HINGE_RADIUS * Math.cos(angle),
+        y: headY + HINGE_Y,
+        z: z - HINGE_RADIUS * Math.sin(angle),
+      }, true)
+      finger.body.setRotation(
+        new THREE.Quaternion().setFromAxisAngle(
+          new THREE.Vector3(0, 1, 0),
+          angle,
+        ),
+        true,
+      )
+      finger.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+      finger.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
+    })
     this.updateVisuals()
   }
 
@@ -187,7 +210,7 @@ export class ArticulatedClaw {
       new THREE.Vector3(head.x, head.y + HEAD_HALF_HEIGHT, head.z),
     )
 
-    const sliderOffset = new THREE.Vector3(0, -0.27, 0).applyQuaternion(
+    const sliderOffset = new THREE.Vector3(0, this.sliderLocalY, 0).applyQuaternion(
       this.headVisual.quaternion,
     )
     this.sliderVisual.position.copy(this.headVisual.position).add(sliderOffset)
@@ -199,15 +222,14 @@ export class ArticulatedClaw {
       finger.visual.position.set(position.x, position.y, position.z)
       finger.visual.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
 
-      const hinge = new THREE.Vector3(HINGE_RADIUS, HINGE_Y, 0)
+      const sliderAnchor = new THREE.Vector3(0.07, this.sliderLocalY, 0)
         .applyAxisAngle(new THREE.Vector3(0, 1, 0), (index * Math.PI * 2) / 3)
         .applyQuaternion(this.headVisual.quaternion)
         .add(this.headVisual.position)
-      const sliderAnchor = new THREE.Vector3(0.07, -0.27, 0)
-        .applyAxisAngle(new THREE.Vector3(0, 1, 0), (index * Math.PI * 2) / 3)
-        .applyQuaternion(this.headVisual.quaternion)
-        .add(this.headVisual.position)
-      this.positionRod(this.linkageVisuals[index]!, sliderAnchor, hinge)
+      const knuckle = new THREE.Vector3(0.32, -0.42, 0)
+        .applyQuaternion(finger.visual.quaternion)
+        .add(finger.visual.position)
+      this.positionRod(this.linkageVisuals[index]!, sliderAnchor, knuckle)
     })
   }
 
@@ -272,6 +294,7 @@ export class ArticulatedClaw {
             angle,
           ),
         )
+        .setAdditionalMass(0.12)
         .setLinearDamping(0.32)
         .setAngularDamping(0.65)
         .setCcdEnabled(true),
@@ -313,7 +336,7 @@ export class ArticulatedClaw {
       body,
       true,
     ) as RAPIER.RevoluteImpulseJoint
-    joint.setLimits(-0.4, 0.24)
+    joint.setLimits(-0.3, 0.5)
     joint.setContactsEnabled(false)
 
     const visual = this.createFingerVisual()

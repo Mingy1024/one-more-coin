@@ -11,13 +11,8 @@ import {
 } from './round'
 import { dragOrbit, orbitPosition, type OrbitState } from './orbit'
 import { banterFor, type BanterLine } from './banter'
-import {
-  approachVelocity,
-  restingSwing,
-  stepSwing,
-  type PlanarMotion,
-  type SwingState,
-} from './clawMotion'
+import { approachVelocity, type PlanarMotion } from './clawMotion'
+import { ArticulatedClaw } from './ArticulatedClaw'
 
 export interface GameSnapshot {
   attempts: number
@@ -54,11 +49,8 @@ export class ClawMachineGame {
   private readonly renderer: THREE.WebGLRenderer
   private readonly world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
   private readonly timer = new THREE.Timer()
-  private readonly clawRoot = new THREE.Group()
-  private readonly swingPivot = new THREE.Group()
-  private readonly head = new THREE.Group()
-  private readonly rope: THREE.Mesh
-  private readonly prongs: THREE.Group[] = []
+  private readonly gantryRoot = new THREE.Group()
+  private readonly articulatedClaw: ArticulatedClaw
   private readonly prize: Prize
   private readonly onSnapshot: (snapshot: GameSnapshot) => void
   private readonly resizeObserver: ResizeObserver
@@ -69,8 +61,6 @@ export class ClawMachineGame {
   private clawPosition = { ...CHUTE }
   private cycleStart = { ...CHUTE }
   private driveVelocity: PlanarMotion = { x: 0, z: 0 }
-  private visualVelocity: PlanarMotion = { x: 0, z: 0 }
-  private swing: SwingState = restingSwing()
   private carried = false
   private lastGrabSucceeded = false
   private running = false
@@ -98,7 +88,13 @@ export class ClawMachineGame {
 
     this.addLights()
     this.addCabinet()
-    this.rope = this.createClaw()
+    this.createGantry()
+    this.articulatedClaw = new ArticulatedClaw(this.world, this.scene, {
+      anchorY: ROPE_ANCHOR_Y,
+      headY: CLAW_TOP_Y,
+      x: CHUTE.x,
+      z: CHUTE.z,
+    })
     this.prize = this.createPrize()
     this.addDecorations()
 
@@ -134,8 +130,11 @@ export class ClawMachineGame {
     if (this.round.phase !== 'aiming') return
     this.lastGrabSucceeded = false
     this.cycleStart = { ...this.clawPosition }
-    this.swing.velocityX += 1.5
-    this.swing.velocityZ -= 0.85
+    this.articulatedClaw.applyImpulse({
+      x: this.driveVelocity.x * 0.08 + 0.1,
+      y: 0,
+      z: this.driveVelocity.z * 0.08 - 0.06,
+    })
     this.round = stepRound(this.round, { type: 'GRAB' })
     this.lastPhase = 'aiming'
     this.publishSnapshot()
@@ -156,8 +155,7 @@ export class ClawMachineGame {
     this.clawPosition = { ...CHUTE }
     this.cycleStart = { ...CHUTE }
     this.driveVelocity = { x: 0, z: 0 }
-    this.visualVelocity = { x: 0, z: 0 }
-    this.swing = restingSwing()
+    this.articulatedClaw.reset(CHUTE.x, CHUTE.z, ROPE_ANCHOR_Y - CLAW_TOP_Y)
     this.prize.body.setBodyType(RAPIER.RigidBodyType.Dynamic, true)
     this.prize.body.setGravityScale(1, true)
     this.prize.body.setTranslation(PRIZE_START, true)
@@ -175,11 +173,9 @@ export class ClawMachineGame {
     this.round = stepRound(this.round, { type: 'TICK', deltaSeconds: delta })
     if (this.round.phase !== previousPhase) this.handlePhaseChange(previousPhase, this.round.phase)
 
-    const previousPosition = { ...this.clawPosition }
     if (this.round.phase === 'aiming') this.updatePlayerMovement(delta)
     else this.driveVelocity = approachVelocity(this.driveVelocity, { x: 0, z: 0 }, delta)
     this.updateClawAnimation()
-    this.updateClawSwing(previousPosition, delta)
     this.updatePhysics(delta)
     this.checkForWin()
 
@@ -217,20 +213,6 @@ export class ClawMachineGame {
     this.clawPosition.z = nextZ
   }
 
-  private updateClawSwing(previousPosition: PlanarMotion, delta: number): void {
-    const velocity = {
-      x: (this.clawPosition.x - previousPosition.x) / Math.max(delta, 0.001),
-      z: (this.clawPosition.z - previousPosition.z) / Math.max(delta, 0.001),
-    }
-    const acceleration = {
-      x: (velocity.x - this.visualVelocity.x) / Math.max(delta, 0.001),
-      z: (velocity.z - this.visualVelocity.z) / Math.max(delta, 0.001),
-    }
-    this.visualVelocity = velocity
-    this.swing = stepSwing(this.swing, acceleration, delta)
-    this.swingPivot.rotation.set(this.swing.angleX, 0, this.swing.angleZ)
-  }
-
   private updateClawAnimation(): void {
     const progress = smoothStep(phaseProgress(this.round))
     const phase = this.round.phase
@@ -253,23 +235,18 @@ export class ClawMachineGame {
       prongOpen = progress
     }
 
-    this.clawRoot.position.set(this.clawPosition.x, 0, this.clawPosition.z)
+    this.gantryRoot.position.set(this.clawPosition.x, 0, this.clawPosition.z)
     const ropeLength = ROPE_ANCHOR_Y - headY
-    this.head.position.y = -ropeLength
-    this.rope.scale.y = ropeLength
-
-    for (const [index, prong] of this.prongs.entries()) {
-      prong.rotation.z = THREE.MathUtils.lerp(-0.18, 0.12, prongOpen)
-      prong.rotation.y = (index / 3) * Math.PI * 2
-    }
+    this.articulatedClaw.setGantryPosition(this.clawPosition.x, this.clawPosition.z)
+    this.articulatedClaw.setCableLength(ropeLength)
+    this.articulatedClaw.setOpening(prongOpen)
 
     if (this.carried) {
-      const headWorldPosition = new THREE.Vector3()
-      this.head.getWorldPosition(headWorldPosition)
+      const grabPosition = this.articulatedClaw.getGrabPosition()
       this.prize.body.setNextKinematicTranslation({
-        x: headWorldPosition.x,
-        y: headWorldPosition.y - 0.86,
-        z: headWorldPosition.z,
+        x: grabPosition.x,
+        y: grabPosition.y,
+        z: grabPosition.z,
       })
     }
   }
@@ -281,7 +258,8 @@ export class ClawMachineGame {
 
   private tryPickup(): void {
     const position = this.prize.body.translation()
-    const distance = Math.hypot(position.x - this.clawPosition.x, position.z - this.clawPosition.z)
+    const grabPosition = this.articulatedClaw.getGrabPosition()
+    const distance = Math.hypot(position.x - grabPosition.x, position.z - grabPosition.z)
     if (distance > 0.75 || position.y > 0.7) return
 
     this.carried = true
@@ -300,8 +278,10 @@ export class ClawMachineGame {
   }
 
   private updatePhysics(delta: number): void {
-    this.world.timestep = delta
-    this.world.step()
+    const substeps = 3
+    this.world.timestep = delta / substeps
+    for (let step = 0; step < substeps; step += 1) this.world.step()
+    this.articulatedClaw.updateVisuals()
 
     const translation = this.prize.body.translation()
     const rotation = this.prize.body.rotation()
@@ -525,16 +505,8 @@ export class ClawMachineGame {
     this.scene.add(badge)
   }
 
-  private createClaw(): THREE.Mesh {
-    const metal = new THREE.MeshPhysicalMaterial({
-      color: 0xe9f3f7,
-      roughness: 0.16,
-      metalness: 0.96,
-      clearcoat: 0.65,
-      clearcoatRoughness: 0.12,
-    })
+  private createGantry(): void {
     const darkMetal = new THREE.MeshStandardMaterial({ color: 0x263347, roughness: 0.22, metalness: 0.88 })
-    const jointMaterial = new THREE.MeshStandardMaterial({ color: 0x708395, roughness: 0.2, metalness: 0.9 })
 
     const railX = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.08, 0.1), darkMetal)
     railX.position.y = 3.56
@@ -542,81 +514,13 @@ export class ClawMachineGame {
 
     const railZ = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 2.8), darkMetal)
     railZ.position.y = 3.5
-    this.clawRoot.add(railZ)
+    this.gantryRoot.add(railZ)
 
     const carriage = new THREE.Mesh(new RoundedBoxGeometry(0.46, 0.2, 0.46, 3, 0.045), darkMetal)
     carriage.position.y = 3.46
     carriage.castShadow = true
-    this.clawRoot.add(carriage)
-
-    this.swingPivot.position.y = ROPE_ANCHOR_Y
-    this.clawRoot.add(this.swingPivot)
-
-    const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1, 12), darkMetal)
-    rope.geometry.translate(0, -0.5, 0)
-    this.swingPivot.add(rope)
-
-    const createRod = (
-      start: [number, number, number],
-      end: [number, number, number],
-      radius: number,
-      material: THREE.Material,
-    ): THREE.Mesh => {
-      const startPoint = new THREE.Vector3(...start)
-      const endPoint = new THREE.Vector3(...end)
-      const direction = endPoint.clone().sub(startPoint)
-      const rod = new THREE.Mesh(
-        new THREE.CylinderGeometry(radius, radius, direction.length(), 12),
-        material,
-      )
-      rod.position.copy(startPoint).add(endPoint).multiplyScalar(0.5)
-      rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize())
-      rod.castShadow = true
-      return rod
-    }
-
-    const swivel = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 0.14, 16), jointMaterial)
-    swivel.position.y = 0.13
-    const housing = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.2, 24), darkMetal)
-    const chromeBand = new THREE.Mesh(new THREE.TorusGeometry(0.155, 0.022, 8, 24), metal)
-    chromeBand.rotation.x = Math.PI / 2
-    chromeBand.position.y = -0.065
-    const lowerHub = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.1, 0.14, 18), metal)
-    lowerHub.position.y = -0.15
-    for (const part of [swivel, housing, chromeBand, lowerHub]) {
-      part.castShadow = true
-      this.head.add(part)
-    }
-
-    for (let index = 0; index < 3; index += 1) {
-      const pivot = new THREE.Group()
-      pivot.position.y = -0.16
-
-      const upperHinge = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.07, 16), jointMaterial)
-      upperHinge.rotation.x = Math.PI / 2
-      upperHinge.position.set(0.075, -0.02, 0)
-      const elbow = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.075, 16), jointMaterial)
-      elbow.rotation.x = Math.PI / 2
-      elbow.position.set(0.34, -0.52, 0)
-
-      const driveLink = createRod([0.075, -0.02, 0], [0.34, -0.52, 0], 0.032, metal)
-      const stabilizerLink = createRod([0.035, -0.08, 0.055], [0.28, -0.56, 0.055], 0.018, jointMaterial)
-      const lowerLink = createRod([0.34, -0.52, 0], [0.25, -0.84, 0], 0.032, metal)
-      const hookedTip = createRod([0.25, -0.84, 0], [0.12, -1.02, 0], 0.04, metal)
-      const tipPad = new THREE.Mesh(new RoundedBoxGeometry(0.13, 0.19, 0.065, 3, 0.025), metal)
-      tipPad.position.set(0.1, -1.02, 0)
-      tipPad.rotation.z = -0.45
-      tipPad.castShadow = true
-
-      pivot.add(upperHinge, elbow, driveLink, stabilizerLink, lowerLink, hookedTip, tipPad)
-      this.head.add(pivot)
-      this.prongs.push(pivot)
-    }
-
-    this.head.position.y = -(ROPE_ANCHOR_Y - CLAW_TOP_Y)
-    this.swingPivot.add(this.head)
-    this.scene.add(this.clawRoot)
-    return rope
+    this.gantryRoot.add(carriage)
+    this.scene.add(this.gantryRoot)
   }
 
   private createPrize(): Prize {
