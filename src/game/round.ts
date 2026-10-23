@@ -1,0 +1,84 @@
+export type RoundPhase =
+  | 'aiming'
+  | 'lowering'
+  | 'closing'
+  | 'lifting'
+  | 'returning'
+  | 'releasing'
+  | 'resetting'
+  | 'won'
+  | 'lost'
+
+export interface RoundState {
+  phase: RoundPhase
+  phaseElapsed: number
+  timeLeft: number
+  attempts: number
+}
+
+export type RoundAction =
+  | { type: 'GRAB' }
+  | { type: 'TICK'; deltaSeconds: number }
+  | { type: 'PRIZE_DROPPED' }
+
+const phaseDurations: Partial<Record<RoundPhase, number>> = {
+  lowering: 0.85,
+  closing: 0.45,
+  lifting: 0.85,
+  returning: 0.85,
+  releasing: 0.35,
+  resetting: 0.35,
+}
+
+const nextPhase: Partial<Record<RoundPhase, RoundPhase>> = {
+  lowering: 'closing',
+  closing: 'lifting',
+  lifting: 'returning',
+  returning: 'releasing',
+  releasing: 'resetting',
+  resetting: 'aiming',
+}
+
+export function createRound(durationSeconds = 30): RoundState {
+  return {
+    phase: 'aiming',
+    phaseElapsed: 0,
+    timeLeft: durationSeconds,
+    attempts: 0,
+  }
+}
+
+export function stepRound(state: RoundState, action: RoundAction): RoundState {
+  if (state.phase === 'won' || state.phase === 'lost') return state
+
+  if (action.type === 'PRIZE_DROPPED') {
+    return { ...state, phase: 'won', phaseElapsed: 0 }
+  }
+
+  if (action.type === 'GRAB') {
+    if (state.phase !== 'aiming') return state
+    return {
+      ...state,
+      phase: 'lowering',
+      phaseElapsed: 0,
+      attempts: state.attempts + 1,
+    }
+  }
+
+  const timeLeft = Math.max(0, state.timeLeft - action.deltaSeconds)
+  if (timeLeft === 0) {
+    return { ...state, phase: 'lost', phaseElapsed: 0, timeLeft }
+  }
+
+  let phase = state.phase
+  let phaseElapsed = state.phaseElapsed + action.deltaSeconds
+
+  while (phase !== 'aiming') {
+    const duration = phaseDurations[phase]
+    if (duration === undefined || phaseElapsed < duration) break
+    phaseElapsed -= duration
+    phase = nextPhase[phase] ?? 'aiming'
+  }
+
+  return { ...state, phase, phaseElapsed, timeLeft }
+}
