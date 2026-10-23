@@ -121,6 +121,28 @@ button:focus-visible {
   line-height: 1;
 }
 
+.hud .spend-hud {
+  min-width: 88px;
+  border-color: rgba(255, 215, 124, 0.32);
+}
+
+.spend-hud strong {
+  color: #ffd77c;
+  font-size: 14px;
+}
+
+.spend-title {
+  display: block;
+  max-width: 82px;
+  margin-top: 4px;
+  overflow: hidden;
+  color: #d7e5f7;
+  font-size: 8px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .status-card {
   position: absolute;
   z-index: 3;
@@ -231,6 +253,100 @@ button:focus-visible {
 
 .start-panel button strong {
   font-size: 15px;
+}
+
+.achievement-toast {
+  position: absolute;
+  z-index: 8;
+  top: 32%;
+  left: 50%;
+  width: min(330px, calc(100% - 40px));
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.achievement-toast[hidden] {
+  display: none;
+}
+
+.achievement-panel {
+  position: relative;
+  display: grid;
+  min-height: 126px;
+  place-items: center;
+  align-content: center;
+  padding: 18px 24px;
+  text-align: center;
+  background: rgba(8, 18, 35, 0.98);
+  border: 1px solid rgba(255, 215, 124, 0.65);
+  border-radius: 20px;
+  box-shadow: 0 0 0 1px rgba(98, 244, 255, 0.18), 0 18px 60px rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(14px);
+}
+
+.achievement-icon {
+  position: absolute;
+  top: -26px;
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  font-size: 28px;
+  background: #10213a;
+  border: 2px solid #ffd77c;
+  border-radius: 50%;
+  box-shadow: 0 0 28px rgba(255, 215, 124, 0.58);
+}
+
+.achievement-eyebrow {
+  margin-top: 14px;
+  color: #62f4ff;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+}
+
+.achievement-panel strong {
+  margin: 4px 0;
+  color: #ffd77c;
+  font-size: clamp(22px, 7vw, 30px);
+  line-height: 1.15;
+  text-shadow: 0 0 22px rgba(255, 215, 124, 0.35);
+}
+
+.achievement-panel > span:last-child {
+  color: #a9bad1;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.achievement-rays {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 220px;
+  height: 220px;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 215, 124, 0.34) 0 5deg, transparent 5deg 22deg);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  mask-image: radial-gradient(circle, transparent 20%, #000 28%, transparent 68%);
+}
+
+.achievement-toast.is-showing .achievement-panel {
+  animation: title-unlock 3.2s ease both;
+}
+
+.achievement-toast.is-showing .achievement-rays {
+  animation: title-rays 3.2s ease-out both;
+}
+
+.game-shell.is-achievement::after {
+  position: absolute;
+  z-index: 7;
+  inset: 0;
+  background: radial-gradient(circle at 50% 25%, rgba(255, 215, 124, 0.24), transparent 48%);
+  content: '';
+  pointer-events: none;
+  animation: achievement-flash 900ms ease-out both;
 }
 
 .controls {
@@ -503,6 +619,13 @@ button:focus-visible {
   font-size: 14px;
 }
 
+.result-panel > .result-spend {
+  margin: -12px 0 22px;
+  color: #ffd77c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .result-panel button {
   width: 100%;
   padding: 14px 20px;
@@ -573,6 +696,47 @@ button:focus-visible {
   .banter-card {
     bottom: 72px;
     width: min(430px, calc(100% - 300px));
+  }
+}
+
+@keyframes title-unlock {
+  0% {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.78) rotate(-2deg);
+  }
+  9%, 82% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0);
+  }
+  86% {
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.94);
+  }
+}
+
+@keyframes title-rays {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.45) rotate(0);
+  }
+  22%, 72% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.25) rotate(28deg);
+  }
+}
+
+@keyframes achievement-flash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 

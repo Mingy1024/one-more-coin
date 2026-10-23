@@ -2,10 +2,13 @@ import './style.css'
 
 import { ClawMachineGame, type GameSnapshot } from './game/ClawMachineGame'
 import { BanterPresenter, type BanterRender } from './game/banterPresenter'
+import { CoinLedger, type SpendSnapshot, type SpendTitle } from './game/coinLedger'
 
 const canvas = requireElement<HTMLCanvasElement>('game-canvas')
 const timeValue = requireElement<HTMLElement>('time-value')
 const attemptValue = requireElement<HTMLElement>('attempt-value')
+const spendValue = requireElement<HTMLElement>('spend-value')
+const spendTitle = requireElement<HTMLElement>('spend-title')
 const statusText = requireElement<HTMLElement>('status-text')
 const grabButton = requireElement<HTMLButtonElement>('grab-button')
 const startButton = requireElement<HTMLButtonElement>('start-button')
@@ -20,12 +23,20 @@ const resultModal = requireElement<HTMLElement>('result-modal')
 const resultIcon = requireElement<HTMLElement>('result-icon')
 const resultTitle = requireElement<HTMLElement>('result-title')
 const resultCopy = requireElement<HTMLElement>('result-copy')
+const resultSpend = requireElement<HTMLElement>('result-spend')
+const achievementToast = requireElement<HTMLElement>('achievement-toast')
+const achievementIcon = requireElement<HTMLElement>('achievement-icon')
+const achievementTitle = requireElement<HTMLElement>('achievement-title')
+const achievementCopy = requireElement<HTMLElement>('achievement-copy')
 const banterPresenter = new BanterPresenter(renderBanter)
+const coinLedger = new CoinLedger()
 
 const game = await ClawMachineGame.create(canvas, updateHud)
 
 const keyboard = new Set<string>()
 const joystickAxis = { x: 0, z: 0 }
+let lastResult: GameSnapshot['result']
+let achievementTimeout: ReturnType<typeof setTimeout> | undefined
 
 window.addEventListener('keydown', (event) => {
   keyboard.add(event.code)
@@ -50,11 +61,16 @@ window.addEventListener('blur', () => {
 
 grabButton.addEventListener('click', () => game.grab())
 startButton.addEventListener('click', () => {
+  const spend = coinLedger.insertCoin()
+  renderSpend(spend)
+  if (spend.achievement) showAchievement(spend.achievement, spend.amount)
   game.startRound()
   grabButton.focus({ preventScroll: true })
 })
 restartButton.addEventListener('click', () => {
   resultModal.hidden = true
+  if (lastResult === 'won') renderSpend(coinLedger.snapshot())
+  lastResult = undefined
   game.restart()
   startButton.focus({ preventScroll: true })
 })
@@ -135,10 +151,44 @@ function updateHud(snapshot: GameSnapshot): void {
   if (snapshot.result) {
     resultModal.hidden = false
     const won = snapshot.result === 'won'
+    if (snapshot.result !== lastResult) {
+      const spend = won ? coinLedger.settleWin() : coinLedger.snapshot()
+      resultSpend.textContent = won
+        ? `這份獎品共投入 NT$${spend.amount} · ${spend.title}`
+        : `目前已投入 NT$${spend.amount} · ${spend.title}`
+      lastResult = snapshot.result
+    }
     resultIcon.textContent = won ? '★' : '↻'
     resultTitle.textContent = won ? '成功夾到了！' : '差一點點！'
     resultCopy.textContent = snapshot.banter.text
   }
+}
+
+function renderSpend(spend: SpendSnapshot): void {
+  spendValue.textContent = String(spend.amount)
+  spendTitle.textContent = spend.title
+}
+
+function showAchievement(title: SpendTitle, amount: number): void {
+  if (achievementTimeout !== undefined) clearTimeout(achievementTimeout)
+  achievementIcon.textContent = title.emoji
+  achievementTitle.textContent = title.name
+  achievementCopy.textContent = `累計投入 NT$${amount}`
+  achievementToast.hidden = false
+  achievementToast.classList.remove('is-showing')
+  document.querySelector('.game-shell')?.classList.remove('is-achievement')
+
+  requestAnimationFrame(() => {
+    achievementToast.classList.add('is-showing')
+    document.querySelector('.game-shell')?.classList.add('is-achievement')
+  })
+
+  achievementTimeout = setTimeout(() => {
+    achievementToast.hidden = true
+    achievementToast.classList.remove('is-showing')
+    document.querySelector('.game-shell')?.classList.remove('is-achievement')
+    achievementTimeout = undefined
+  }, 3_200)
 }
 
 function renderBanter({ durationMs, line }: BanterRender): void {

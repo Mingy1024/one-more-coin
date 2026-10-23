@@ -19,6 +19,11 @@
         <div class="hud" aria-live="polite">
           <div><span class="hud-label">時間</span><strong id="time-value">30</strong></div>
           <div><span class="hud-label">次數</span><strong id="attempt-value">0</strong></div>
+          <div class="spend-hud">
+            <span class="hud-label">累計投入</span>
+            <strong>NT$<span id="spend-value">0</span></strong>
+            <span id="spend-title" class="spend-title">尚未入坑</span>
+          </div>
         </div>
       </header>
 
@@ -33,9 +38,19 @@
           <span><strong>先看準目標</strong><small>拖曳畫面確認下爪位置</small></span>
         </div>
         <button id="start-button" type="button">
-          <span>投入代幣</span>
+          <span>投入 10 元</span>
           <strong>開始 30 秒</strong>
         </button>
+      </section>
+
+      <section id="achievement-toast" class="achievement-toast" role="status" aria-live="assertive" hidden>
+        <div class="achievement-rays" aria-hidden="true"></div>
+        <div class="achievement-panel">
+          <span id="achievement-icon" class="achievement-icon" aria-hidden="true">🪙</span>
+          <span class="achievement-eyebrow">NEW TITLE UNLOCKED</span>
+          <strong id="achievement-title">試水溫選手</strong>
+          <span id="achievement-copy">累計投入 NT$10</span>
+        </div>
       </section>
 
       <aside id="banter-card" class="banter-card" aria-live="polite" aria-atomic="true">
@@ -69,6 +84,7 @@
           <p class="eyebrow">ROUND COMPLETE</p>
           <h1 id="result-title">成功夾到了！</h1>
           <p id="result-copy">禮物已安全抵達取物口。</p>
+          <p id="result-spend" class="result-spend">本次投入 NT$10</p>
           <button id="restart-button" type="button">再玩一次</button>
         </div>
       </section>
