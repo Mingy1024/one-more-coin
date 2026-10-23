@@ -11,6 +11,15 @@ const CLOSED_ANGLE = -0.25
 const OPEN_ANGLE = 0.45
 const MIN_CABLE_LENGTH = 0.25
 const MAX_LATERAL_IMPULSE = 0.065
+const MAX_SWING_RADIUS = 0.34
+const MAX_SWING_ANGLE = Math.PI / 4
+const MAX_HEAD_ANGULAR_SPEED = 2.2
+const HEAD_BOUNDS = {
+  minX: -1.45,
+  maxX: 1.45,
+  minZ: -1.25,
+  maxZ: 1.25,
+} as const
 
 const FINGER_PATH = [
   new THREE.Vector3(0, 0, 0),
@@ -171,6 +180,116 @@ export class ArticulatedClaw {
       y: impulse.y,
       z: impulse.z * scale,
     }, true)
+  }
+
+  stabilizeSwing(): void {
+    const anchor = this.gantryBody.translation()
+    const head = this.headBody.translation()
+    const offsetX = head.x - anchor.x
+    const offsetZ = head.z - anchor.z
+    const offsetLength = Math.hypot(offsetX, offsetZ)
+    const allowedRadius = Math.min(
+      MAX_SWING_RADIUS,
+      this.cableLength * Math.sin(MAX_SWING_ANGLE),
+    )
+
+    let nextX = head.x
+    let nextZ = head.z
+    let radialX = 0
+    let radialZ = 0
+    let radialLimited = false
+    if (offsetLength > allowedRadius) {
+      radialX = offsetX / offsetLength
+      radialZ = offsetZ / offsetLength
+      nextX = anchor.x + radialX * allowedRadius
+      nextZ = anchor.z + radialZ * allowedRadius
+      radialLimited = true
+    }
+
+    nextX = THREE.MathUtils.clamp(nextX, HEAD_BOUNDS.minX, HEAD_BOUNDS.maxX)
+    nextZ = THREE.MathUtils.clamp(nextZ, HEAD_BOUNDS.minZ, HEAD_BOUNDS.maxZ)
+    const correctionX = nextX - head.x
+    const correctionZ = nextZ - head.z
+    if (Math.abs(correctionX) > 0.0001 || Math.abs(correctionZ) > 0.0001) {
+      this.headBody.setTranslation({ x: nextX, y: head.y, z: nextZ }, true)
+      for (const finger of this.fingers) {
+        const position = finger.body.translation()
+        finger.body.setTranslation({
+          x: position.x + correctionX,
+          y: position.y,
+          z: position.z + correctionZ,
+        }, true)
+      }
+    }
+
+    const atMinX = nextX <= HEAD_BOUNDS.minX + 0.0001
+    const atMaxX = nextX >= HEAD_BOUNDS.maxX - 0.0001
+    const atMinZ = nextZ <= HEAD_BOUNDS.minZ + 0.0001
+    const atMaxZ = nextZ >= HEAD_BOUNDS.maxZ - 0.0001
+    if (radialLimited || atMinX || atMaxX || atMinZ || atMaxZ) {
+      this.limitOutwardVelocity(
+        this.headBody,
+        radialLimited,
+        radialX,
+        radialZ,
+        atMinX,
+        atMaxX,
+        atMinZ,
+        atMaxZ,
+      )
+      for (const finger of this.fingers) {
+        this.limitOutwardVelocity(
+          finger.body,
+          radialLimited,
+          radialX,
+          radialZ,
+          atMinX,
+          atMaxX,
+          atMinZ,
+          atMaxZ,
+        )
+      }
+    }
+
+    const angularVelocity = this.headBody.angvel()
+    const angularSpeed = Math.hypot(
+      angularVelocity.x,
+      angularVelocity.y,
+      angularVelocity.z,
+    )
+    if (angularSpeed > MAX_HEAD_ANGULAR_SPEED) {
+      const scale = MAX_HEAD_ANGULAR_SPEED / angularSpeed
+      this.headBody.setAngvel({
+        x: angularVelocity.x * scale,
+        y: angularVelocity.y * scale,
+        z: angularVelocity.z * scale,
+      }, true)
+    }
+  }
+
+  private limitOutwardVelocity(
+    body: RAPIER.RigidBody,
+    radialLimited: boolean,
+    radialX: number,
+    radialZ: number,
+    atMinX: boolean,
+    atMaxX: boolean,
+    atMinZ: boolean,
+    atMaxZ: boolean,
+  ): void {
+    const velocity = body.linvel()
+    let velocityX = velocity.x
+    let velocityZ = velocity.z
+    if (radialLimited) {
+      const outwardSpeed = velocityX * radialX + velocityZ * radialZ
+      if (outwardSpeed > 0) {
+        velocityX -= outwardSpeed * radialX
+        velocityZ -= outwardSpeed * radialZ
+      }
+    }
+    if ((atMinX && velocityX < 0) || (atMaxX && velocityX > 0)) velocityX = 0
+    if ((atMinZ && velocityZ < 0) || (atMaxZ && velocityZ > 0)) velocityZ = 0
+    body.setLinvel({ x: velocityX, y: velocity.y, z: velocityZ }, true)
   }
 
   reset(x: number, z: number, cableLength: number): void {

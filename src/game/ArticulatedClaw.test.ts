@@ -62,10 +62,42 @@ describe('articulated claw physics', () => {
       const loweringProgress = Math.min(1, frame / 225)
       claw.setCableLength(0.47 + (2.1 - 0.47) * loweringProgress)
       world.step()
+      claw.stabilizeSwing()
       const position = claw.getHeadPosition()
       maximumOffset = Math.max(maximumOffset, Math.hypot(position.x, position.z))
     }
 
     expect(maximumOffset).toBeLessThanOrEqual(0.38)
+  })
+
+  it('does not accumulate an unsafe swing during repeated side-to-side movement', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    const claw = new ArticulatedClaw(
+      world,
+      new THREE.Scene(),
+      { anchorY: 3.52, headY: 3.05, x: 0, z: 0 },
+    )
+    world.timestep = 1 / 180
+
+    let anchorX = 0
+    let maximumOffset = 0
+    let maximumHeadX = -Infinity
+    for (let frame = 0; frame < 1800; frame += 1) {
+      const direction = Math.floor(frame / 105) % 2 === 0 ? 1 : -1
+      anchorX = THREE.MathUtils.clamp(anchorX + direction * (1.9 / 180), -1.28, 1.28)
+      claw.setGantryPosition(anchorX, 0)
+      world.step()
+      claw.stabilizeSwing()
+
+      const position = claw.getHeadPosition()
+      maximumOffset = Math.max(
+        maximumOffset,
+        Math.hypot(position.x - anchorX, position.z),
+      )
+      maximumHeadX = Math.max(maximumHeadX, position.x)
+    }
+
+    expect(maximumOffset).toBeLessThanOrEqual(0.36)
+    expect(maximumHeadX).toBeLessThanOrEqual(1.45)
   })
 })

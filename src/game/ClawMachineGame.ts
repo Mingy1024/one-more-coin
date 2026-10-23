@@ -280,7 +280,10 @@ export class ClawMachineGame {
   private updatePhysics(delta: number): void {
     const substeps = 3
     this.world.timestep = delta / substeps
-    for (let step = 0; step < substeps; step += 1) this.world.step()
+    for (let step = 0; step < substeps; step += 1) {
+      this.world.step()
+      this.articulatedClaw.stabilizeSwing()
+    }
     this.articulatedClaw.updateVisuals()
 
     const translation = this.prize.body.translation()
