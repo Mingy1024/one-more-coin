@@ -131,9 +131,9 @@ export class ClawMachineGame {
     this.lastGrabSucceeded = false
     this.cycleStart = { ...this.clawPosition }
     this.articulatedClaw.applyImpulse({
-      x: this.driveVelocity.x * 0.08 + 0.1,
+      x: this.driveVelocity.x * 0.025,
       y: 0,
-      z: this.driveVelocity.z * 0.08 - 0.06,
+      z: this.driveVelocity.z * 0.025,
     })
     this.round = stepRound(this.round, { type: 'GRAB' })
     this.lastPhase = 'aiming'
@@ -199,16 +199,16 @@ export class ClawMachineGame {
     }, delta)
     const nextX = THREE.MathUtils.clamp(
       this.clawPosition.x + this.driveVelocity.x * delta,
-      -1.45,
-      1.45,
+      -1.28,
+      1.28,
     )
     const nextZ = THREE.MathUtils.clamp(
       this.clawPosition.z + this.driveVelocity.z * delta,
-      -1.08,
-      1.1,
+      -0.94,
+      0.96,
     )
-    if (nextX === -1.45 || nextX === 1.45) this.driveVelocity.x = 0
-    if (nextZ === -1.08 || nextZ === 1.1) this.driveVelocity.z = 0
+    if (nextX === -1.28 || nextX === 1.28) this.driveVelocity.x = 0
+    if (nextZ === -0.94 || nextZ === 0.96) this.driveVelocity.z = 0
     this.clawPosition.x = nextX
     this.clawPosition.z = nextZ
   }

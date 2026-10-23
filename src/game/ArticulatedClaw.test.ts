@@ -46,4 +46,26 @@ describe('articulated claw physics', () => {
 
     expect(claw.getHeadPosition().x).toBeGreaterThan(initialX + 0.02)
   })
+
+  it('keeps a strong lateral input inside a restrained pendulum arc', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    const claw = new ArticulatedClaw(
+      world,
+      new THREE.Scene(),
+      { anchorY: 3.52, headY: 3.05, x: 0, z: 0 },
+    )
+    claw.applyImpulse({ x: 3, y: 0, z: -2 })
+    world.timestep = 1 / 180
+
+    let maximumOffset = 0
+    for (let frame = 0; frame < 360; frame += 1) {
+      const loweringProgress = Math.min(1, frame / 225)
+      claw.setCableLength(0.47 + (2.1 - 0.47) * loweringProgress)
+      world.step()
+      const position = claw.getHeadPosition()
+      maximumOffset = Math.max(maximumOffset, Math.hypot(position.x, position.z))
+    }
+
+    expect(maximumOffset).toBeLessThanOrEqual(0.38)
+  })
 })

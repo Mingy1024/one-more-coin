@@ -10,6 +10,7 @@ const HINGE_Y = -0.14
 const CLOSED_ANGLE = -0.25
 const OPEN_ANGLE = 0.45
 const MIN_CABLE_LENGTH = 0.25
+const MAX_LATERAL_IMPULSE = 0.065
 
 const FINGER_PATH = [
   new THREE.Vector3(0, 0, 0),
@@ -68,8 +69,8 @@ export class ArticulatedClaw {
       RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(options.x, options.headY, options.z)
         .setAdditionalMass(0.82)
-        .setLinearDamping(0.42)
-        .setAngularDamping(0.72)
+        .setLinearDamping(0.45)
+        .setAngularDamping(0.8)
         .setCcdEnabled(true),
     )
     world.createCollider(
@@ -161,7 +162,15 @@ export class ArticulatedClaw {
   }
 
   applyImpulse(impulse: RAPIER.Vector): void {
-    this.headBody.applyImpulse(impulse, true)
+    const lateralMagnitude = Math.hypot(impulse.x, impulse.z)
+    const scale = lateralMagnitude > MAX_LATERAL_IMPULSE
+      ? MAX_LATERAL_IMPULSE / lateralMagnitude
+      : 1
+    this.headBody.applyImpulse({
+      x: impulse.x * scale,
+      y: impulse.y,
+      z: impulse.z * scale,
+    }, true)
   }
 
   reset(x: number, z: number, cableLength: number): void {

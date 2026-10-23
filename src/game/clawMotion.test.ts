@@ -7,6 +7,6 @@ describe('claw motion', () => {
     const velocity = approachVelocity({ x: 0, z: 0 }, { x: 1.9, z: 0 }, 1 / 60)
 
     expect(velocity.x).toBeGreaterThan(0)
-    expect(velocity.x).toBeLessThan(1.9)
+    expect(velocity.x).toBeLessThan(0.18)
   })
 })
