@@ -13,12 +13,12 @@
 
       <header class="topbar">
         <div class="brand">
-          <span class="brand-mark" aria-hidden="true">✦</span>
-          <span>再十塊就夾到</span>
+          <span class="brand-mark" aria-hidden="true"><i></i></span>
+          <span class="brand-copy"><small>景品研究所 010</small><strong>再十塊就夾到</strong></span>
         </div>
         <div class="hud" aria-live="polite">
-          <div><span class="hud-label">時間</span><strong id="time-value">30</strong></div>
-          <div><span class="hud-label">次數</span><strong id="attempt-value">0</strong></div>
+          <div class="timer-hud"><span class="hud-label">剩餘秒數</span><strong id="time-value">30</strong></div>
+          <div><span class="hud-label">出爪</span><strong id="attempt-value">0</strong></div>
           <div class="spend-hud">
             <span class="hud-label">累計投入</span>
             <strong>NT$<span id="spend-value">0</span></strong>
@@ -34,12 +34,12 @@
 
       <section id="start-panel" class="start-panel" aria-label="開始遊戲">
         <div class="start-message">
-          <span class="coin-mark" aria-hidden="true">◎</span>
-          <span><strong>先看準目標</strong><small>拖曳畫面確認下爪位置</small></span>
+          <span class="coin-mark" aria-hidden="true"><i>10</i></span>
+          <span><strong>先研究角度</strong><small>拖曳機台，確認下爪位置</small></span>
         </div>
         <button id="start-button" type="button">
           <span>投入 10 元</span>
-          <strong>開始 30 秒</strong>
+          <strong>開始挑戰</strong>
         </button>
       </section>
 
@@ -47,7 +47,7 @@
         <div class="achievement-rays" aria-hidden="true"></div>
         <div class="achievement-panel">
           <span id="achievement-icon" class="achievement-icon" aria-hidden="true">🪙</span>
-          <span class="achievement-eyebrow">NEW TITLE UNLOCKED</span>
+          <span class="achievement-eyebrow">機台認證・新稱號</span>
           <strong id="achievement-title">試水溫選手</strong>
           <span id="achievement-copy">累計投入 NT$10</span>
         </div>
@@ -78,10 +78,10 @@
       <p class="view-hint">↔ 拖曳畫面旋轉視角</p>
       <p class="desktop-hint">拖曳畫面旋轉・WASD / 方向鍵移動・空白鍵出爪</p>
 
-      <section id="result-modal" class="result-modal" hidden>
+      <section id="result-modal" class="result-modal" role="dialog" aria-modal="true" aria-labelledby="result-title" hidden>
         <div class="result-panel">
           <span id="result-icon" class="result-icon" aria-hidden="true">★</span>
-          <p class="eyebrow">ROUND COMPLETE</p>
+          <p class="eyebrow">景品研究結果</p>
           <h1 id="result-title">成功夾到了！</h1>
           <p id="result-copy">禮物已安全抵達取物口。</p>
           <p id="result-spend" class="result-spend">本次投入 NT$10</p>

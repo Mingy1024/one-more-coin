@@ -157,6 +157,7 @@ function updateHud(snapshot: GameSnapshot): void {
         ? `這份獎品共投入 NT$${spend.amount} · ${spend.title}`
         : `目前已投入 NT$${spend.amount} · ${spend.title}`
       lastResult = snapshot.result
+      requestAnimationFrame(() => restartButton.focus({ preventScroll: true }))
     }
     resultIcon.textContent = won ? '★' : '↻'
     resultTitle.textContent = won ? '成功夾到了！' : '差一點點！'

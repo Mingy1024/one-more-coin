@@ -27,11 +27,11 @@ interface Prize {
 }
 
 const COLORS = {
-  aqua: 0x62f4ff,
-  navy: 0x07101f,
-  pink: 0xff5aa5,
-  violet: 0x8b74ff,
-  warm: 0xffd77c,
+  aqua: 0x42c9e8,
+  navy: 0x0d1b2e,
+  pink: 0xef5f83,
+  violet: 0x6f89e8,
+  warm: 0xffd65a,
 }
 
 const CLAW_TOP_Y = 3.05
@@ -76,7 +76,7 @@ export class ClawMachineGame {
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.1
+    this.renderer.toneMappingExposure = 1.18
 
     this.scene.background = new THREE.Color(COLORS.navy)
     this.scene.fog = new THREE.Fog(COLORS.navy, 8, 15)
@@ -279,7 +279,7 @@ export class ClawMachineGame {
   }
 
   private addLights(): void {
-    this.scene.add(new THREE.HemisphereLight(0xbfeaff, 0x100f24, 2.25))
+    this.scene.add(new THREE.HemisphereLight(0xd8f4ff, 0x101c30, 2.55))
 
     const key = new THREE.DirectionalLight(0xffffff, 3.2)
     key.position.set(3, 7, 4)
@@ -297,8 +297,9 @@ export class ClawMachineGame {
   }
 
   private addCabinet(): void {
-    const baseMaterial = new THREE.MeshStandardMaterial({ color: 0x15213a, roughness: 0.28, metalness: 0.72 })
-    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x263451, roughness: 0.42, metalness: 0.25 })
+    const frameMaterial = new THREE.MeshStandardMaterial({ color: 0xd8e2e8, roughness: 0.3, metalness: 0.48 })
+    const baseMaterial = new THREE.MeshStandardMaterial({ color: 0x142a42, roughness: 0.3, metalness: 0.68 })
+    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x1c3854, roughness: 0.42, metalness: 0.25 })
     const glassMaterial = new THREE.MeshPhysicalMaterial({
       color: 0xbceeff,
       transparent: true,
@@ -315,13 +316,13 @@ export class ClawMachineGame {
     this.scene.add(floor)
     this.addStaticCollider({ x: 2.3, y: 0.08, z: 1.675 }, { x: 0, y: -0.08, z: 0 })
 
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(4.75, 0.22, 3.5), baseMaterial)
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(4.75, 0.22, 3.5), frameMaterial)
     roof.position.y = 3.75
     this.scene.add(roof)
 
     for (const x of [-2.28, 2.28]) {
       for (const z of [-1.62, 1.62]) {
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.14, 3.7, 0.14), baseMaterial)
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.14, 3.7, 0.14), frameMaterial)
         post.position.set(x, 1.83, z)
         this.scene.add(post)
       }
