@@ -7,6 +7,9 @@ const timeValue = requireElement<HTMLElement>('time-value')
 const attemptValue = requireElement<HTMLElement>('attempt-value')
 const statusText = requireElement<HTMLElement>('status-text')
 const grabButton = requireElement<HTMLButtonElement>('grab-button')
+const startButton = requireElement<HTMLButtonElement>('start-button')
+const startPanel = requireElement<HTMLElement>('start-panel')
+const gameControls = requireElement<HTMLElement>('game-controls')
 const restartButton = requireElement<HTMLButtonElement>('restart-button')
 const resultModal = requireElement<HTMLElement>('result-modal')
 const resultIcon = requireElement<HTMLElement>('result-icon')
@@ -40,9 +43,14 @@ window.addEventListener('blur', () => {
 })
 
 grabButton.addEventListener('click', () => game.grab())
+startButton.addEventListener('click', () => {
+  game.startRound()
+  grabButton.focus({ preventScroll: true })
+})
 restartButton.addEventListener('click', () => {
   resultModal.hidden = true
   game.restart()
+  startButton.focus({ preventScroll: true })
 })
 
 setupJoystick()
@@ -108,6 +116,9 @@ function updateHud(snapshot: GameSnapshot): void {
   attemptValue.textContent = String(snapshot.attempts)
   statusText.textContent = snapshot.status
   grabButton.disabled = !snapshot.canGrab
+  startPanel.hidden = !snapshot.isReady
+  gameControls.classList.toggle('is-locked', snapshot.isReady)
+  gameControls.setAttribute('aria-disabled', String(snapshot.isReady))
 
   if (snapshot.result) {
     resultModal.hidden = false

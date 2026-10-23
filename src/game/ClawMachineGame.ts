@@ -13,6 +13,7 @@ import { dragOrbit, orbitPosition, type OrbitState } from './orbit'
 export interface GameSnapshot {
   attempts: number
   canGrab: boolean
+  isReady: boolean
   result?: 'won' | 'lost'
   status: string
   timeLeft: number
@@ -118,6 +119,13 @@ export class ClawMachineGame {
     this.cycleStart = { ...this.clawPosition }
     this.round = stepRound(this.round, { type: 'GRAB' })
     this.lastPhase = 'aiming'
+    this.publishSnapshot()
+  }
+
+  startRound(): void {
+    if (this.round.phase !== 'ready') return
+    this.round = stepRound(this.round, { type: 'START' })
+    this.timer.reset()
     this.publishSnapshot()
   }
 
@@ -477,6 +485,7 @@ export class ClawMachineGame {
     this.onSnapshot({
       attempts: this.round.attempts,
       canGrab: this.round.phase === 'aiming',
+      isReady: this.round.phase === 'ready',
       result: this.round.phase === 'won' || this.round.phase === 'lost' ? this.round.phase : undefined,
       status: statusForPhase(this.round.phase),
       timeLeft: this.round.timeLeft,
@@ -541,6 +550,7 @@ export class ClawMachineGame {
 
 function statusForPhase(phase: RoundPhase): string {
   const messages: Record<RoundPhase, string> = {
+    ready: '先拖曳畫面確認目標，準備好再開始',
     aiming: '移動搖桿，讓夾爪對準粉紅禮物',
     lowering: '夾爪下降中…',
     closing: '正在夾取！',

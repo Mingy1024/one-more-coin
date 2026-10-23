@@ -27,7 +27,18 @@
         <span id="status-text">移動搖桿，對準禮物</span>
       </section>
 
-      <section class="controls" aria-label="遊戲控制">
+      <section id="start-panel" class="start-panel" aria-label="開始遊戲">
+        <div class="start-message">
+          <span class="coin-mark" aria-hidden="true">◎</span>
+          <span><strong>先看準目標</strong><small>拖曳畫面確認下爪位置</small></span>
+        </div>
+        <button id="start-button" type="button">
+          <span>投入代幣</span>
+          <strong>開始 30 秒</strong>
+        </button>
+      </section>
+
+      <section id="game-controls" class="controls is-locked" aria-label="遊戲控制" aria-disabled="true">
         <div class="joystick-wrap">
           <div id="joystick" class="joystick" role="group" aria-label="移動夾爪">
             <div id="joystick-knob" class="joystick-knob"></div>

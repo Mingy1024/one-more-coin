@@ -23,6 +23,11 @@ button {
   font: inherit;
 }
 
+button:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 4px;
+}
+
 .game-shell {
   position: relative;
   width: 100%;
@@ -147,6 +152,87 @@ button {
   box-shadow: 0 0 12px rgba(117, 255, 159, 0.9);
 }
 
+.start-panel {
+  position: absolute;
+  z-index: 5;
+  top: calc(max(14px, env(safe-area-inset-top)) + 105px);
+  left: 50%;
+  display: grid;
+  width: min(360px, calc(100% - 32px));
+  gap: 10px;
+  padding: 12px;
+  background: rgba(8, 18, 35, 0.9);
+  border: 1px solid rgba(98, 244, 255, 0.26);
+  border-radius: 18px;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.36), inset 0 1px rgba(255, 255, 255, 0.08);
+  transform: translateX(-50%);
+  backdrop-filter: blur(14px);
+}
+
+.start-panel[hidden] {
+  display: none;
+}
+
+.start-message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px;
+}
+
+.start-message > span:last-child {
+  display: grid;
+}
+
+.start-message strong {
+  font-size: 13px;
+}
+
+.start-message small {
+  margin-top: 2px;
+  color: #91a7c5;
+  font-size: 10px;
+}
+
+.coin-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  color: #07101f;
+  font-size: 22px;
+  font-weight: 900;
+  background: #ffd77c;
+  border-radius: 50%;
+  box-shadow: 0 0 18px rgba(255, 215, 124, 0.35);
+}
+
+.start-panel button {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+  color: #07101f;
+  border: 0;
+  border-radius: 12px;
+  background: #62f4ff;
+  box-shadow: 0 8px 20px rgba(98, 244, 255, 0.18);
+  cursor: pointer;
+}
+
+.start-panel button span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.start-panel button strong {
+  font-size: 15px;
+}
+
 .controls {
   position: absolute;
   z-index: 4;
@@ -156,6 +242,12 @@ button {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
+}
+
+.controls.is-locked {
+  opacity: 0.42;
+  filter: saturate(0.35);
+  pointer-events: none;
 }
 
 .joystick-wrap {
@@ -357,6 +449,13 @@ button {
     top: 28px;
   }
 
+  .start-panel {
+    top: 80px;
+    grid-template-columns: 1fr 1.1fr;
+    width: min(510px, calc(100% - 40px));
+    align-items: center;
+  }
+
   .controls {
     right: 48px;
     bottom: 42px;
@@ -392,6 +491,12 @@ button {
 }
 
 @media (max-height: 620px) and (orientation: landscape) {
+  .start-panel {
+    top: 72px;
+    grid-template-columns: 1fr 1.1fr;
+    width: min(500px, calc(100% - 160px));
+  }
+
   .controls {
     right: 20px;
     bottom: 16px;

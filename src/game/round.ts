@@ -1,4 +1,5 @@
 export type RoundPhase =
+  | 'ready'
   | 'aiming'
   | 'lowering'
   | 'closing'
@@ -17,6 +18,7 @@ export interface RoundState {
 }
 
 export type RoundAction =
+  | { type: 'START' }
   | { type: 'GRAB' }
   | { type: 'TICK'; deltaSeconds: number }
   | { type: 'PRIZE_DROPPED' }
@@ -47,7 +49,7 @@ const nextPhase: Partial<Record<RoundPhase, RoundPhase>> = {
 
 export function createRound(durationSeconds = 30): RoundState {
   return {
-    phase: 'aiming',
+    phase: 'ready',
     phaseElapsed: 0,
     timeLeft: durationSeconds,
     attempts: 0,
@@ -56,6 +58,13 @@ export function createRound(durationSeconds = 30): RoundState {
 
 export function stepRound(state: RoundState, action: RoundAction): RoundState {
   if (state.phase === 'won' || state.phase === 'lost') return state
+
+  if (action.type === 'START') {
+    if (state.phase !== 'ready') return state
+    return { ...state, phase: 'aiming', phaseElapsed: 0 }
+  }
+
+  if (state.phase === 'ready') return state
 
   if (action.type === 'PRIZE_DROPPED') {
     return { ...state, phase: 'won', phaseElapsed: 0 }
@@ -79,7 +88,7 @@ export function stepRound(state: RoundState, action: RoundAction): RoundState {
   let phase: RoundPhase = state.phase
   let phaseElapsed = state.phaseElapsed + action.deltaSeconds
 
-  while (phase !== 'aiming') {
+  while (phase !== 'aiming' && phase !== 'ready') {
     const duration = phaseDurations[phase]
     if (duration === undefined || phaseElapsed < duration) break
     phaseElapsed -= duration
