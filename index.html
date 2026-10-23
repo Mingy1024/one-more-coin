@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#07101f" />
+    <meta name="description" content="一款行動優先的 3D 網頁夾娃娃機小遊戲" />
+    <title>星光夾物所</title>
+  </head>
+  <body>
+    <main class="game-shell">
+      <canvas id="game-canvas" aria-label="3D 夾娃娃機遊戲畫面"></canvas>
+
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">✦</span>
+          <span>星光夾物所</span>
+        </div>
+        <div class="hud" aria-live="polite">
+          <div><span class="hud-label">時間</span><strong id="time-value">30</strong></div>
+          <div><span class="hud-label">次數</span><strong id="attempt-value">0</strong></div>
+        </div>
+      </header>
+
+      <section class="status-card" aria-live="polite">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="status-text">移動搖桿，對準禮物</span>
+      </section>
+
+      <section class="controls" aria-label="遊戲控制">
+        <div class="joystick-wrap">
+          <div id="joystick" class="joystick" role="group" aria-label="移動夾爪">
+            <div id="joystick-knob" class="joystick-knob"></div>
+          </div>
+          <span>移動</span>
+        </div>
+
+        <button id="grab-button" class="grab-button" type="button">
+          <span class="grab-icon" aria-hidden="true">⌄</span>
+          <span>出爪</span>
+        </button>
+      </section>
+
+      <p class="desktop-hint">鍵盤：WASD / 方向鍵移動・空白鍵出爪</p>
+
+      <section id="result-modal" class="result-modal" hidden>
+        <div class="result-panel">
+          <span id="result-icon" class="result-icon" aria-hidden="true">★</span>
+          <p class="eyebrow">ROUND COMPLETE</p>
+          <h1 id="result-title">成功夾到了！</h1>
+          <p id="result-copy">禮物已安全抵達取物口。</p>
+          <button id="restart-button" type="button">再玩一次</button>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -21,13 +21,19 @@ export type RoundAction =
   | { type: 'TICK'; deltaSeconds: number }
   | { type: 'PRIZE_DROPPED' }
 
-const phaseDurations: Partial<Record<RoundPhase, number>> = {
+export const phaseDurations: Partial<Record<RoundPhase, number>> = {
   lowering: 0.85,
   closing: 0.45,
   lifting: 0.85,
   returning: 0.85,
   releasing: 0.35,
   resetting: 0.35,
+}
+
+export function phaseProgress(state: RoundState): number {
+  const duration = phaseDurations[state.phase]
+  if (duration === undefined) return 0
+  return Math.min(1, state.phaseElapsed / duration)
 }
 
 const nextPhase: Partial<Record<RoundPhase, RoundPhase>> = {
@@ -70,7 +76,7 @@ export function stepRound(state: RoundState, action: RoundAction): RoundState {
     return { ...state, phase: 'lost', phaseElapsed: 0, timeLeft }
   }
 
-  let phase = state.phase
+  let phase: RoundPhase = state.phase
   let phaseElapsed = state.phaseElapsed + action.deltaSeconds
 
   while (phase !== 'aiming') {
