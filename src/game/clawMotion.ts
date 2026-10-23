@@ -37,9 +37,9 @@ export function stepSwing(
   const delta = Math.min(Math.max(deltaSeconds, 0), 0.05)
   const accelerationX = clamp(acceleration.x, -24, 24)
   const accelerationZ = clamp(acceleration.z, -24, 24)
-  const stiffness = 18
-  const damping = 4.8
-  const inertia = 0.15
+  const stiffness = 10.5
+  const damping = 2.5
+  const inertia = 0.3
 
   const velocityX = state.velocityX
     + (-state.angleX * stiffness - state.velocityX * damping + accelerationZ * inertia) * delta
@@ -47,8 +47,8 @@ export function stepSwing(
     + (-state.angleZ * stiffness - state.velocityZ * damping - accelerationX * inertia) * delta
 
   return {
-    angleX: clamp(state.angleX + velocityX * delta, -0.2, 0.2),
-    angleZ: clamp(state.angleZ + velocityZ * delta, -0.2, 0.2),
+    angleX: clamp(state.angleX + velocityX * delta, -0.4, 0.4),
+    angleZ: clamp(state.angleZ + velocityZ * delta, -0.4, 0.4),
     velocityX,
     velocityZ,
   }

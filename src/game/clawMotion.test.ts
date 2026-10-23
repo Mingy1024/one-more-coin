@@ -17,6 +17,16 @@ describe('claw motion', () => {
     expect(swing.angleX).toBe(0)
   })
 
+  it('allows a clearly visible pendulum arc while keeping it bounded', () => {
+    let swing = restingSwing()
+    for (let frame = 0; frame < 18; frame += 1) {
+      swing = stepSwing(swing, { x: 24, z: 0 }, 1 / 60)
+    }
+
+    expect(Math.abs(swing.angleZ)).toBeGreaterThan(0.12)
+    expect(Math.abs(swing.angleZ)).toBeLessThanOrEqual(0.4)
+  })
+
   it('settles back toward the center after the movement stops', () => {
     let swing = { angleX: 0, angleZ: 0.16, velocityX: 0, velocityZ: 0 }
     for (let frame = 0; frame < 180; frame += 1) {

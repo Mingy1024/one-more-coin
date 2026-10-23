@@ -43,7 +43,7 @@ const COLORS = {
 }
 
 const CLAW_TOP_Y = 3.05
-const CLAW_LOW_Y = 0.88
+const CLAW_LOW_Y = 1.28
 const CHUTE = { x: -1.2, z: 0.96 }
 const PRIZE_START = { x: 0.48, y: 0.42, z: -0.18 }
 const ROPE_ANCHOR_Y = 3.52
@@ -134,8 +134,8 @@ export class ClawMachineGame {
     if (this.round.phase !== 'aiming') return
     this.lastGrabSucceeded = false
     this.cycleStart = { ...this.clawPosition }
-    this.swing.velocityX += 0.6
-    this.swing.velocityZ -= 0.35
+    this.swing.velocityX += 1.5
+    this.swing.velocityZ -= 0.85
     this.round = stepRound(this.round, { type: 'GRAB' })
     this.lastPhase = 'aiming'
     this.publishSnapshot()
@@ -259,7 +259,7 @@ export class ClawMachineGame {
     this.rope.scale.y = ropeLength
 
     for (const [index, prong] of this.prongs.entries()) {
-      prong.rotation.z = THREE.MathUtils.lerp(-0.08, 0.25, prongOpen)
+      prong.rotation.z = THREE.MathUtils.lerp(-0.18, 0.12, prongOpen)
       prong.rotation.y = (index / 3) * Math.PI * 2
     }
 
@@ -268,7 +268,7 @@ export class ClawMachineGame {
       this.head.getWorldPosition(headWorldPosition)
       this.prize.body.setNextKinematicTranslation({
         x: headWorldPosition.x,
-        y: headWorldPosition.y - 0.52,
+        y: headWorldPosition.y - 0.86,
         z: headWorldPosition.z,
       })
     }
@@ -556,14 +556,33 @@ export class ClawMachineGame {
     rope.geometry.translate(0, -0.5, 0)
     this.swingPivot.add(rope)
 
-    const swivel = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.14, 16), jointMaterial)
-    swivel.position.y = 0.16
-    const housing = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.3, 24), darkMetal)
-    const chromeBand = new THREE.Mesh(new THREE.TorusGeometry(0.245, 0.035, 8, 24), metal)
+    const createRod = (
+      start: [number, number, number],
+      end: [number, number, number],
+      radius: number,
+      material: THREE.Material,
+    ): THREE.Mesh => {
+      const startPoint = new THREE.Vector3(...start)
+      const endPoint = new THREE.Vector3(...end)
+      const direction = endPoint.clone().sub(startPoint)
+      const rod = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius, direction.length(), 12),
+        material,
+      )
+      rod.position.copy(startPoint).add(endPoint).multiplyScalar(0.5)
+      rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize())
+      rod.castShadow = true
+      return rod
+    }
+
+    const swivel = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 0.14, 16), jointMaterial)
+    swivel.position.y = 0.13
+    const housing = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.2, 24), darkMetal)
+    const chromeBand = new THREE.Mesh(new THREE.TorusGeometry(0.155, 0.022, 8, 24), metal)
     chromeBand.rotation.x = Math.PI / 2
-    chromeBand.position.y = -0.1
-    const lowerHub = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.17, 0.16, 18), metal)
-    lowerHub.position.y = -0.22
+    chromeBand.position.y = -0.065
+    const lowerHub = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.1, 0.14, 18), metal)
+    lowerHub.position.y = -0.15
     for (const part of [swivel, housing, chromeBand, lowerHub]) {
       part.castShadow = true
       this.head.add(part)
@@ -571,17 +590,25 @@ export class ClawMachineGame {
 
     for (let index = 0; index < 3; index += 1) {
       const pivot = new THREE.Group()
-      pivot.position.y = -0.22
-      const hinge = new THREE.Mesh(new THREE.SphereGeometry(0.075, 14, 10), jointMaterial)
-      hinge.position.x = 0.1
-      const upperArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.043, 0.34, 6, 12), metal)
-      upperArm.position.set(0.17, -0.2, 0)
-      upperArm.rotation.z = 0.32
-      const clawTip = new THREE.Mesh(new THREE.CapsuleGeometry(0.038, 0.22, 6, 12), metal)
-      clawTip.position.set(0.28, -0.43, 0)
-      clawTip.rotation.z = -0.22
-      for (const part of [hinge, upperArm, clawTip]) part.castShadow = true
-      pivot.add(hinge, upperArm, clawTip)
+      pivot.position.y = -0.16
+
+      const upperHinge = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.07, 16), jointMaterial)
+      upperHinge.rotation.x = Math.PI / 2
+      upperHinge.position.set(0.075, -0.02, 0)
+      const elbow = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.075, 16), jointMaterial)
+      elbow.rotation.x = Math.PI / 2
+      elbow.position.set(0.34, -0.52, 0)
+
+      const driveLink = createRod([0.075, -0.02, 0], [0.34, -0.52, 0], 0.032, metal)
+      const stabilizerLink = createRod([0.035, -0.08, 0.055], [0.28, -0.56, 0.055], 0.018, jointMaterial)
+      const lowerLink = createRod([0.34, -0.52, 0], [0.25, -0.84, 0], 0.032, metal)
+      const hookedTip = createRod([0.25, -0.84, 0], [0.12, -1.02, 0], 0.04, metal)
+      const tipPad = new THREE.Mesh(new RoundedBoxGeometry(0.13, 0.19, 0.065, 3, 0.025), metal)
+      tipPad.position.set(0.1, -1.02, 0)
+      tipPad.rotation.z = -0.45
+      tipPad.castShadow = true
+
+      pivot.add(upperHinge, elbow, driveLink, stabilizerLink, lowerLink, hookedTip, tipPad)
       this.head.add(pivot)
       this.prongs.push(pivot)
     }
