@@ -44,6 +44,11 @@ button {
   width: 100%;
   height: 100%;
   display: block;
+  cursor: grab;
+}
+
+#game-canvas.is-dragging {
+  cursor: grabbing;
 }
 
 .topbar {
@@ -247,6 +252,26 @@ button {
   display: none;
 }
 
+.view-hint {
+  position: absolute;
+  z-index: 3;
+  bottom: max(154px, calc(env(safe-area-inset-bottom) + 146px));
+  left: 50%;
+  margin: 0;
+  padding: 7px 11px;
+  color: #a9bad1;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  background: rgba(7, 16, 31, 0.62);
+  border: 1px solid rgba(188, 238, 255, 0.12);
+  border-radius: 999px;
+  transform: translateX(-50%);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
 .result-modal {
   position: absolute;
   z-index: 10;
@@ -360,6 +385,10 @@ button {
     transform: translateX(-50%);
     backdrop-filter: blur(8px);
   }
+
+  .view-hint {
+    display: none;
+  }
 }
 
 @media (max-height: 620px) and (orientation: landscape) {
@@ -383,6 +412,7 @@ button {
   }
 
   .joystick-wrap > span,
+  .view-hint,
   .desktop-hint {
     display: none;
   }

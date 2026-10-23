@@ -8,6 +8,7 @@ import {
   type RoundPhase,
   type RoundState,
 } from './round'
+import { dragOrbit, orbitPosition, type OrbitState } from './orbit'
 
 export interface GameSnapshot {
   attempts: number
@@ -48,6 +49,7 @@ export class ClawMachineGame {
   private readonly prize: Prize
   private readonly onSnapshot: (snapshot: GameSnapshot) => void
   private readonly resizeObserver: ResizeObserver
+  private readonly canvas: HTMLCanvasElement
 
   private round: RoundState = createRound()
   private movement = { x: 0, z: 0 }
@@ -57,8 +59,12 @@ export class ClawMachineGame {
   private running = false
   private lastPublishedSecond = -1
   private lastPhase: RoundPhase = 'aiming'
+  private orbit: OrbitState = { yaw: 0.68, pitch: 0.3 }
+  private orbitRadius = 10
+  private cameraDrag?: { pointerId: number; x: number; y: number }
 
   private constructor(canvas: HTMLCanvasElement, onSnapshot: (snapshot: GameSnapshot) => void) {
+    this.canvas = canvas
     this.onSnapshot = onSnapshot
     this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75))
@@ -81,6 +87,7 @@ export class ClawMachineGame {
 
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(canvas)
+    this.setupCameraDrag()
     this.timer.connect(document)
     this.resize()
     this.publishSnapshot()
@@ -482,13 +489,53 @@ export class ClawMachineGame {
     const height = Math.max(1, canvas.clientHeight)
     this.renderer.setSize(width, height, false)
     this.camera.aspect = width / height
-    this.camera.position.set(
-      height > width ? 6.9 : 6.2,
-      height > width ? 5.1 : 4.4,
-      height > width ? 9.2 : 7.5,
-    )
-    this.camera.lookAt(0, 1.55, 0)
+    this.orbitRadius = height > width ? 12 : 10.2
+    this.applyCameraOrbit()
     this.camera.updateProjectionMatrix()
+  }
+
+  private setupCameraDrag(): void {
+    this.canvas.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return
+      this.cameraDrag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY }
+      this.canvas.setPointerCapture(event.pointerId)
+      this.canvas.classList.add('is-dragging')
+    })
+
+    this.canvas.addEventListener('pointermove', (event) => {
+      if (!this.cameraDrag || this.cameraDrag.pointerId !== event.pointerId) return
+
+      this.orbit = dragOrbit(
+        this.orbit,
+        event.clientX - this.cameraDrag.x,
+        event.clientY - this.cameraDrag.y,
+      )
+      this.cameraDrag.x = event.clientX
+      this.cameraDrag.y = event.clientY
+      this.applyCameraOrbit()
+    })
+
+    const stopDragging = (event: PointerEvent): void => {
+      if (!this.cameraDrag || this.cameraDrag.pointerId !== event.pointerId) return
+      if (this.canvas.hasPointerCapture(event.pointerId)) {
+        this.canvas.releasePointerCapture(event.pointerId)
+      }
+      this.cameraDrag = undefined
+      this.canvas.classList.remove('is-dragging')
+    }
+
+    this.canvas.addEventListener('pointerup', stopDragging)
+    this.canvas.addEventListener('pointercancel', stopDragging)
+  }
+
+  private applyCameraOrbit(): void {
+    const position = orbitPosition({
+      ...this.orbit,
+      radius: this.orbitRadius,
+      targetY: 1.55,
+    })
+    this.camera.position.set(position.x, position.y, position.z)
+    this.camera.lookAt(0, 1.55, 0)
   }
 }
 
