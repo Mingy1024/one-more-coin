@@ -28,32 +28,20 @@ export function banterFor(context: BanterContext): BanterLine {
     return line('本人', '😎', '夾了啦，哪次不夾。')
   }
 
-  if (phase === 'lowering') {
+  if (phase === 'lowering' || phase === 'closing') {
     return line('朋友群', '👀', '有喔有喔，感覺要夾到了！')
   }
 
-  if (phase === 'closing') {
-    return line('夾爪', '🤏', '我先意思一下，大家不要有壓力。')
-  }
-
-  if (phase === 'lifting') {
+  if (phase === 'lifting' || phase === 'returning' || phase === 'releasing') {
     return carried
       ? line('朋友 A', '🤫', '有有有！先不要叫，還沒進洞！')
       : line('機台', '✨', '感謝使用「摸一下就走」服務。')
   }
 
-  if (phase === 'returning') {
-    return carried
-      ? line('全場', '🚨', '不要晃！不要晃！今天可以睡了！')
-      : line('本人', '🧠', '位置其實對了，是爪子沒有配合。')
-  }
-
-  if (phase === 'releasing') {
-    return line('本人', '😤', '這裡不夾出來，晚上睡不著。')
-  }
-
   if (phase === 'resetting') {
-    return line('朋友 B', '🧾', '都夾這麼多了，盤要盤得有價值。')
+    return carried
+      ? line('朋友 A', '🤫', '有有有！先不要叫，還沒進洞！')
+      : line('機台', '✨', '感謝使用「摸一下就走」服務。')
   }
 
   if (phase === 'won') {

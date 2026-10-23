@@ -24,12 +24,12 @@ export type RoundAction =
   | { type: 'PRIZE_DROPPED' }
 
 export const phaseDurations: Partial<Record<RoundPhase, number>> = {
-  lowering: 0.85,
-  closing: 0.45,
-  lifting: 0.85,
-  returning: 0.85,
-  releasing: 0.35,
-  resetting: 0.35,
+  lowering: 1.25,
+  closing: 0.8,
+  lifting: 1.25,
+  returning: 1.4,
+  releasing: 0.55,
+  resetting: 0.45,
 }
 
 export function phaseProgress(state: RoundState): number {

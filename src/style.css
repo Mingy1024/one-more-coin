@@ -251,6 +251,7 @@ button:focus-visible {
 }
 
 .banter-card {
+  --banter-duration: 3000ms;
   position: absolute;
   z-index: 4;
   bottom: max(184px, calc(env(safe-area-inset-bottom) + 176px));
@@ -268,11 +269,24 @@ button:focus-visible {
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
   transform: translateX(-50%);
   backdrop-filter: blur(12px);
+  overflow: hidden;
   pointer-events: none;
 }
 
 .banter-card.is-entering {
   animation: banter-pop 280ms ease-out;
+}
+
+.banter-card.is-entering::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #ffd77c, #62f4ff);
+  content: '';
+  transform-origin: left;
+  animation: banter-hold var(--banter-duration) linear forwards;
 }
 
 .banter-emoji {
@@ -308,6 +322,12 @@ button:focus-visible {
   from {
     opacity: 0;
     transform: translate(-50%, 8px) scale(0.98);
+  }
+}
+
+@keyframes banter-hold {
+  to {
+    transform: scaleX(0);
   }
 }
 

@@ -23,13 +23,24 @@ describe('claw machine round', () => {
     round = stepRound(round, { type: 'GRAB' })
     expect(round.phase).toBe('lowering')
 
-    for (let index = 0; index < 120; index += 1) {
+    for (let index = 0; index < 180; index += 1) {
       round = stepRound(round, { type: 'TICK', deltaSeconds: 1 / 30 })
     }
 
     expect(round.phase).toBe('aiming')
     expect(round.attempts).toBe(1)
     expect(round.timeLeft).toBeLessThan(30)
+  })
+
+  it('leaves enough breathing room for the player to follow the grab sequence', () => {
+    let round = stepRound(createRound(30), { type: 'START' })
+    round = stepRound(round, { type: 'GRAB' })
+
+    round = stepRound(round, { type: 'TICK', deltaSeconds: 4 })
+    expect(round.phase).not.toBe('aiming')
+
+    round = stepRound(round, { type: 'TICK', deltaSeconds: 2 })
+    expect(round.phase).toBe('aiming')
   })
 
   it('ignores a second grab while the claw is busy', () => {

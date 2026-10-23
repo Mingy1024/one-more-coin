@@ -1,6 +1,7 @@
 import './style.css'
 
 import { ClawMachineGame, type GameSnapshot } from './game/ClawMachineGame'
+import { BanterPresenter, type BanterRender } from './game/banterPresenter'
 
 const canvas = requireElement<HTMLCanvasElement>('game-canvas')
 const timeValue = requireElement<HTMLElement>('time-value')
@@ -19,7 +20,7 @@ const resultModal = requireElement<HTMLElement>('result-modal')
 const resultIcon = requireElement<HTMLElement>('result-icon')
 const resultTitle = requireElement<HTMLElement>('result-title')
 const resultCopy = requireElement<HTMLElement>('result-copy')
-let lastBanter = ''
+const banterPresenter = new BanterPresenter(renderBanter)
 
 const game = await ClawMachineGame.create(canvas, updateHud)
 
@@ -125,15 +126,11 @@ function updateHud(snapshot: GameSnapshot): void {
   gameControls.classList.toggle('is-locked', snapshot.isReady)
   gameControls.setAttribute('aria-disabled', String(snapshot.isReady))
 
-  const banterKey = `${snapshot.banter.speaker}:${snapshot.banter.text}`
-  if (banterKey !== lastBanter) {
-    banterEmoji.textContent = snapshot.banter.emoji
-    banterSpeaker.textContent = snapshot.banter.speaker
-    banterText.textContent = snapshot.banter.text
-    banterCard.classList.remove('is-entering')
-    requestAnimationFrame(() => banterCard.classList.add('is-entering'))
-    lastBanter = banterKey
-  }
+  banterPresenter.show(snapshot.banter, {
+    interrupt: snapshot.isReady
+      || snapshot.result !== undefined
+      || (snapshot.attempts === 0 && snapshot.canGrab),
+  })
 
   if (snapshot.result) {
     resultModal.hidden = false
@@ -142,6 +139,15 @@ function updateHud(snapshot: GameSnapshot): void {
     resultTitle.textContent = won ? '成功夾到了！' : '差一點點！'
     resultCopy.textContent = snapshot.banter.text
   }
+}
+
+function renderBanter({ durationMs, line }: BanterRender): void {
+  banterEmoji.textContent = line.emoji
+  banterSpeaker.textContent = line.speaker
+  banterText.textContent = line.text
+  banterCard.style.setProperty('--banter-duration', `${durationMs}ms`)
+  banterCard.classList.remove('is-entering')
+  requestAnimationFrame(() => banterCard.classList.add('is-entering'))
 }
 
 function requireElement<T extends HTMLElement>(id: string): T {
