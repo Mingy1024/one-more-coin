@@ -14,6 +14,7 @@ import { banterFor, type BanterLine } from './banter'
 import { approachVelocity, type PlanarMotion } from './clawMotion'
 import { ArticulatedClaw } from './ArticulatedClaw'
 import { MACHINE_DIMENSIONS } from './machineDimensions'
+import { PrizeCarryController } from './PrizeCarryController'
 
 export interface GameSnapshot {
   attempts: number
@@ -27,6 +28,7 @@ export interface GameSnapshot {
 
 interface Prize {
   body: RAPIER.RigidBody
+  collider: RAPIER.Collider
   mesh: THREE.Group
 }
 
@@ -53,6 +55,7 @@ export class ClawMachineGame {
   private readonly gantryRoot = new THREE.Group()
   private readonly articulatedClaw: ArticulatedClaw
   private readonly prize: Prize
+  private readonly prizeCarry: PrizeCarryController
   private readonly onSnapshot: (snapshot: GameSnapshot) => void
   private readonly resizeObserver: ResizeObserver
   private readonly canvas: HTMLCanvasElement
@@ -97,6 +100,7 @@ export class ClawMachineGame {
       z: CHUTE.z,
     })
     this.prize = this.createPrize()
+    this.prizeCarry = new PrizeCarryController(this.prize.body, this.prize.collider)
     this.addDecorations()
 
     this.resizeObserver = new ResizeObserver(() => this.resize())
@@ -157,8 +161,7 @@ export class ClawMachineGame {
     this.cycleStart = { ...CHUTE }
     this.driveVelocity = { x: 0, z: 0 }
     this.articulatedClaw.reset(CHUTE.x, CHUTE.z, ROPE_ANCHOR_Y - CLAW_TOP_Y)
-    this.prize.body.setBodyType(RAPIER.RigidBodyType.Dynamic, true)
-    this.prize.body.setGravityScale(1, true)
+    this.prizeCarry.release()
     this.prize.body.setTranslation(PRIZE_START, true)
     this.prize.body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true)
     this.prize.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
@@ -242,14 +245,6 @@ export class ClawMachineGame {
     this.articulatedClaw.setCableLength(ropeLength)
     this.articulatedClaw.setOpening(prongOpen)
 
-    if (this.carried) {
-      const grabPosition = this.articulatedClaw.getGrabPosition()
-      this.prize.body.setNextKinematicTranslation({
-        x: grabPosition.x,
-        y: grabPosition.y,
-        z: grabPosition.z,
-      })
-    }
   }
 
   private handlePhaseChange(previous: RoundPhase, next: RoundPhase): void {
@@ -265,15 +260,13 @@ export class ClawMachineGame {
 
     this.carried = true
     this.lastGrabSucceeded = true
-    this.prize.body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true)
-    this.prize.body.setGravityScale(0, true)
+    this.prizeCarry.capture(grabPosition)
   }
 
   private releasePrize(): void {
     if (!this.carried) return
     this.carried = false
-    this.prize.body.setBodyType(RAPIER.RigidBodyType.Dynamic, true)
-    this.prize.body.setGravityScale(1, true)
+    this.prizeCarry.release()
     this.prize.body.setLinvel({ x: 0, y: -0.25, z: 0 }, true)
     this.prize.body.setAngvel({ x: 0.8, y: 0.4, z: -0.5 }, true)
   }
@@ -284,6 +277,9 @@ export class ClawMachineGame {
     for (let step = 0; step < substeps; step += 1) {
       this.world.step()
       this.articulatedClaw.stabilizeSwing()
+      if (this.carried) {
+        this.prizeCarry.follow(this.articulatedClaw.getGrabPosition(), this.world.timestep)
+      }
     }
     this.articulatedClaw.updateVisuals()
 
@@ -568,7 +564,7 @@ export class ClawMachineGame {
         .setLinearDamping(0.35)
         .setAngularDamping(0.6),
     )
-    this.world.createCollider(
+    const collider = this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(0.36, 0.36, 0.36).setRestitution(0.15).setFriction(0.8),
       body,
     )
@@ -617,7 +613,7 @@ export class ClawMachineGame {
     mesh.add(ribbonX, ribbonZ, prizeGlow)
     this.scene.add(mesh)
 
-    return { body, mesh }
+    return { body, collider, mesh }
   }
 
   private addDecorations(): void {

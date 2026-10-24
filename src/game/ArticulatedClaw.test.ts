@@ -138,4 +138,19 @@ describe('articulated claw physics', () => {
 
     expect(claw.getFingerTipSpread()).toBeLessThan(0.3)
   })
+
+  it('holds the prize inside the lower half of the closed fingers', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    const claw = new ArticulatedClaw(
+      world,
+      new THREE.Scene(),
+      { anchorY: 4.05, headY: 3.5, x: 0, z: 0 },
+    )
+
+    const head = claw.getHeadPosition()
+    const grip = claw.getGrabPosition()
+
+    expect(head.y - grip.y).toBeGreaterThanOrEqual(0.72)
+    expect(head.y - grip.y).toBeLessThanOrEqual(0.82)
+  })
 })

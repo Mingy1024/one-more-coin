@@ -14,6 +14,7 @@ const MAX_LATERAL_IMPULSE = 0.065
 const MAX_SWING_RADIUS = 0.34
 const MAX_SWING_ANGLE = Math.PI / 4
 const MAX_HEAD_ANGULAR_SPEED = 2.2
+const GRIP_CENTER_Y = -0.76
 const HEAD_BOUNDS = {
   minX: -1.45,
   maxX: 1.45,
@@ -143,7 +144,7 @@ export class ArticulatedClaw {
 
   getGrabPosition(): RAPIER.Vector {
     const position = this.headBody.translation()
-    return { x: position.x, y: position.y - 0.9, z: position.z }
+    return { x: position.x, y: position.y + GRIP_CENTER_Y, z: position.z }
   }
 
   getFingerTipSpread(): number {
