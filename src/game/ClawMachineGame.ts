@@ -22,8 +22,11 @@ import {
   CHUTE_OPENING_HALF_Z,
   isPrizeCaptured,
   PRIZE_GRIP_OPENING,
-  PRIZE_HALF_SIZE,
+  PRIZE_HALF_DEPTH,
+  PRIZE_HALF_HEIGHT,
+  PRIZE_HALF_WIDTH,
 } from './prizeInteraction'
+import { createPrizeModel } from './prizeModel'
 
 export interface GameSnapshot {
   attempts: number
@@ -660,8 +663,6 @@ export class ClawMachineGame {
   }
 
   private createPrize(): Prize {
-    const prizeSize = PRIZE_HALF_SIZE * 2
-    const shellSize = prizeSize + 0.03
     const body = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(PRIZE_START.x, PRIZE_START.y, PRIZE_START.z)
@@ -669,54 +670,16 @@ export class ClawMachineGame {
         .setAngularDamping(0.6),
     )
     const collider = this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(PRIZE_HALF_SIZE, PRIZE_HALF_SIZE, PRIZE_HALF_SIZE)
+      RAPIER.ColliderDesc.cuboid(PRIZE_HALF_WIDTH, PRIZE_HALF_HEIGHT, PRIZE_HALF_DEPTH)
         .setRestitution(0.15)
         .setFriction(0.8),
       body,
     )
 
-    const mesh = new THREE.Group()
-    const box = new THREE.Mesh(
-      new RoundedBoxGeometry(prizeSize, prizeSize, prizeSize, 4, 0.05),
-      new THREE.MeshBasicMaterial({
-        color: COLORS.pink,
-        toneMapped: false,
-      }),
-    )
-    box.castShadow = true
-    box.receiveShadow = true
-    mesh.add(box)
-
-    const clearShell = new THREE.Mesh(
-      new RoundedBoxGeometry(shellSize, shellSize, shellSize, 4, 0.055),
-      new THREE.MeshPhysicalMaterial({
-        color: 0xffe8ee,
-        transparent: true,
-        opacity: 0.22,
-        roughness: 0.12,
-        metalness: 0,
-        transmission: 0.32,
-        clearcoat: 1,
-        clearcoatRoughness: 0.08,
-        depthWrite: false,
-      }),
-    )
-    mesh.add(clearShell)
-
-    const ribbonMaterial = new THREE.MeshStandardMaterial({
-      color: COLORS.warm,
-      emissive: COLORS.warm,
-      emissiveIntensity: 0.16,
-      roughness: 0.3,
-      metalness: 0.24,
-    })
-    const ribbonX = new THREE.Mesh(new RoundedBoxGeometry(shellSize, 0.08, 0.16, 2, 0.025), ribbonMaterial)
-    const ribbonZ = new THREE.Mesh(new RoundedBoxGeometry(0.16, 0.08, shellSize, 2, 0.025), ribbonMaterial)
-    ribbonX.position.y = PRIZE_HALF_SIZE - 0.01
-    ribbonZ.position.y = PRIZE_HALF_SIZE - 0.01
+    const mesh = createPrizeModel()
     const prizeGlow = new THREE.PointLight(COLORS.pink, 2.8, 2.2)
-    prizeGlow.position.y = PRIZE_HALF_SIZE + 0.07
-    mesh.add(ribbonX, ribbonZ, prizeGlow)
+    prizeGlow.position.y = PRIZE_HALF_HEIGHT + 0.07
+    mesh.add(prizeGlow)
     this.scene.add(mesh)
 
     return { body, collider, mesh }

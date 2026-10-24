@@ -6,7 +6,9 @@ import {
   CHUTE_OPENING_HALF_Z,
   isPrizeCaptured,
   PRIZE_HALF_DIAGONAL,
-  PRIZE_HALF_SIZE,
+  PRIZE_HALF_DEPTH,
+  PRIZE_HALF_HEIGHT,
+  PRIZE_HALF_WIDTH,
 } from './prizeInteraction'
 
 const chute = { x: -1.2, z: 0.96 }
@@ -42,6 +44,12 @@ describe('prize pickup', () => {
   })
 
   it('keeps the gift compact enough to sit between the fingers without clipping', () => {
-    expect(PRIZE_HALF_SIZE).toBeLessThanOrEqual(0.31)
+    expect(PRIZE_HALF_WIDTH).toBeLessThanOrEqual(0.31)
+  })
+
+  it('uses a tall, shallow collider that matches the doll silhouette', () => {
+    expect(PRIZE_HALF_HEIGHT).toBeGreaterThanOrEqual(0.39)
+    expect(PRIZE_HALF_HEIGHT).toBeLessThanOrEqual(0.41)
+    expect(PRIZE_HALF_DEPTH).toBeLessThanOrEqual(0.26)
   })
 })

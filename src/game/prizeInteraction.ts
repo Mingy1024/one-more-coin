@@ -1,9 +1,11 @@
 export const PRIZE_GRIP_OPENING = 0.55
-export const PRIZE_HALF_SIZE = 0.31
+export const PRIZE_HALF_WIDTH = 0.31
+export const PRIZE_HALF_HEIGHT = 0.4
+export const PRIZE_HALF_DEPTH = 0.25
 export const CHUTE_CAPTURE_Y = -0.52
 export const CHUTE_OPENING_HALF_X = 0.68
 export const CHUTE_OPENING_HALF_Z = 0.62
-export const PRIZE_HALF_DIAGONAL = Math.hypot(PRIZE_HALF_SIZE, PRIZE_HALF_SIZE)
+export const PRIZE_HALF_DIAGONAL = Math.hypot(PRIZE_HALF_WIDTH, PRIZE_HALF_DEPTH)
 const PICKUP_RADIUS = 0.55
 
 export interface PrizePosition {
