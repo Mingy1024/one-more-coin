@@ -100,4 +100,42 @@ describe('articulated claw physics', () => {
     expect(maximumOffset).toBeLessThanOrEqual(0.36)
     expect(maximumHeadX).toBeLessThanOrEqual(1.45)
   })
+
+  it('keeps the fingers visibly open throughout a full descent', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    const claw = new ArticulatedClaw(
+      world,
+      new THREE.Scene(),
+      { anchorY: 4.05, headY: 3.5, x: 0, z: 0 },
+    )
+    world.timestep = 1 / 180
+
+    for (let frame = 0; frame < 360; frame += 1) {
+      const progress = frame / 359
+      claw.setCableLength(0.55 + 2.25 * progress)
+      claw.setOpening(1)
+      world.step()
+      claw.stabilizeSwing()
+    }
+
+    expect(claw.getFingerTipSpread()).toBeGreaterThanOrEqual(0.42)
+  })
+
+  it('still closes the fingers after the open descent', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    const claw = new ArticulatedClaw(
+      world,
+      new THREE.Scene(),
+      { anchorY: 4.05, headY: 3.5, x: 0, z: 0 },
+    )
+    world.timestep = 1 / 180
+    claw.setCableLength(2.8)
+    claw.setOpening(1)
+    for (let frame = 0; frame < 180; frame += 1) world.step()
+
+    claw.setOpening(0)
+    for (let frame = 0; frame < 180; frame += 1) world.step()
+
+    expect(claw.getFingerTipSpread()).toBeLessThan(0.3)
+  })
 })

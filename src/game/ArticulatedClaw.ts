@@ -146,6 +146,23 @@ export class ArticulatedClaw {
     return { x: position.x, y: position.y - 0.9, z: position.z }
   }
 
+  getFingerTipSpread(): number {
+    const head = this.headBody.translation()
+    const tip = FINGER_VISUAL_PATH[FINGER_VISUAL_PATH.length - 1]!
+    return Math.max(...this.fingers.map((finger) => {
+      const position = finger.body.translation()
+      const rotation = finger.body.rotation()
+      const worldTip = tip.clone().applyQuaternion(new THREE.Quaternion(
+        rotation.x,
+        rotation.y,
+        rotation.z,
+        rotation.w,
+      ))
+      worldTip.add(new THREE.Vector3(position.x, position.y, position.z))
+      return Math.hypot(worldTip.x - head.x, worldTip.z - head.z)
+    }))
+  }
+
   setGantryPosition(x: number, z: number): void {
     const current = this.gantryBody.translation()
     this.gantryBody.setNextKinematicTranslation({ x, y: current.y, z })
@@ -165,8 +182,8 @@ export class ArticulatedClaw {
     const target = THREE.MathUtils.lerp(CLOSED_ANGLE, OPEN_ANGLE, amount)
     this.sliderLocalY = linkagePose(amount).sliderY - 0.1
     for (const finger of this.fingers) {
-      finger.joint.configureMotorPosition(target, 34, 4.8)
-      finger.joint.setMotorMaxForce(12)
+      finger.joint.configureMotorPosition(target, 240, 18)
+      finger.joint.setMotorMaxForce(220)
     }
   }
 

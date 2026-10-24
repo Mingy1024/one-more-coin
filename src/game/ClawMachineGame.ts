@@ -13,6 +13,7 @@ import { dragOrbit, orbitPosition, type OrbitState } from './orbit'
 import { banterFor, type BanterLine } from './banter'
 import { approachVelocity, type PlanarMotion } from './clawMotion'
 import { ArticulatedClaw } from './ArticulatedClaw'
+import { MACHINE_DIMENSIONS } from './machineDimensions'
 
 export interface GameSnapshot {
   attempts: number
@@ -37,11 +38,11 @@ const COLORS = {
   warm: 0xffd65a,
 }
 
-const CLAW_TOP_Y = 3.05
-const CLAW_LOW_Y = 1.28
+const CLAW_TOP_Y = MACHINE_DIMENSIONS.clawTopY
+const CLAW_LOW_Y = MACHINE_DIMENSIONS.clawLowY
 const CHUTE = { x: -1.2, z: 0.96 }
 const PRIZE_START = { x: 0.48, y: 0.42, z: -0.18 }
-const ROPE_ANCHOR_Y = 3.52
+const ROPE_ANCHOR_Y = MACHINE_DIMENSIONS.ropeAnchorY
 
 export class ClawMachineGame {
   private readonly scene = new THREE.Scene()
@@ -216,7 +217,7 @@ export class ClawMachineGame {
   private updateClawAnimation(): void {
     const progress = smoothStep(phaseProgress(this.round))
     const phase = this.round.phase
-    let headY = CLAW_TOP_Y
+    let headY: number = CLAW_TOP_Y
     let prongOpen = 1
 
     if (phase === 'lowering') {
@@ -370,13 +371,13 @@ export class ClawMachineGame {
     this.addStaticCollider({ x: 1.91, y: 0.08, z: 1.675 }, { x: 0, y: -0.08, z: 0 })
 
     const roof = new THREE.Mesh(new RoundedBoxGeometry(3.96, 0.22, 3.5, 3, 0.06), frameMaterial)
-    roof.position.y = 3.75
+    roof.position.y = MACHINE_DIMENSIONS.roofY
     this.scene.add(roof)
 
     for (const x of [-1.89, 1.89]) {
       for (const z of [-1.62, 1.62]) {
-        const post = new THREE.Mesh(new RoundedBoxGeometry(0.17, 3.7, 0.17, 3, 0.045), frameMaterial)
-        post.position.set(x, 1.83, z)
+        const post = new THREE.Mesh(new RoundedBoxGeometry(0.17, 4.2, 0.17, 3, 0.045), frameMaterial)
+        post.position.set(x, 2.08, z)
         this.scene.add(post)
       }
     }
@@ -436,30 +437,30 @@ export class ClawMachineGame {
       this.scene.add(channel, strip, glow)
     }
 
-    addLightStrip([0.055, 3.34, 0.055], [-1.8, 1.84, 1.705], COLORS.aqua, [0, 0, 1])
-    addLightStrip([0.055, 3.34, 0.055], [1.8, 1.84, 1.705], COLORS.pink, [0, 0, 1])
-    addLightStrip([0.055, 3.34, 0.055], [-1.8, 1.84, -1.655], COLORS.pink, [0, 0, -1])
-    addLightStrip([0.055, 3.34, 0.055], [1.8, 1.84, -1.655], COLORS.aqua, [0, 0, -1])
-    addLightStrip([1.7, 0.055, 0.055], [-0.9, 3.62, 1.705], COLORS.pink, [0, 0, 1])
-    addLightStrip([1.7, 0.055, 0.055], [0.9, 3.62, 1.705], COLORS.aqua, [0, 0, 1])
-    addLightStrip([0.055, 0.055, 3.08], [-1.915, 3.62, 0], COLORS.pink, [-1, 0, 0])
-    addLightStrip([0.055, 0.055, 3.08], [1.915, 3.62, 0], COLORS.aqua, [1, 0, 0])
+    addLightStrip([0.055, 3.84, 0.055], [-1.8, 2.08, 1.705], COLORS.aqua, [0, 0, 1])
+    addLightStrip([0.055, 3.84, 0.055], [1.8, 2.08, 1.705], COLORS.pink, [0, 0, 1])
+    addLightStrip([0.055, 3.84, 0.055], [-1.8, 2.08, -1.655], COLORS.pink, [0, 0, -1])
+    addLightStrip([0.055, 3.84, 0.055], [1.8, 2.08, -1.655], COLORS.aqua, [0, 0, -1])
+    addLightStrip([1.7, 0.055, 0.055], [-0.9, 4.14, 1.705], COLORS.pink, [0, 0, 1])
+    addLightStrip([1.7, 0.055, 0.055], [0.9, 4.14, 1.705], COLORS.aqua, [0, 0, 1])
+    addLightStrip([0.055, 0.055, 3.08], [-1.915, 4.14, 0], COLORS.pink, [-1, 0, 0])
+    addLightStrip([0.055, 0.055, 3.08], [1.915, 4.14, 0], COLORS.aqua, [1, 0, 0])
     addLightStrip([1.7, 0.045, 0.055], [-0.9, 0.08, 1.705], COLORS.aqua, [0, 0, 1])
     addLightStrip([1.7, 0.045, 0.055], [0.9, 0.08, 1.705], COLORS.pink, [0, 0, 1])
 
     const leftGlow = new THREE.PointLight(COLORS.aqua, 10, 3.6)
-    leftGlow.position.set(-1.75, 2, 2)
+    leftGlow.position.set(-1.75, 2.25, 2)
     const rightGlow = new THREE.PointLight(COLORS.pink, 10, 3.6)
-    rightGlow.position.set(1.75, 2, 2)
+    rightGlow.position.set(1.75, 2.25, 2)
     this.scene.add(leftGlow, rightGlow)
 
-    const back = new THREE.Mesh(new THREE.PlaneGeometry(3.72, 3.55), glassMaterial)
-    back.position.set(0, 1.82, -1.58)
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(3.72, MACHINE_DIMENSIONS.glassHeight), glassMaterial)
+    back.position.set(0, 2.05, -1.58)
     this.scene.add(back)
 
-    const left = new THREE.Mesh(new THREE.PlaneGeometry(3.25, 3.55), glassMaterial)
+    const left = new THREE.Mesh(new THREE.PlaneGeometry(3.25, MACHINE_DIMENSIONS.glassHeight), glassMaterial)
     left.rotation.y = Math.PI / 2
-    left.position.set(-1.86, 1.82, 0)
+    left.position.set(-1.86, 2.05, 0)
     this.scene.add(left)
 
     const right = left.clone()
@@ -480,20 +481,24 @@ export class ClawMachineGame {
     chuteFrame.position.set(CHUTE.x, 0.05, CHUTE.z)
     this.scene.add(chuteFrame)
 
-    const plinth = new THREE.Mesh(new RoundedBoxGeometry(4.04, 0.68, 3.65, 4, 0.12), baseMaterial)
-    plinth.position.y = -0.5
+    const lowerCabinetCenterY = -0.08 - MACHINE_DIMENSIONS.lowerCabinetHeight / 2
+    const plinth = new THREE.Mesh(
+      new RoundedBoxGeometry(4.04, MACHINE_DIMENSIONS.lowerCabinetHeight, 3.65, 4, 0.12),
+      baseMaterial,
+    )
+    plinth.position.y = lowerCabinetCenterY
     plinth.castShadow = true
     this.scene.add(plinth)
 
     const frontPanel = new THREE.Mesh(
-      new THREE.BoxGeometry(3.58, 0.42, 0.08),
+      new THREE.BoxGeometry(3.58, MACHINE_DIMENSIONS.lowerCabinetHeight - 0.24, 0.08),
       new THREE.MeshStandardMaterial({ color: 0x284961, roughness: 0.32, metalness: 0.42 }),
     )
-    frontPanel.position.set(0, -0.48, 1.86)
+    frontPanel.position.set(0, lowerCabinetCenterY, 1.86)
     this.scene.add(frontPanel)
 
-    addLightStrip([1.48, 0.055, 0.04], [-0.82, -0.32, 1.91], COLORS.pink, [0, 0, 1])
-    addLightStrip([1.48, 0.055, 0.04], [0.82, -0.32, 1.91], COLORS.aqua, [0, 0, 1])
+    addLightStrip([1.48, 0.055, 0.04], [-0.82, -0.22, 1.91], COLORS.pink, [0, 0, 1])
+    addLightStrip([1.48, 0.055, 0.04], [0.82, -0.22, 1.91], COLORS.aqua, [0, 0, 1])
 
     const badge = new THREE.Mesh(
       new THREE.BoxGeometry(0.5, 0.2, 0.025),
@@ -504,23 +509,53 @@ export class ClawMachineGame {
         roughness: 0.3,
       }),
     )
-    badge.position.set(0, -0.53, 1.915)
+    badge.position.set(0.94, lowerCabinetCenterY, 1.915)
     this.scene.add(badge)
+
+    const prizeDoor = new THREE.Mesh(
+      new RoundedBoxGeometry(1.18, 0.72, 0.08, 3, 0.04),
+      new THREE.MeshStandardMaterial({
+        color: 0x0b1828,
+        roughness: 0.3,
+        metalness: 0.5,
+      }),
+    )
+    prizeDoor.position.set(-0.92, lowerCabinetCenterY - 0.04, 1.93)
+    this.scene.add(prizeDoor)
+
+    const prizeDoorInset = new THREE.Mesh(
+      new RoundedBoxGeometry(0.9, 0.46, 0.025, 2, 0.03),
+      new THREE.MeshStandardMaterial({
+        color: 0x17344a,
+        emissive: COLORS.aqua,
+        emissiveIntensity: 0.32,
+        roughness: 0.28,
+      }),
+    )
+    prizeDoorInset.position.set(-0.92, lowerCabinetCenterY - 0.04, 1.98)
+    this.scene.add(prizeDoorInset)
+
+    const coinSlot = new THREE.Mesh(
+      new RoundedBoxGeometry(0.46, 0.34, 0.06, 2, 0.025),
+      new THREE.MeshStandardMaterial({ color: 0x111b27, roughness: 0.24, metalness: 0.8 }),
+    )
+    coinSlot.position.set(0.94, lowerCabinetCenterY - 0.25, 1.96)
+    this.scene.add(coinSlot)
   }
 
   private createGantry(): void {
     const darkMetal = new THREE.MeshStandardMaterial({ color: 0x263347, roughness: 0.22, metalness: 0.88 })
 
     const railX = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.08, 0.1), darkMetal)
-    railX.position.y = 3.56
+    railX.position.y = 4.09
     this.scene.add(railX)
 
     const railZ = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 2.8), darkMetal)
-    railZ.position.y = 3.5
+    railZ.position.y = 4.03
     this.gantryRoot.add(railZ)
 
     const carriage = new THREE.Mesh(new RoundedBoxGeometry(0.46, 0.2, 0.46, 3, 0.045), darkMetal)
-    carriage.position.y = 3.46
+    carriage.position.y = 3.99
     carriage.castShadow = true
     this.gantryRoot.add(carriage)
     this.scene.add(this.gantryRoot)
@@ -655,7 +690,7 @@ export class ClawMachineGame {
     this.camera.aspect = width / height
     this.orbitRadius = this.camera.aspect < 1
       ? THREE.MathUtils.clamp(7 / this.camera.aspect, 13.2, 15)
-      : 10.2
+      : 11.4
     this.applyCameraOrbit()
     this.camera.updateProjectionMatrix()
   }
