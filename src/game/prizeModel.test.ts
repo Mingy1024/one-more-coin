@@ -37,4 +37,23 @@ describe('three-dimensional doll prize', () => {
     expect(material.bumpMap).toBeInstanceOf(THREE.Texture)
     expect(doll.getObjectByName('doll-fuzz')).toBeInstanceOf(THREE.Points)
   })
+
+  it('lets the separate eye whites visibly overlap the top of the white face patch', () => {
+    const doll = createPrizeModel()
+    const face = doll.getObjectByName('doll-face')
+    const leftEye = doll.getObjectByName('doll-left-eye')
+    const rightEye = doll.getObjectByName('doll-right-eye')
+
+    expect(face).toBeInstanceOf(THREE.Mesh)
+    expect(leftEye).toBeInstanceOf(THREE.Mesh)
+    expect(rightEye).toBeInstanceOf(THREE.Mesh)
+
+    const faceBounds = new THREE.Box3().setFromObject(face!)
+    for (const eye of [leftEye!, rightEye!]) {
+      const eyeBounds = new THREE.Box3().setFromObject(eye)
+
+      expect(eyeBounds.max.y).toBeGreaterThan(faceBounds.max.y + 0.045)
+      expect(eyeBounds.min.y).toBeLessThan(faceBounds.max.y - 0.035)
+    }
+  })
 })

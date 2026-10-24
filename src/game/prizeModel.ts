@@ -144,7 +144,7 @@ export function createPrizeModel(): THREE.Group {
   addPart(doll, 'doll-head', new THREE.SphereGeometry(0.22, 36, 28), blue,
     [0, 0.105, 0], [1, 0.98, 0.82])
   addPart(doll, 'doll-face', new THREE.SphereGeometry(0.185, 32, 24), white,
-    [0, 0.105, 0.147], [0.91, 0.86, 0.22])
+    [0, 0.09, 0.147], [0.93, 0.72, 0.22])
   addPart(doll, 'doll-belly', new THREE.SphereGeometry(0.135, 28, 20), white,
     [0, -0.155, 0.132], [0.86, 1.02, 0.2])
 
@@ -155,11 +155,11 @@ export function createPrizeModel(): THREE.Group {
 
   for (const side of [-1, 1] as const) {
     addPart(doll, side < 0 ? 'doll-left-eye' : 'doll-right-eye',
-      new THREE.SphereGeometry(0.042, 24, 18), white,
-      [side * 0.041, 0.225, 0.195], [0.82, 1.12, 0.48])
+      new THREE.SphereGeometry(0.055, 28, 20), white,
+      [side * 0.043, 0.238, 0.204], [0.78, 1.5, 0.42])
     addPart(doll, side < 0 ? 'doll-left-pupil' : 'doll-right-pupil',
       new THREE.SphereGeometry(0.014, 18, 14), black,
-      [side * 0.036, 0.225, 0.222], [0.78, 1, 0.5])
+      [side * 0.036, 0.235, 0.232], [0.78, 1.08, 0.5])
   }
 
   addPart(doll, 'doll-nose', new THREE.SphereGeometry(0.034, 24, 18), red, [0, 0.177, 0.23])
