@@ -56,4 +56,13 @@ describe('three-dimensional doll prize', () => {
       expect(eyeBounds.min.y).toBeLessThan(faceBounds.max.y - 0.035)
     }
   })
+
+  it('wraps the red collar around both the front and back of the neck', () => {
+    const collar = createPrizeModel().getObjectByName('doll-collar') as THREE.Mesh
+    const positions = collar.geometry.getAttribute('position')
+    const depths = Array.from({ length: positions.count }, (_, index) => positions.getZ(index))
+
+    expect(Math.min(...depths)).toBeLessThan(-0.12)
+    expect(Math.max(...depths)).toBeGreaterThan(0.12)
+  })
 })

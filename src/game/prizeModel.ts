@@ -57,21 +57,72 @@ function addPart(
   return part
 }
 
-function addRod(
-  parent: THREE.Group,
-  start: THREE.Vector3,
-  end: THREE.Vector3,
-  material: THREE.Material,
-): void {
-  const direction = end.clone().sub(start)
-  const rod = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.003, 0.003, direction.length(), 8),
-    material,
-  )
-  rod.position.copy(start).add(end).multiplyScalar(0.5)
-  rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize())
-  rod.castShadow = true
-  parent.add(rod)
+function ellipsoidFront(x: number, y: number, centerY: number, radiusX: number, radiusY: number, radiusZ: number): number {
+  const distance = (x / radiusX) ** 2 + ((y - centerY) / radiusY) ** 2
+  return radiusZ * Math.sqrt(Math.max(0, 1 - distance))
+}
+
+const headFront = (x: number, y: number): number => ellipsoidFront(x, y, 0.105, 0.22, 0.22 * 0.98, 0.22 * 0.82)
+const faceFront = (x: number, y: number): number => headFront(x, y) + 0.004
+const bodyFront = (x: number, y: number): number => ellipsoidFront(x, y, -0.14, 0.2 * 0.88, 0.2 * 1.04, 0.2 * 0.76)
+
+function createSurfacePatch(
+  centerY: number,
+  radiusX: number,
+  radiusY: number,
+  surface: (x: number, y: number) => number,
+  offset: number,
+): THREE.BufferGeometry {
+  const segments = 48
+  const rings = 6
+  const positions = [0, centerY, surface(0, centerY) + offset]
+  const indices: number[] = []
+
+  for (let ring = 1; ring <= rings; ring += 1) {
+    for (let segment = 0; segment < segments; segment += 1) {
+      const angle = segment / segments * Math.PI * 2
+      const x = Math.cos(angle) * radiusX * ring / rings
+      const y = centerY + Math.sin(angle) * radiusY * ring / rings
+      positions.push(x, y, surface(x, y) + offset)
+
+      const next = (segment + 1) % segments
+      if (ring === 1) indices.push(0, 1 + segment, 1 + next)
+      else {
+        const inner = 1 + (ring - 2) * segments + segment
+        const outer = 1 + (ring - 1) * segments + segment
+        const innerNext = 1 + (ring - 2) * segments + next
+        const outerNext = 1 + (ring - 1) * segments + next
+        indices.push(inner, outer, outerNext, inner, outerNext, innerNext)
+      }
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  return geometry
+}
+
+function createCollarBand(): THREE.BufferGeometry {
+  const segments = 48
+  const positions: number[] = []
+  const indices: number[] = []
+  for (let segment = 0; segment <= segments; segment += 1) {
+    const angle = segment / segments * Math.PI * 2
+    const x = Math.cos(angle) * 0.164
+    const z = Math.sin(angle) * 0.143
+    positions.push(x, -0.064, z, x, -0.046, z)
+    if (segment < segments) {
+      const lower = segment * 2
+      indices.push(lower, lower + 1, lower + 2, lower + 1, lower + 3, lower + 2)
+    }
+  }
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  return geometry
 }
 
 function addFuzzLayer(parent: THREE.Group): void {
@@ -143,15 +194,11 @@ export function createPrizeModel(): THREE.Group {
   addPart(doll, 'doll-body', new THREE.SphereGeometry(0.2, 32, 24), blue, [0, -0.14, 0], [0.88, 1.04, 0.76])
   addPart(doll, 'doll-head', new THREE.SphereGeometry(0.22, 36, 28), blue,
     [0, 0.105, 0], [1, 0.98, 0.82])
-  addPart(doll, 'doll-face', new THREE.SphereGeometry(0.185, 32, 24), white,
-    [0, 0.09, 0.147], [0.93, 0.72, 0.22])
-  addPart(doll, 'doll-belly', new THREE.SphereGeometry(0.135, 28, 20), white,
-    [0, -0.155, 0.132], [0.86, 1.02, 0.2])
+  addPart(doll, 'doll-face', createSurfacePatch(0.09, 0.172, 0.133, headFront, 0.004), white, [0, 0, 0])
+  addPart(doll, 'doll-belly', createSurfacePatch(-0.155, 0.116, 0.135, bodyFront, 0.004), white, [0, 0, 0])
 
-  addPart(doll, 'doll-mouth', new THREE.SphereGeometry(0.115, 28, 20), darkMouth,
-    [0, 0.055, 0.205], [1.25, 0.72, 0.18])
-  addPart(doll, 'doll-tongue', new THREE.SphereGeometry(0.075, 24, 16), tongue,
-    [0, 0.01, 0.229], [1.18, 0.4, 0.12])
+  addPart(doll, 'doll-mouth', createSurfacePatch(0.046, 0.138, 0.078, faceFront, 0.004), darkMouth, [0, 0, 0])
+  addPart(doll, 'doll-tongue', createSurfacePatch(0, 0.075, 0.026, faceFront, 0.007), tongue, [0, 0, 0])
 
   for (const side of [-1, 1] as const) {
     const eye = addPart(doll, side < 0 ? 'doll-left-eye' : 'doll-right-eye',
@@ -163,10 +210,10 @@ export function createPrizeModel(): THREE.Group {
       [side * 0.036, 0.231, 0.19], [0.78, 1.08, 0.5])
   }
 
-  addPart(doll, 'doll-nose', new THREE.SphereGeometry(0.034, 24, 18), red, [0, 0.177, 0.23])
-  addPart(doll, 'doll-collar', new RoundedBoxGeometry(0.3, 0.035, 0.055, 3, 0.015), red, [0, -0.055, 0.153])
-  addPart(doll, 'doll-bell', new THREE.SphereGeometry(0.04, 24, 16), yellow, [0, -0.083, 0.198], [1, 0.86, 0.64])
-  addPart(doll, 'doll-bell-slot', new RoundedBoxGeometry(0.035, 0.006, 0.008, 2, 0.003), black, [0, -0.078, 0.224])
+  addPart(doll, 'doll-nose', new THREE.SphereGeometry(0.034, 24, 18), red, [0, 0.177, 0.185])
+  addPart(doll, 'doll-collar', createCollarBand(), red, [0, 0, 0])
+  addPart(doll, 'doll-bell', new THREE.SphereGeometry(0.04, 24, 16), yellow, [0, -0.083, 0.154], [1, 0.86, 0.8])
+  addPart(doll, 'doll-bell-slot', new RoundedBoxGeometry(0.035, 0.006, 0.008, 2, 0.003), black, [0, -0.078, 0.186])
 
   for (const side of [-1, 1] as const) {
     const arm = addPart(doll, side < 0 ? 'doll-left-arm' : 'doll-right-arm',
@@ -184,18 +231,23 @@ export function createPrizeModel(): THREE.Group {
   const whiskerMaterial = plushMaterial(0x39343a, 0.78)
   for (const side of [-1, 1] as const) {
     for (const [index, y] of [0.15, 0.12, 0.09].entries()) {
-      addRod(
-        doll,
-        new THREE.Vector3(side * 0.065, y, 0.226),
-        new THREE.Vector3(side * (0.15 + index * 0.006), y + (1 - index) * 0.012, 0.216),
-        whiskerMaterial,
-      )
+      const endX = 0.142 + index * 0.005
+      const endY = y + (1 - index) * 0.012
+      const points = Array.from({ length: 7 }, (_, point) => {
+        const progress = point / 6
+        const x = side * (0.065 + (endX - 0.065) * progress)
+        const whiskerY = y + (endY - y) * progress
+        return new THREE.Vector3(x, whiskerY, faceFront(x, whiskerY) + 0.008)
+      })
+      addPart(doll, `doll-whisker-${side}-${index}`,
+        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 12, 0.0025, 6, false),
+        whiskerMaterial, [0, 0, 0])
     }
   }
 
   const tearDrop = addPart(doll, 'doll-tear',
     new THREE.SphereGeometry(0.035, 22, 16), tear,
-    [0.115, 0.17, 0.224], [0.58, 1.22, 0.38])
+    [0.115, 0.17, 0.16], [0.58, 1.22, 0.38])
   tearDrop.rotation.z = -0.55
   addFuzzLayer(doll)
 
