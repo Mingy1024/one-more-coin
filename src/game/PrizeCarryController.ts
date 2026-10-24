@@ -38,7 +38,10 @@ export class PrizeCarryController {
     this.follow(grabPosition)
   }
 
-  follow(grabPosition: CarryTarget, deltaSeconds = 1 / 60): void {
+  follow(grabPosition: CarryTarget, deltaSeconds = 1 / 60, centerStrength = 0): void {
+    if (centerStrength > 0) {
+      this.lateralOffset.multiplyScalar(Math.exp(-centerStrength * deltaSeconds))
+    }
     this.body.setTranslation({
       x: grabPosition.x + this.lateralOffset.x,
       y: grabPosition.y,

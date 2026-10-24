@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import { ArticulatedClaw } from './ArticulatedClaw'
+import { PRIZE_GRIP_OPENING } from './prizeInteraction'
 
 beforeAll(async () => {
   await RAPIER.init()
@@ -152,5 +153,41 @@ describe('articulated claw physics', () => {
 
     expect(head.y - grip.y).toBeGreaterThanOrEqual(0.72)
     expect(head.y - grip.y).toBeLessThanOrEqual(0.82)
+  })
+
+  it('keeps the finger tips outside the gift box while carrying it', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    const claw = new ArticulatedClaw(
+      world,
+      new THREE.Scene(),
+      { anchorY: 4.05, headY: 3.5, x: 0, z: 0 },
+    )
+    world.timestep = 1 / 180
+
+    claw.setOpening(PRIZE_GRIP_OPENING)
+    for (let frame = 0; frame < 240; frame += 1) world.step()
+
+    expect(claw.getFingerTipSpread()).toBeGreaterThanOrEqual(0.36)
+    expect(claw.getFingerTipSpread()).toBeLessThanOrEqual(0.48)
+  })
+
+  it('settles the swinging head over the gantry before release', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    const claw = new ArticulatedClaw(
+      world,
+      new THREE.Scene(),
+      { anchorY: 4.05, headY: 3.5, x: 0, z: 0 },
+    )
+    world.timestep = 1 / 180
+    claw.applyImpulse({ x: 0.065, y: 0, z: 0.03 })
+    for (let frame = 0; frame < 90; frame += 1) world.step()
+
+    for (let frame = 0; frame < 180; frame += 1) {
+      world.step()
+      claw.settleSwing(1 / 180, 10)
+    }
+
+    const head = claw.getHeadPosition()
+    expect(Math.hypot(head.x, head.z)).toBeLessThan(0.01)
   })
 })

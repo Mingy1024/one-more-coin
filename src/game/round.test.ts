@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createRound, stepRound } from './round'
+import { createRound, phaseDurations, stepRound } from './round'
 
 describe('claw machine round', () => {
   it('keeps the timer and claw locked until the player starts the round', () => {
@@ -23,7 +23,7 @@ describe('claw machine round', () => {
     round = stepRound(round, { type: 'GRAB' })
     expect(round.phase).toBe('lowering')
 
-    for (let index = 0; index < 180; index += 1) {
+    for (let index = 0; index < 210; index += 1) {
       round = stepRound(round, { type: 'TICK', deltaSeconds: 1 / 30 })
     }
 
@@ -39,8 +39,14 @@ describe('claw machine round', () => {
     round = stepRound(round, { type: 'TICK', deltaSeconds: 4 })
     expect(round.phase).not.toBe('aiming')
 
-    round = stepRound(round, { type: 'TICK', deltaSeconds: 2 })
+    round = stepRound(round, { type: 'TICK', deltaSeconds: 3 })
     expect(round.phase).toBe('lost')
+  })
+
+  it('leaves enough time to watch the prize fall into the chute', () => {
+    const dropWindow = (phaseDurations.releasing ?? 0) + (phaseDurations.resetting ?? 0)
+
+    expect(dropWindow).toBeGreaterThanOrEqual(1.6)
   })
 
   it('ignores a second grab while the claw is busy', () => {

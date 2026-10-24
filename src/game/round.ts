@@ -28,8 +28,8 @@ export const phaseDurations: Partial<Record<RoundPhase, number>> = {
   closing: 0.8,
   lifting: 1.25,
   returning: 1.4,
-  releasing: 0.55,
-  resetting: 0.45,
+  releasing: 0.65,
+  resetting: 1.15,
 }
 
 export function phaseProgress(state: RoundState): number {

@@ -80,6 +80,21 @@ describe('carried prize', () => {
     expect(up.angleTo(new THREE.Vector3(0, 1, 0))).toBeLessThan(0.12)
   })
 
+  it('smoothly centres the prize before releasing it over the chute', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    const prize = createPrize(world)
+    const carry = new PrizeCarryController(prize.body, prize.collider)
+    const target = { x: -1.2, y: 2.8, z: 0.96 }
+    carry.capture({ x: 0, y: 0.38, z: 0 })
+
+    for (let frame = 0; frame < 180; frame += 1) {
+      carry.follow(target, 1 / 180, 10)
+    }
+
+    const position = prize.body.translation()
+    expect(Math.hypot(position.x - target.x, position.z - target.z)).toBeLessThan(0.01)
+  })
+
   it('restores physical collisions when the claw releases the prize', () => {
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
     const prize = createPrize(world)

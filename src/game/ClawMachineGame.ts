@@ -15,6 +15,12 @@ import { approachVelocity, type PlanarMotion } from './clawMotion'
 import { ArticulatedClaw } from './ArticulatedClaw'
 import { MACHINE_DIMENSIONS } from './machineDimensions'
 import { PrizeCarryController } from './PrizeCarryController'
+import {
+  CHUTE_OPENING_HALF_X,
+  CHUTE_OPENING_HALF_Z,
+  isPrizeCaptured,
+  PRIZE_GRIP_OPENING,
+} from './prizeInteraction'
 
 export interface GameSnapshot {
   attempts: number
@@ -227,16 +233,16 @@ export class ClawMachineGame {
       headY = THREE.MathUtils.lerp(CLAW_TOP_Y, CLAW_LOW_Y, progress)
     } else if (phase === 'closing') {
       headY = CLAW_LOW_Y
-      prongOpen = 1 - progress
+      prongOpen = THREE.MathUtils.lerp(1, PRIZE_GRIP_OPENING, progress)
     } else if (phase === 'lifting') {
       headY = THREE.MathUtils.lerp(CLAW_LOW_Y, CLAW_TOP_Y, progress)
-      prongOpen = 0
+      prongOpen = this.carried ? PRIZE_GRIP_OPENING : 0
     } else if (phase === 'returning') {
       this.clawPosition.x = THREE.MathUtils.lerp(this.cycleStart.x, CHUTE.x, progress)
       this.clawPosition.z = THREE.MathUtils.lerp(this.cycleStart.z, CHUTE.z, progress)
-      prongOpen = 0
+      prongOpen = this.carried ? PRIZE_GRIP_OPENING : 0
     } else if (phase === 'releasing') {
-      prongOpen = progress
+      prongOpen = THREE.MathUtils.lerp(PRIZE_GRIP_OPENING, 1, progress)
     }
 
     this.gantryRoot.position.set(this.clawPosition.x, 0, this.clawPosition.z)
@@ -274,11 +280,22 @@ export class ClawMachineGame {
   private updatePhysics(delta: number): void {
     const substeps = 3
     this.world.timestep = delta / substeps
+    const returnProgress = this.round.phase === 'returning'
+      ? smoothStep(phaseProgress(this.round))
+      : 0
+    const centerStrength = returnProgress > 0 ? 4 + returnProgress * 8 : 0
     for (let step = 0; step < substeps; step += 1) {
       this.world.step()
       this.articulatedClaw.stabilizeSwing()
       if (this.carried) {
-        this.prizeCarry.follow(this.articulatedClaw.getGrabPosition(), this.world.timestep)
+        if (centerStrength > 0) {
+          this.articulatedClaw.settleSwing(this.world.timestep, centerStrength)
+        }
+        this.prizeCarry.follow(
+          this.articulatedClaw.getGrabPosition(),
+          this.world.timestep,
+          centerStrength,
+        )
       }
     }
     this.articulatedClaw.updateVisuals()
@@ -294,11 +311,7 @@ export class ClawMachineGame {
     if (this.round.phase !== 'releasing' && this.round.phase !== 'resetting') return
 
     const position = this.prize.body.translation()
-    const insideChute = Math.abs(position.x - CHUTE.x) < 0.5
-      && Math.abs(position.z - CHUTE.z) < 0.44
-      && position.y < 0.42
-
-    if (insideChute) {
+    if (isPrizeCaptured(position, CHUTE)) {
       this.round = stepRound(this.round, { type: 'PRIZE_DROPPED' })
       this.publishSnapshot()
     }
@@ -360,11 +373,47 @@ export class ClawMachineGame {
       side: THREE.DoubleSide,
     })
 
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(3.82, 0.16, 3.35), floorMaterial)
-    floor.position.y = -0.08
-    floor.receiveShadow = true
-    this.scene.add(floor)
-    this.addStaticCollider({ x: 1.91, y: 0.08, z: 1.675 }, { x: 0, y: -0.08, z: 0 })
+    const machineHalfX = 1.91
+    const machineHalfZ = 1.675
+    const openingMinX = CHUTE.x - CHUTE_OPENING_HALF_X
+    const openingMaxX = CHUTE.x + CHUTE_OPENING_HALF_X
+    const openingMinZ = CHUTE.z - CHUTE_OPENING_HALF_Z
+    const openingMaxZ = CHUTE.z + CHUTE_OPENING_HALF_Z
+    const openingWidth = CHUTE_OPENING_HALF_X * 2
+    const floorPanels: Array<{
+      size: [number, number, number]
+      position: [number, number, number]
+    }> = [
+      {
+        size: [openingMinX + machineHalfX, 0.16, machineHalfZ * 2],
+        position: [(-machineHalfX + openingMinX) / 2, -0.08, 0],
+      },
+      {
+        size: [machineHalfX - openingMaxX, 0.16, machineHalfZ * 2],
+        position: [(openingMaxX + machineHalfX) / 2, -0.08, 0],
+      },
+      {
+        size: [openingWidth, 0.16, openingMinZ + machineHalfZ],
+        position: [CHUTE.x, -0.08, (-machineHalfZ + openingMinZ) / 2],
+      },
+      {
+        size: [openingWidth, 0.16, machineHalfZ - openingMaxZ],
+        position: [CHUTE.x, -0.08, (openingMaxZ + machineHalfZ) / 2],
+      },
+    ]
+    for (const panel of floorPanels) {
+      const floor = new THREE.Mesh(
+        new THREE.BoxGeometry(panel.size[0], panel.size[1], panel.size[2]),
+        floorMaterial,
+      )
+      floor.position.set(panel.position[0], panel.position[1], panel.position[2])
+      floor.receiveShadow = true
+      this.scene.add(floor)
+      this.addStaticCollider(
+        { x: panel.size[0] / 2, y: panel.size[1] / 2, z: panel.size[2] / 2 },
+        { x: panel.position[0], y: panel.position[1], z: panel.position[2] },
+      )
+    }
 
     const roof = new THREE.Mesh(new RoundedBoxGeometry(3.96, 0.22, 3.5, 3, 0.06), frameMaterial)
     roof.position.y = MACHINE_DIMENSIONS.roofY
@@ -464,14 +513,65 @@ export class ClawMachineGame {
     this.scene.add(right)
 
     const chute = new THREE.Mesh(
-      new THREE.BoxGeometry(1.14, 0.025, 1.02),
+      new THREE.BoxGeometry(
+        CHUTE_OPENING_HALF_X * 2,
+        0.025,
+        CHUTE_OPENING_HALF_Z * 2,
+      ),
       new THREE.MeshStandardMaterial({ color: COLORS.aqua, emissive: COLORS.aqua, emissiveIntensity: 1.4 }),
     )
-    chute.position.set(CHUTE.x, 0.015, CHUTE.z)
+    chute.position.set(CHUTE.x, -1.02, CHUTE.z)
     this.scene.add(chute)
 
+    const chuteWallMaterial = new THREE.MeshStandardMaterial({
+      color: 0x0a1724,
+      roughness: 0.42,
+      metalness: 0.36,
+    })
+    const chuteWell: Array<{
+      size: [number, number, number]
+      position: [number, number, number]
+    }> = [
+      {
+        size: [CHUTE_OPENING_HALF_X * 2, 0.9, 0.08],
+        position: [CHUTE.x, -0.56, CHUTE.z - CHUTE_OPENING_HALF_Z - 0.04],
+      },
+      {
+        size: [CHUTE_OPENING_HALF_X * 2, 0.9, 0.08],
+        position: [CHUTE.x, -0.56, CHUTE.z + CHUTE_OPENING_HALF_Z + 0.04],
+      },
+      {
+        size: [0.08, 0.9, CHUTE_OPENING_HALF_Z * 2],
+        position: [CHUTE.x - CHUTE_OPENING_HALF_X - 0.04, -0.56, CHUTE.z],
+      },
+      {
+        size: [0.08, 0.9, CHUTE_OPENING_HALF_Z * 2],
+        position: [CHUTE.x + CHUTE_OPENING_HALF_X + 0.04, -0.56, CHUTE.z],
+      },
+    ]
+    for (const wall of chuteWell) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(wall.size[0], wall.size[1], wall.size[2]),
+        chuteWallMaterial,
+      )
+      mesh.position.set(wall.position[0], wall.position[1], wall.position[2])
+      this.scene.add(mesh)
+      this.addStaticCollider(
+        { x: wall.size[0] / 2, y: wall.size[1] / 2, z: wall.size[2] / 2 },
+        { x: wall.position[0], y: wall.position[1], z: wall.position[2] },
+      )
+    }
+    this.addStaticCollider(
+      { x: CHUTE_OPENING_HALF_X, y: 0.04, z: CHUTE_OPENING_HALF_Z },
+      { x: CHUTE.x, y: -1.06, z: CHUTE.z },
+    )
+
     const chuteFrame = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(1.18, 0.08, 1.06)),
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(
+        CHUTE_OPENING_HALF_X * 2 + 0.04,
+        0.08,
+        CHUTE_OPENING_HALF_Z * 2 + 0.04,
+      )),
       new THREE.LineBasicMaterial({ color: 0xffffff }),
     )
     chuteFrame.position.set(CHUTE.x, 0.05, CHUTE.z)

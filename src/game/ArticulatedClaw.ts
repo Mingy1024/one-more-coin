@@ -285,6 +285,40 @@ export class ArticulatedClaw {
     }
   }
 
+  settleSwing(deltaSeconds: number, strength: number): void {
+    const anchor = this.gantryBody.translation()
+    const head = this.headBody.translation()
+    const blend = 1 - Math.exp(-strength * deltaSeconds)
+    const correctionX = (anchor.x - head.x) * blend
+    const correctionZ = (anchor.z - head.z) * blend
+    this.headBody.setTranslation({
+      x: head.x + correctionX,
+      y: head.y,
+      z: head.z + correctionZ,
+    }, true)
+    const velocityDamping = Math.exp(-strength * deltaSeconds)
+    const headVelocity = this.headBody.linvel()
+    this.headBody.setLinvel({
+      x: headVelocity.x * velocityDamping,
+      y: headVelocity.y,
+      z: headVelocity.z * velocityDamping,
+    }, true)
+    for (const finger of this.fingers) {
+      const position = finger.body.translation()
+      finger.body.setTranslation({
+        x: position.x + correctionX,
+        y: position.y,
+        z: position.z + correctionZ,
+      }, true)
+      const velocity = finger.body.linvel()
+      finger.body.setLinvel({
+        x: velocity.x * velocityDamping,
+        y: velocity.y,
+        z: velocity.z * velocityDamping,
+      }, true)
+    }
+  }
+
   private limitOutwardVelocity(
     body: RAPIER.RigidBody,
     radialLimited: boolean,
