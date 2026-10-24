@@ -12,6 +12,7 @@ import {
 import { dragOrbit, orbitPosition, type OrbitState } from './orbit'
 import { banterFor, type BanterLine } from './banter'
 import { approachVelocity, type PlanarMotion } from './clawMotion'
+import { clawOpeningForPhase } from './clawPose'
 import { ArticulatedClaw } from './ArticulatedClaw'
 import { MACHINE_DIMENSIONS } from './machineDimensions'
 import { PrizeCarryController } from './PrizeCarryController'
@@ -229,22 +230,22 @@ export class ClawMachineGame {
     const progress = smoothStep(phaseProgress(this.round))
     const phase = this.round.phase
     let headY: number = CLAW_TOP_Y
-    let prongOpen = 1
+    const prongOpen = clawOpeningForPhase(
+      phase,
+      progress,
+      this.carried,
+      PRIZE_GRIP_OPENING,
+    )
 
     if (phase === 'lowering') {
       headY = THREE.MathUtils.lerp(CLAW_TOP_Y, CLAW_LOW_Y, progress)
     } else if (phase === 'closing') {
       headY = CLAW_LOW_Y
-      prongOpen = THREE.MathUtils.lerp(1, PRIZE_GRIP_OPENING, progress)
     } else if (phase === 'lifting') {
       headY = THREE.MathUtils.lerp(CLAW_LOW_Y, CLAW_TOP_Y, progress)
-      prongOpen = this.carried ? PRIZE_GRIP_OPENING : 0
     } else if (phase === 'returning') {
       this.clawPosition.x = THREE.MathUtils.lerp(this.cycleStart.x, CHUTE.x, progress)
       this.clawPosition.z = THREE.MathUtils.lerp(this.cycleStart.z, CHUTE.z, progress)
-      prongOpen = this.carried ? PRIZE_GRIP_OPENING : 0
-    } else if (phase === 'releasing') {
-      prongOpen = THREE.MathUtils.lerp(PRIZE_GRIP_OPENING, 1, progress)
     }
 
     this.gantryRoot.position.set(this.clawPosition.x, 0, this.clawPosition.z)
