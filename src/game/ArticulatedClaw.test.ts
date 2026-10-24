@@ -151,8 +151,8 @@ describe('articulated claw physics', () => {
     const head = claw.getHeadPosition()
     const grip = claw.getGrabPosition()
 
-    expect(head.y - grip.y).toBeGreaterThanOrEqual(0.72)
-    expect(head.y - grip.y).toBeLessThanOrEqual(0.82)
+    expect(head.y - grip.y).toBeGreaterThanOrEqual(0.8)
+    expect(head.y - grip.y).toBeLessThanOrEqual(0.86)
   })
 
   it('keeps the finger tips outside the gift box while carrying it', () => {
@@ -169,6 +169,26 @@ describe('articulated claw physics', () => {
 
     expect(claw.getFingerTipSpread()).toBeGreaterThanOrEqual(0.36)
     expect(claw.getFingerTipSpread()).toBeLessThanOrEqual(0.48)
+  })
+
+  it('makes the closed grip clearly narrower than the fully open claw', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    const claw = new ArticulatedClaw(
+      world,
+      new THREE.Scene(),
+      { anchorY: 4.05, headY: 3.5, x: 0, z: 0 },
+    )
+    world.timestep = 1 / 180
+
+    claw.setOpening(1)
+    for (let frame = 0; frame < 240; frame += 1) world.step()
+    const openSpread = claw.getFingerTipSpread()
+
+    claw.setOpening(PRIZE_GRIP_OPENING)
+    for (let frame = 0; frame < 240; frame += 1) world.step()
+    const gripSpread = claw.getFingerTipSpread()
+
+    expect(openSpread - gripSpread).toBeGreaterThanOrEqual(0.16)
   })
 
   it('settles the swinging head over the gantry before release', () => {

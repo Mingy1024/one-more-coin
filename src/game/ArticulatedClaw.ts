@@ -8,13 +8,13 @@ const HEAD_HALF_HEIGHT = 0.12
 const HINGE_RADIUS = 0.1
 const HINGE_Y = -0.14
 const CLOSED_ANGLE = -0.25
-const OPEN_ANGLE = 0.45
+const OPEN_ANGLE = 0.8
 const MIN_CABLE_LENGTH = 0.25
 const MAX_LATERAL_IMPULSE = 0.065
 const MAX_SWING_RADIUS = 0.34
 const MAX_SWING_ANGLE = Math.PI / 4
 const MAX_HEAD_ANGULAR_SPEED = 2.2
-const GRIP_CENTER_Y = -0.76
+const GRIP_CENTER_Y = -0.82
 const HEAD_BOUNDS = {
   minX: -1.45,
   maxX: 1.45,

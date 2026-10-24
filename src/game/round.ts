@@ -25,7 +25,7 @@ export type RoundAction =
 
 export const phaseDurations: Partial<Record<RoundPhase, number>> = {
   lowering: 1.25,
-  closing: 0.8,
+  closing: 1,
   lifting: 1.25,
   returning: 1.4,
   releasing: 0.65,

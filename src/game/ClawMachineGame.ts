@@ -16,10 +16,12 @@ import { ArticulatedClaw } from './ArticulatedClaw'
 import { MACHINE_DIMENSIONS } from './machineDimensions'
 import { PrizeCarryController } from './PrizeCarryController'
 import {
+  canPickupPrize,
   CHUTE_OPENING_HALF_X,
   CHUTE_OPENING_HALF_Z,
   isPrizeCaptured,
   PRIZE_GRIP_OPENING,
+  PRIZE_HALF_SIZE,
 } from './prizeInteraction'
 
 export interface GameSnapshot {
@@ -261,8 +263,7 @@ export class ClawMachineGame {
   private tryPickup(): void {
     const position = this.prize.body.translation()
     const grabPosition = this.articulatedClaw.getGrabPosition()
-    const distance = Math.hypot(position.x - grabPosition.x, position.z - grabPosition.z)
-    if (distance > 0.75 || position.y > 0.7) return
+    if (!canPickupPrize(position, grabPosition)) return
 
     this.carried = true
     this.lastGrabSucceeded = true
@@ -658,6 +659,8 @@ export class ClawMachineGame {
   }
 
   private createPrize(): Prize {
+    const prizeSize = PRIZE_HALF_SIZE * 2
+    const shellSize = prizeSize + 0.03
     const body = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(PRIZE_START.x, PRIZE_START.y, PRIZE_START.z)
@@ -665,13 +668,15 @@ export class ClawMachineGame {
         .setAngularDamping(0.6),
     )
     const collider = this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(0.36, 0.36, 0.36).setRestitution(0.15).setFriction(0.8),
+      RAPIER.ColliderDesc.cuboid(PRIZE_HALF_SIZE, PRIZE_HALF_SIZE, PRIZE_HALF_SIZE)
+        .setRestitution(0.15)
+        .setFriction(0.8),
       body,
     )
 
     const mesh = new THREE.Group()
     const box = new THREE.Mesh(
-      new RoundedBoxGeometry(0.72, 0.72, 0.72, 4, 0.055),
+      new RoundedBoxGeometry(prizeSize, prizeSize, prizeSize, 4, 0.05),
       new THREE.MeshBasicMaterial({
         color: COLORS.pink,
         toneMapped: false,
@@ -682,7 +687,7 @@ export class ClawMachineGame {
     mesh.add(box)
 
     const clearShell = new THREE.Mesh(
-      new RoundedBoxGeometry(0.75, 0.75, 0.75, 4, 0.06),
+      new RoundedBoxGeometry(shellSize, shellSize, shellSize, 4, 0.055),
       new THREE.MeshPhysicalMaterial({
         color: 0xffe8ee,
         transparent: true,
@@ -704,12 +709,12 @@ export class ClawMachineGame {
       roughness: 0.3,
       metalness: 0.24,
     })
-    const ribbonX = new THREE.Mesh(new RoundedBoxGeometry(0.75, 0.09, 0.18, 2, 0.025), ribbonMaterial)
-    const ribbonZ = new THREE.Mesh(new RoundedBoxGeometry(0.18, 0.09, 0.75, 2, 0.025), ribbonMaterial)
-    ribbonX.position.y = 0.35
-    ribbonZ.position.y = 0.35
+    const ribbonX = new THREE.Mesh(new RoundedBoxGeometry(shellSize, 0.08, 0.16, 2, 0.025), ribbonMaterial)
+    const ribbonZ = new THREE.Mesh(new RoundedBoxGeometry(0.16, 0.08, shellSize, 2, 0.025), ribbonMaterial)
+    ribbonX.position.y = PRIZE_HALF_SIZE - 0.01
+    ribbonZ.position.y = PRIZE_HALF_SIZE - 0.01
     const prizeGlow = new THREE.PointLight(COLORS.pink, 2.8, 2.2)
-    prizeGlow.position.y = 0.45
+    prizeGlow.position.y = PRIZE_HALF_SIZE + 0.07
     mesh.add(ribbonX, ribbonZ, prizeGlow)
     this.scene.add(mesh)
 

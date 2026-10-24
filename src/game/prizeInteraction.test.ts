@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  canPickupPrize,
   CHUTE_OPENING_HALF_X,
   CHUTE_OPENING_HALF_Z,
   isPrizeCaptured,
   PRIZE_HALF_DIAGONAL,
+  PRIZE_HALF_SIZE,
 } from './prizeInteraction'
 
 const chute = { x: -1.2, z: 0.96 }
@@ -25,5 +27,21 @@ describe('prize drop', () => {
   it('leaves clearance for the gift box even when it is rotated', () => {
     expect(CHUTE_OPENING_HALF_X - PRIZE_HALF_DIAGONAL).toBeGreaterThan(0.16)
     expect(CHUTE_OPENING_HALF_Z - PRIZE_HALF_DIAGONAL).toBeGreaterThan(0.1)
+  })
+})
+
+describe('prize pickup', () => {
+  const grabPosition = { x: 0, y: 0.1, z: 0 }
+
+  it('accepts a prize centered inside the claw', () => {
+    expect(canPickupPrize({ x: 0.35, y: 0.2, z: 0 }, grabPosition)).toBe(true)
+  })
+
+  it('rejects a prize that only brushes the outside of the claw', () => {
+    expect(canPickupPrize({ x: 0.6, y: 0.2, z: 0 }, grabPosition)).toBe(false)
+  })
+
+  it('keeps the gift compact enough to sit between the fingers without clipping', () => {
+    expect(PRIZE_HALF_SIZE).toBeLessThanOrEqual(0.31)
   })
 })
