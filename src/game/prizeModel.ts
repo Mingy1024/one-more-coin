@@ -154,12 +154,13 @@ export function createPrizeModel(): THREE.Group {
     [0, 0.01, 0.229], [1.18, 0.4, 0.12])
 
   for (const side of [-1, 1] as const) {
-    addPart(doll, side < 0 ? 'doll-left-eye' : 'doll-right-eye',
+    const eye = addPart(doll, side < 0 ? 'doll-left-eye' : 'doll-right-eye',
       new THREE.SphereGeometry(0.055, 28, 20), white,
-      [side * 0.043, 0.238, 0.204], [0.78, 1.5, 0.42])
+      [side * 0.043, 0.217, 0.132], [0.78, 1.5, 1.12])
+    eye.rotation.x = -0.6
     addPart(doll, side < 0 ? 'doll-left-pupil' : 'doll-right-pupil',
       new THREE.SphereGeometry(0.014, 18, 14), black,
-      [side * 0.036, 0.235, 0.232], [0.78, 1.08, 0.5])
+      [side * 0.036, 0.231, 0.19], [0.78, 1.08, 0.5])
   }
 
   addPart(doll, 'doll-nose', new THREE.SphereGeometry(0.034, 24, 18), red, [0, 0.177, 0.23])
