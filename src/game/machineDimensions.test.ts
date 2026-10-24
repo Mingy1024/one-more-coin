@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   clawTravelDistance,
+  chuteRestingPrizeTopY,
   lowerCabinetRatio,
   MACHINE_DIMENSIONS,
 } from './machineDimensions'
@@ -15,5 +16,9 @@ describe('machine proportions', () => {
 
   it('includes a full lower cabinet instead of a shallow pedestal', () => {
     expect(lowerCabinetRatio()).toBeGreaterThanOrEqual(0.35)
+  })
+
+  it('places the chute bottom deep enough to hide the enlarged doll', () => {
+    expect(chuteRestingPrizeTopY(0.6)).toBeLessThanOrEqual(-0.2)
   })
 })

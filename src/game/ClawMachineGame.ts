@@ -22,6 +22,7 @@ import {
   CHUTE_OPENING_HALF_X,
   CHUTE_OPENING_HALF_Z,
   isPrizeCaptured,
+  prizeReleaseAngularVelocity,
   PRIZE_GRIP_OPENING,
   PRIZE_HALF_DEPTH,
   PRIZE_HALF_HEIGHT,
@@ -284,7 +285,7 @@ export class ClawMachineGame {
       true,
     )
     this.prize.body.setLinvel({ x: 0, y: -0.25, z: 0 }, true)
-    this.prize.body.setAngvel({ x: 0.8, y: 0.4, z: -0.5 }, true)
+    this.prize.body.setAngvel(prizeReleaseAngularVelocity(), true)
   }
 
   private updatePhysics(delta: number): void {
@@ -366,6 +367,13 @@ export class ClawMachineGame {
       metalness: 0.52,
       clearcoat: 0.42,
       clearcoatRoughness: 0.32,
+    })
+    const insetMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0x17344a,
+      roughness: 0.28,
+      metalness: 0.38,
+      clearcoat: 0.58,
+      clearcoatRoughness: 0.24,
     })
     const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x4b7180, roughness: 0.36, metalness: 0.16 })
     const glassMaterial = new THREE.MeshPhysicalMaterial({
@@ -528,9 +536,13 @@ export class ClawMachineGame {
         0.025,
         CHUTE_OPENING_HALF_Z * 2,
       ),
-      new THREE.MeshStandardMaterial({ color: COLORS.aqua, emissive: COLORS.aqua, emissiveIntensity: 1.4 }),
+      new THREE.MeshStandardMaterial({ color: 0x07121d, roughness: 0.48, metalness: 0.24 }),
     )
-    chute.position.set(CHUTE.x, -1.02, CHUTE.z)
+    chute.position.set(
+      CHUTE.x,
+      MACHINE_DIMENSIONS.chuteBottomY + MACHINE_DIMENSIONS.chuteBottomHalfThickness,
+      CHUTE.z,
+    )
     this.scene.add(chute)
 
     const chuteWallMaterial = new THREE.MeshStandardMaterial({
@@ -543,20 +555,20 @@ export class ClawMachineGame {
       position: [number, number, number]
     }> = [
       {
-        size: [CHUTE_OPENING_HALF_X * 2, 0.9, 0.08],
-        position: [CHUTE.x, -0.56, CHUTE.z - CHUTE_OPENING_HALF_Z - 0.04],
+        size: [CHUTE_OPENING_HALF_X * 2, MACHINE_DIMENSIONS.chuteWellDepth, 0.08],
+        position: [CHUTE.x, -MACHINE_DIMENSIONS.chuteWellDepth / 2, CHUTE.z - CHUTE_OPENING_HALF_Z - 0.04],
       },
       {
-        size: [CHUTE_OPENING_HALF_X * 2, 0.9, 0.08],
-        position: [CHUTE.x, -0.56, CHUTE.z + CHUTE_OPENING_HALF_Z + 0.04],
+        size: [CHUTE_OPENING_HALF_X * 2, MACHINE_DIMENSIONS.chuteWellDepth, 0.08],
+        position: [CHUTE.x, -MACHINE_DIMENSIONS.chuteWellDepth / 2, CHUTE.z + CHUTE_OPENING_HALF_Z + 0.04],
       },
       {
-        size: [0.08, 0.9, CHUTE_OPENING_HALF_Z * 2],
-        position: [CHUTE.x - CHUTE_OPENING_HALF_X - 0.04, -0.56, CHUTE.z],
+        size: [0.08, MACHINE_DIMENSIONS.chuteWellDepth, CHUTE_OPENING_HALF_Z * 2],
+        position: [CHUTE.x - CHUTE_OPENING_HALF_X - 0.04, -MACHINE_DIMENSIONS.chuteWellDepth / 2, CHUTE.z],
       },
       {
-        size: [0.08, 0.9, CHUTE_OPENING_HALF_Z * 2],
-        position: [CHUTE.x + CHUTE_OPENING_HALF_X + 0.04, -0.56, CHUTE.z],
+        size: [0.08, MACHINE_DIMENSIONS.chuteWellDepth, CHUTE_OPENING_HALF_Z * 2],
+        position: [CHUTE.x + CHUTE_OPENING_HALF_X + 0.04, -MACHINE_DIMENSIONS.chuteWellDepth / 2, CHUTE.z],
       },
     ]
     for (const wall of chuteWell) {
@@ -572,8 +584,12 @@ export class ClawMachineGame {
       )
     }
     this.addStaticCollider(
-      { x: CHUTE_OPENING_HALF_X, y: 0.04, z: CHUTE_OPENING_HALF_Z },
-      { x: CHUTE.x, y: -1.06, z: CHUTE.z },
+      {
+        x: CHUTE_OPENING_HALF_X,
+        y: MACHINE_DIMENSIONS.chuteBottomHalfThickness,
+        z: CHUTE_OPENING_HALF_Z,
+      },
+      { x: CHUTE.x, y: MACHINE_DIMENSIONS.chuteBottomY, z: CHUTE.z },
     )
 
     const chuteFrame = new THREE.LineSegments(
@@ -590,21 +606,25 @@ export class ClawMachineGame {
     const lowerCabinetCenterY = -0.08 - MACHINE_DIMENSIONS.lowerCabinetHeight / 2
     const plinth = new THREE.Mesh(
       new RoundedBoxGeometry(4.04, MACHINE_DIMENSIONS.lowerCabinetHeight, 3.65, 4, 0.12),
-      baseMaterial,
+      frameMaterial,
     )
     plinth.position.y = lowerCabinetCenterY
     plinth.castShadow = true
     this.scene.add(plinth)
 
     const frontPanel = new THREE.Mesh(
-      new THREE.BoxGeometry(3.58, MACHINE_DIMENSIONS.lowerCabinetHeight - 0.24, 0.08),
-      new THREE.MeshStandardMaterial({ color: 0x284961, roughness: 0.32, metalness: 0.42 }),
+      new RoundedBoxGeometry(3.62, MACHINE_DIMENSIONS.lowerCabinetHeight - 0.28, 0.1, 4, 0.07),
+      insetMaterial,
     )
-    frontPanel.position.set(0, lowerCabinetCenterY, 1.86)
+    frontPanel.position.set(0, lowerCabinetCenterY, 1.88)
     this.scene.add(frontPanel)
 
     addLightStrip([1.48, 0.055, 0.04], [-0.82, -0.22, 1.91], COLORS.pink, [0, 0, 1])
     addLightStrip([1.48, 0.055, 0.04], [0.82, -0.22, 1.91], COLORS.aqua, [0, 0, 1])
+    addLightStrip([0.045, 1.12, 0.04], [-1.77, lowerCabinetCenterY, 1.94], COLORS.aqua, [0, 0, 1])
+    addLightStrip([0.045, 1.12, 0.04], [1.77, lowerCabinetCenterY, 1.94], COLORS.pink, [0, 0, 1])
+    addLightStrip([1.48, 0.045, 0.04], [-0.82, -1.47, 1.94], COLORS.pink, [0, 0, 1])
+    addLightStrip([1.48, 0.045, 0.04], [0.82, -1.47, 1.94], COLORS.aqua, [0, 0, 1])
 
     const badge = new THREE.Mesh(
       new THREE.BoxGeometry(0.5, 0.2, 0.025),
@@ -618,34 +638,50 @@ export class ClawMachineGame {
     badge.position.set(0.94, lowerCabinetCenterY, 1.915)
     this.scene.add(badge)
 
-    const prizeDoor = new THREE.Mesh(
-      new RoundedBoxGeometry(1.18, 0.72, 0.08, 3, 0.04),
-      new THREE.MeshStandardMaterial({
-        color: 0x0b1828,
-        roughness: 0.3,
-        metalness: 0.5,
-      }),
+    const prizeDoorBezel = new THREE.Mesh(
+      new RoundedBoxGeometry(1.34, 0.84, 0.09, 4, 0.07),
+      frameMaterial,
     )
-    prizeDoor.position.set(-0.92, lowerCabinetCenterY - 0.04, 1.93)
-    this.scene.add(prizeDoor)
+    prizeDoorBezel.position.set(-0.92, lowerCabinetCenterY - 0.04, 1.95)
+    this.scene.add(prizeDoorBezel)
 
     const prizeDoorInset = new THREE.Mesh(
-      new RoundedBoxGeometry(0.9, 0.46, 0.025, 2, 0.03),
+      new RoundedBoxGeometry(1.06, 0.56, 0.035, 3, 0.045),
       new THREE.MeshStandardMaterial({
-        color: 0x17344a,
+        color: 0x081725,
         emissive: COLORS.aqua,
-        emissiveIntensity: 0.32,
+        emissiveIntensity: 0.2,
+        roughness: 0.36,
+        metalness: 0.2,
+      }),
+    )
+    prizeDoorInset.position.set(-0.92, lowerCabinetCenterY - 0.04, 2.01)
+    this.scene.add(prizeDoorInset)
+
+    const coinPanel = new THREE.Mesh(
+      new RoundedBoxGeometry(0.76, 0.86, 0.085, 4, 0.065),
+      frameMaterial,
+    )
+    coinPanel.position.set(0.94, lowerCabinetCenterY - 0.02, 1.95)
+    this.scene.add(coinPanel)
+
+    const coinPanelInset = new THREE.Mesh(
+      new RoundedBoxGeometry(0.56, 0.66, 0.035, 3, 0.04),
+      baseMaterial,
+    )
+    coinPanelInset.position.set(0.94, lowerCabinetCenterY - 0.02, 2.01)
+    this.scene.add(coinPanelInset)
+
+    const coinSlot = new THREE.Mesh(
+      new RoundedBoxGeometry(0.3, 0.065, 0.025, 2, 0.02),
+      new THREE.MeshStandardMaterial({
+        color: COLORS.warm,
+        emissive: COLORS.warm,
+        emissiveIntensity: 0.5,
         roughness: 0.28,
       }),
     )
-    prizeDoorInset.position.set(-0.92, lowerCabinetCenterY - 0.04, 1.98)
-    this.scene.add(prizeDoorInset)
-
-    const coinSlot = new THREE.Mesh(
-      new RoundedBoxGeometry(0.46, 0.34, 0.06, 2, 0.025),
-      new THREE.MeshStandardMaterial({ color: 0x111b27, roughness: 0.24, metalness: 0.8 }),
-    )
-    coinSlot.position.set(0.94, lowerCabinetCenterY - 0.25, 1.96)
+    coinSlot.position.set(0.94, lowerCabinetCenterY - 0.18, 2.045)
     this.scene.add(coinSlot)
   }
 

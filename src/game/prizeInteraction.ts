@@ -2,7 +2,7 @@ export const PRIZE_GRIP_OPENING = 0.68
 export const PRIZE_HALF_WIDTH = 0.4
 export const PRIZE_HALF_HEIGHT = 0.6
 export const PRIZE_HALF_DEPTH = 0.3
-export const CHUTE_CAPTURE_Y = -0.36
+export const CHUTE_CAPTURE_Y = -PRIZE_HALF_HEIGHT - 0.05
 export const CHUTE_OPENING_HALF_X = 0.7
 export const CHUTE_OPENING_HALF_Z = 0.72
 export const PRIZE_HALF_DIAGONAL = Math.hypot(PRIZE_HALF_WIDTH, PRIZE_HALF_DEPTH)
@@ -18,6 +18,10 @@ export interface PrizePosition {
 export interface ChutePosition {
   x: number
   z: number
+}
+
+export function prizeReleaseAngularVelocity(): { x: number; y: number; z: number } {
+  return { x: 0, y: 0.35, z: 0 }
 }
 
 export function alignPrizeWithChute(
