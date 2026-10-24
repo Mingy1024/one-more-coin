@@ -17,6 +17,7 @@ import { ArticulatedClaw } from './ArticulatedClaw'
 import { MACHINE_DIMENSIONS } from './machineDimensions'
 import { PrizeCarryController } from './PrizeCarryController'
 import {
+  alignPrizeWithChute,
   canPickupPrize,
   CHUTE_OPENING_HALF_X,
   CHUTE_OPENING_HALF_Z,
@@ -55,7 +56,7 @@ const COLORS = {
 const CLAW_TOP_Y = MACHINE_DIMENSIONS.clawTopY
 const CLAW_LOW_Y = MACHINE_DIMENSIONS.clawLowY
 const CHUTE = { x: -1.2, z: 0.96 }
-const PRIZE_START = { x: 0.48, y: 0.42, z: -0.18 }
+const PRIZE_START = { x: 0.48, y: 0.62, z: -0.18 }
 const ROPE_ANCHOR_Y = MACHINE_DIMENSIONS.ropeAnchorY
 
 export class ClawMachineGame {
@@ -113,7 +114,7 @@ export class ClawMachineGame {
     })
     this.prize = this.createPrize()
     this.prizeCarry = new PrizeCarryController(this.prize.body, this.prize.collider)
-    this.addDecorations()
+    this.addAmbientStars()
 
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(canvas)
@@ -278,6 +279,10 @@ export class ClawMachineGame {
     if (!this.carried) return
     this.carried = false
     this.prizeCarry.release()
+    this.prize.body.setTranslation(
+      alignPrizeWithChute(this.prize.body.translation(), CHUTE),
+      true,
+    )
     this.prize.body.setLinvel({ x: 0, y: -0.25, z: 0 }, true)
     this.prize.body.setAngvel({ x: 0.8, y: 0.4, z: -0.5 }, true)
   }
@@ -685,32 +690,7 @@ export class ClawMachineGame {
     return { body, collider, mesh }
   }
 
-  private addDecorations(): void {
-    const colors = [COLORS.aqua, COLORS.violet, COLORS.warm, 0x75ff9f]
-    const positions = [
-      [-0.55, -0.72],
-      [1.34, 0.58],
-      [-0.72, 0.2],
-      [0.95, -0.78],
-    ]
-
-    for (const [index, position] of positions.entries()) {
-      const gem = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(0.22 + (index % 2) * 0.05, 1),
-        new THREE.MeshStandardMaterial({
-          color: colors[index],
-          emissive: colors[index],
-          emissiveIntensity: 0.22,
-          roughness: 0.24,
-          metalness: 0.35,
-        }),
-      )
-      gem.position.set(position[0] ?? 0, 0.22, position[1] ?? 0)
-      gem.rotation.set(index, index * 0.6, index * 0.3)
-      gem.castShadow = true
-      this.scene.add(gem)
-    }
-
+  private addAmbientStars(): void {
     const stars = new THREE.BufferGeometry()
     const points: number[] = []
     for (let index = 0; index < 120; index += 1) {

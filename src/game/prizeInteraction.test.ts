@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  alignPrizeWithChute,
   canPickupPrize,
   CHUTE_OPENING_HALF_X,
   CHUTE_OPENING_HALF_Z,
@@ -14,12 +15,24 @@ import {
 const chute = { x: -1.2, z: 0.96 }
 
 describe('prize drop', () => {
+  it('centers a carried doll over the chute before release', () => {
+    expect(alignPrizeWithChute({ x: -0.9, y: 1.4, z: 0.7 }, chute)).toEqual({
+      x: -1.2,
+      y: 1.4,
+      z: 0.96,
+    })
+  })
+
   it('does not report a win while the prize is still above the cabinet floor', () => {
     expect(isPrizeCaptured({ x: -1.2, y: 0.2, z: 0.96 }, chute)).toBe(false)
   })
 
   it('reports a win only after the prize visibly falls through the chute', () => {
     expect(isPrizeCaptured({ x: -1.2, y: -0.55, z: 0.96 }, chute)).toBe(true)
+  })
+
+  it('reports the enlarged doll after it settles inside the chute well', () => {
+    expect(isPrizeCaptured({ x: -1.2, y: -0.42, z: 0.96 }, chute)).toBe(true)
   })
 
   it('does not report a win when the prize falls outside the chute', () => {
@@ -39,17 +52,22 @@ describe('prize pickup', () => {
     expect(canPickupPrize({ x: 0.35, y: 0.2, z: 0 }, grabPosition)).toBe(true)
   })
 
+  it('accepts the enlarged doll at its resting height', () => {
+    expect(canPickupPrize({ x: 0, y: 0.72, z: 0 }, grabPosition)).toBe(true)
+  })
+
   it('rejects a prize that only brushes the outside of the claw', () => {
     expect(canPickupPrize({ x: 0.6, y: 0.2, z: 0 }, grabPosition)).toBe(false)
   })
 
-  it('keeps the gift compact enough to sit between the fingers without clipping', () => {
-    expect(PRIZE_HALF_WIDTH).toBeLessThanOrEqual(0.31)
+  it('keeps the enlarged doll inside the widened chute', () => {
+    expect(PRIZE_HALF_WIDTH).toBeGreaterThanOrEqual(0.39)
+    expect(PRIZE_HALF_WIDTH).toBeLessThanOrEqual(0.4)
   })
 
   it('uses a tall, shallow collider that matches the doll silhouette', () => {
-    expect(PRIZE_HALF_HEIGHT).toBeGreaterThanOrEqual(0.39)
-    expect(PRIZE_HALF_HEIGHT).toBeLessThanOrEqual(0.41)
-    expect(PRIZE_HALF_DEPTH).toBeLessThanOrEqual(0.26)
+    expect(PRIZE_HALF_HEIGHT).toBeGreaterThanOrEqual(0.59)
+    expect(PRIZE_HALF_HEIGHT).toBeLessThanOrEqual(0.61)
+    expect(PRIZE_HALF_DEPTH).toBeLessThanOrEqual(0.31)
   })
 })

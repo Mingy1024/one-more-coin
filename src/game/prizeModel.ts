@@ -8,8 +8,35 @@ const MOUTH = 0x8d1722
 const TONGUE = 0xef5a50
 const YELLOW = 0xf0bd22
 
-function plushMaterial(color: number, roughness = 0.58): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.02 })
+function createFiberTexture(): THREE.DataTexture {
+  const size = 32
+  const data = new Uint8Array(size * size)
+  let seed = 1907
+  for (let index = 0; index < data.length; index += 1) {
+    seed = (seed * 16807) % 2147483647
+    data[index] = 96 + (seed % 144)
+  }
+  const texture = new THREE.DataTexture(data, size, size, THREE.RedFormat)
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  texture.repeat.set(5, 5)
+  texture.needsUpdate = true
+  return texture
+}
+
+const FIBER_TEXTURE = createFiberTexture()
+
+function plushMaterial(color: number, roughness = 0.94): THREE.MeshPhysicalMaterial {
+  return new THREE.MeshPhysicalMaterial({
+    color,
+    roughness,
+    metalness: 0,
+    sheen: 1,
+    sheenColor: new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.34),
+    sheenRoughness: 0.9,
+    bumpMap: FIBER_TEXTURE,
+    bumpScale: 0.012,
+  })
 }
 
 function addPart(
@@ -47,22 +74,65 @@ function addRod(
   parent.add(rod)
 }
 
+function addFuzzLayer(parent: THREE.Group): void {
+  const positions: number[] = []
+  let seed = 73
+  const addEllipsoid = (
+    count: number,
+    center: THREE.Vector3,
+    radii: THREE.Vector3,
+  ): void => {
+    for (let index = 0; index < count; index += 1) {
+      seed = (seed * 48271) % 2147483647
+      const u = seed / 2147483647
+      seed = (seed * 48271) % 2147483647
+      const v = seed / 2147483647
+      const theta = u * Math.PI * 2
+      const phi = Math.acos(2 * v - 1)
+      positions.push(
+        center.x + radii.x * Math.sin(phi) * Math.cos(theta),
+        center.y + radii.y * Math.cos(phi),
+        center.z + radii.z * Math.sin(phi) * Math.sin(theta),
+      )
+    }
+  }
+
+  addEllipsoid(220, new THREE.Vector3(0, 0.105, 0), new THREE.Vector3(0.224, 0.219, 0.185))
+  addEllipsoid(140, new THREE.Vector3(0, -0.14, 0), new THREE.Vector3(0.18, 0.212, 0.156))
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  const fuzz = new THREE.Points(
+    geometry,
+    new THREE.PointsMaterial({
+      color: BLUE,
+      size: 0.008,
+      transparent: true,
+      opacity: 0.52,
+      depthWrite: false,
+      sizeAttenuation: true,
+    }),
+  )
+  fuzz.name = 'doll-fuzz'
+  parent.add(fuzz)
+}
+
 export function createPrizeModel(): THREE.Group {
   const root = new THREE.Group()
   root.name = 'doll-prize'
 
   const doll = new THREE.Group()
   doll.rotation.y = Math.PI / 7
-  doll.scale.setScalar(1.18)
+  doll.scale.setScalar(1.77)
   root.add(doll)
 
   const blue = plushMaterial(BLUE)
-  const white = plushMaterial(WHITE, 0.68)
-  const red = plushMaterial(RED, 0.46)
-  const darkMouth = plushMaterial(MOUTH, 0.72)
-  const tongue = plushMaterial(TONGUE, 0.7)
-  const yellow = plushMaterial(YELLOW, 0.4)
-  const black = plushMaterial(0x242127, 0.75)
+  const white = plushMaterial(WHITE, 0.97)
+  const red = plushMaterial(RED, 0.92)
+  const darkMouth = plushMaterial(MOUTH, 0.96)
+  const tongue = plushMaterial(TONGUE, 0.94)
+  const yellow = plushMaterial(YELLOW, 0.9)
+  const black = plushMaterial(0x242127, 0.98)
   const tear = new THREE.MeshPhysicalMaterial({
     color: 0x8ed8ed,
     roughness: 0.22,
@@ -126,6 +196,7 @@ export function createPrizeModel(): THREE.Group {
     new THREE.SphereGeometry(0.035, 22, 16), tear,
     [0.115, 0.17, 0.224], [0.58, 1.22, 0.38])
   tearDrop.rotation.z = -0.55
+  addFuzzLayer(doll)
 
   return root
 }

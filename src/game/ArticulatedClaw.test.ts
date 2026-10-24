@@ -191,6 +191,22 @@ describe('articulated claw physics', () => {
     expect(openSpread - gripSpread).toBeGreaterThanOrEqual(0.16)
   })
 
+  it('keeps the shortened fingers under one head-height of reach', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    const claw = new ArticulatedClaw(
+      world,
+      new THREE.Scene(),
+      { anchorY: 4.05, headY: 3.5, x: 0, z: 0 },
+    )
+    world.timestep = 1 / 180
+
+    claw.setOpening(1)
+    for (let frame = 0; frame < 240; frame += 1) world.step()
+
+    expect(claw.getFingerTipDrop()).toBeGreaterThanOrEqual(0.75)
+    expect(claw.getFingerTipDrop()).toBeLessThanOrEqual(0.92)
+  })
+
   it('settles the swinging head over the gantry before release', () => {
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
     const claw = new ArticulatedClaw(

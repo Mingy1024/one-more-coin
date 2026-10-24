@@ -24,18 +24,18 @@ const HEAD_BOUNDS = {
 
 const FINGER_PATH = [
   new THREE.Vector3(0, 0, 0),
-  new THREE.Vector3(0.24, -0.4, 0),
-  new THREE.Vector3(0.32, -0.7, 0),
-  new THREE.Vector3(0.31, -0.94, 0),
-  new THREE.Vector3(0.22, -1.08, 0),
+  new THREE.Vector3(0.24, -0.34, 0),
+  new THREE.Vector3(0.32, -0.59, 0),
+  new THREE.Vector3(0.31, -0.79, 0),
+  new THREE.Vector3(0.22, -0.91, 0),
 ] as const
 
 const FINGER_VISUAL_PATH = [
   new THREE.Vector3(0, 0, 0),
-  new THREE.Vector3(0.17, -0.24, 0),
-  new THREE.Vector3(0.29, -0.69, 0),
-  new THREE.Vector3(0.285, -0.92, 0),
-  new THREE.Vector3(0.19, -1.055, 0),
+  new THREE.Vector3(0.17, -0.2, 0),
+  new THREE.Vector3(0.29, -0.58, 0),
+  new THREE.Vector3(0.285, -0.77, 0),
+  new THREE.Vector3(0.19, -0.89, 0),
 ] as const
 
 interface FingerAssembly {
@@ -161,6 +161,23 @@ export class ArticulatedClaw {
       ))
       worldTip.add(new THREE.Vector3(position.x, position.y, position.z))
       return Math.hypot(worldTip.x - head.x, worldTip.z - head.z)
+    }))
+  }
+
+  getFingerTipDrop(): number {
+    const head = this.headBody.translation()
+    const tip = FINGER_VISUAL_PATH[FINGER_VISUAL_PATH.length - 1]!
+    return Math.max(...this.fingers.map((finger) => {
+      const position = finger.body.translation()
+      const rotation = finger.body.rotation()
+      const worldTip = tip.clone().applyQuaternion(new THREE.Quaternion(
+        rotation.x,
+        rotation.y,
+        rotation.z,
+        rotation.w,
+      ))
+      worldTip.add(new THREE.Vector3(position.x, position.y, position.z))
+      return head.y - worldTip.y
     }))
   }
 

@@ -21,8 +21,20 @@ describe('three-dimensional doll prize', () => {
     const bounds = new THREE.Box3().setFromObject(doll)
     const size = bounds.getSize(new THREE.Vector3())
 
-    expect(size.x).toBeGreaterThan(0.65)
-    expect(size.y).toBeGreaterThan(0.76)
-    expect(size.z).toBeGreaterThan(0.38)
+    expect(size.x).toBeGreaterThan(1)
+    expect(size.y).toBeGreaterThan(1.15)
+    expect(size.z).toBeGreaterThan(0.58)
+  })
+
+  it('uses rough fabric shading and a visible fiber layer', () => {
+    const doll = createPrizeModel()
+    const head = doll.getObjectByName('doll-head') as THREE.Mesh
+    const material = head.material as THREE.MeshPhysicalMaterial
+
+    expect(material).toBeInstanceOf(THREE.MeshPhysicalMaterial)
+    expect(material.roughness).toBeGreaterThanOrEqual(0.9)
+    expect(material.sheen).toBeGreaterThanOrEqual(0.8)
+    expect(material.bumpMap).toBeInstanceOf(THREE.Texture)
+    expect(doll.getObjectByName('doll-fuzz')).toBeInstanceOf(THREE.Points)
   })
 })
