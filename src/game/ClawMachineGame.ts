@@ -128,7 +128,7 @@ export class ClawMachineGame {
     })
     this.prizes = [
       this.createPrize(PRIZE_START, createPrizeModel(), COLORS.pink),
-      this.createPrize(ARCANINE_START, createArcanineModel(), COLORS.warm),
+      this.createPrize(ARCANINE_START, createArcanineModel(), COLORS.warm, 0.35),
     ]
     this.addAmbientStars()
 
@@ -727,6 +727,7 @@ export class ClawMachineGame {
     start: { x: number; y: number; z: number },
     mesh: THREE.Group,
     glowColor: number,
+    glowIntensity = 2.8,
   ): Prize {
     const body = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
@@ -741,7 +742,7 @@ export class ClawMachineGame {
       body,
     )
 
-    const prizeGlow = new THREE.PointLight(glowColor, 2.8, 2.2)
+    const prizeGlow = new THREE.PointLight(glowColor, glowIntensity, 2.2)
     prizeGlow.position.y = PRIZE_HALF_HEIGHT + 0.07
     mesh.add(prizeGlow)
     this.scene.add(mesh)

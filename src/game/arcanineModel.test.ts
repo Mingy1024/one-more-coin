@@ -9,10 +9,8 @@ describe('Arcanine plush prize', () => {
 
     for (const part of [
       'arcanine-body', 'arcanine-head', 'arcanine-mane', 'arcanine-tail',
-      'arcanine-left-ear', 'arcanine-right-ear', 'arcanine-left-eye',
-      'arcanine-right-eye', 'arcanine-nose', 'arcanine-left-stripe',
-      'arcanine-right-stripe', 'arcanine-front-left-paw', 'arcanine-front-right-paw',
-      'arcanine-front-left-stripe', 'arcanine-front-right-stripe',
+      'arcanine-left-ear', 'arcanine-right-ear', 'arcanine-nose',
+      'arcanine-front-left-paw', 'arcanine-front-right-paw',
     ]) {
       expect(doll.getObjectByName(part), part).toBeInstanceOf(THREE.Mesh)
     }
@@ -38,6 +36,21 @@ describe('Arcanine plush prize', () => {
     expect(material.roughness).toBeGreaterThanOrEqual(0.9)
     expect(material.sheen).toBeGreaterThan(0.7)
     expect(material.bumpMap).toBeInstanceOf(THREE.Texture)
-    expect(doll.getObjectByName('arcanine-fuzz')).toBeInstanceOf(THREE.Points)
+    expect(material.map).toBeInstanceOf(THREE.DataTexture)
+  })
+
+  it('embeds facial markings and tiger stripes in the cloth instead of floating meshes', () => {
+    const doll = createArcanineModel()
+    for (const name of ['arcanine-head', 'arcanine-body', 'arcanine-front-left-leg']) {
+      const mesh = doll.getObjectByName(name) as THREE.Mesh
+      const map = (mesh.material as THREE.MeshPhysicalMaterial).map as THREE.DataTexture
+      const data = map.image.data!
+      let darkPixels = 0
+      for (let i = 0; i < data.length; i += 4) if (data[i]! < 60) darkPixels += 1
+      expect(darkPixels, name).toBeGreaterThan(20)
+    }
+    expect(doll.getObjectByName('arcanine-left-eye')).toBeUndefined()
+    expect(doll.getObjectByName('arcanine-left-stripe')).toBeUndefined()
+    expect(doll.getObjectByName('arcanine-mouth')).toBeUndefined()
   })
 })
