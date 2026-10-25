@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { clawOpeningForPhase } from './clawPose'
+import { clawDescentProgress, clawOpeningForPhase } from './clawPose'
 
 const gripOpening = 0.55
 
@@ -10,10 +10,14 @@ describe('claw pose by round phase', () => {
     expect(clawOpeningForPhase('aiming', 0, false, gripOpening)).toBe(0)
   })
 
-  it('opens the claw only after the descent starts', () => {
+  it('opens fully before the head starts descending', () => {
     expect(clawOpeningForPhase('lowering', 0, false, gripOpening)).toBe(0)
-    expect(clawOpeningForPhase('lowering', 0.5, false, gripOpening)).toBeCloseTo(0.5)
+    expect(clawOpeningForPhase('lowering', 0.2, false, gripOpening)).toBe(1)
+    expect(clawDescentProgress(0.2)).toBe(0)
+    expect(clawDescentProgress(0.3)).toBeGreaterThan(0)
+    expect(clawOpeningForPhase('lowering', 0.5, false, gripOpening)).toBe(1)
     expect(clawOpeningForPhase('lowering', 1, false, gripOpening)).toBe(1)
+    expect(clawDescentProgress(1)).toBe(1)
   })
 
   it('closes from fully open to the carrying grip at the bottom', () => {

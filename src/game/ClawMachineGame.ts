@@ -12,7 +12,7 @@ import {
 import { dragOrbit, orbitPosition, type OrbitState } from './orbit'
 import { banterFor, type BanterLine } from './banter'
 import { approachVelocity, type PlanarMotion } from './clawMotion'
-import { clawOpeningForPhase } from './clawPose'
+import { clawDescentProgress, clawOpeningForPhase } from './clawPose'
 import { ArticulatedClaw } from './ArticulatedClaw'
 import { MACHINE_DIMENSIONS } from './machineDimensions'
 import { PrizeCarryController } from './PrizeCarryController'
@@ -29,6 +29,7 @@ import {
   PRIZE_HALF_WIDTH,
 } from './prizeInteraction'
 import { createPrizeModel } from './prizeModel'
+import { createGantryAssembly } from './gantry'
 
 export interface GameSnapshot {
   attempts: number
@@ -66,7 +67,7 @@ export class ClawMachineGame {
   private readonly renderer: THREE.WebGLRenderer
   private readonly world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
   private readonly timer = new THREE.Timer()
-  private readonly gantryRoot = new THREE.Group()
+  private readonly gantry = createGantryAssembly()
   private readonly articulatedClaw: ArticulatedClaw
   private readonly prize: Prize
   private readonly prizeCarry: PrizeCarryController
@@ -106,7 +107,7 @@ export class ClawMachineGame {
 
     this.addLights()
     this.addCabinet()
-    this.createGantry()
+    this.scene.add(this.gantry.root)
     this.articulatedClaw = new ArticulatedClaw(this.world, this.scene, {
       anchorY: ROPE_ANCHOR_Y,
       headY: CLAW_TOP_Y,
@@ -232,18 +233,19 @@ export class ClawMachineGame {
   }
 
   private updateClawAnimation(): void {
-    const progress = smoothStep(phaseProgress(this.round))
+    const phaseFraction = phaseProgress(this.round)
+    const progress = smoothStep(phaseFraction)
     const phase = this.round.phase
     let headY: number = CLAW_TOP_Y
     const prongOpen = clawOpeningForPhase(
       phase,
-      progress,
+      phase === 'lowering' ? phaseFraction : progress,
       this.carried,
       PRIZE_GRIP_OPENING,
     )
 
     if (phase === 'lowering') {
-      headY = THREE.MathUtils.lerp(CLAW_TOP_Y, CLAW_LOW_Y, progress)
+      headY = THREE.MathUtils.lerp(CLAW_TOP_Y, CLAW_LOW_Y, clawDescentProgress(phaseFraction))
     } else if (phase === 'closing') {
       headY = CLAW_LOW_Y
     } else if (phase === 'lifting') {
@@ -253,7 +255,8 @@ export class ClawMachineGame {
       this.clawPosition.z = THREE.MathUtils.lerp(this.cycleStart.z, CHUTE.z, progress)
     }
 
-    this.gantryRoot.position.set(this.clawPosition.x, 0, this.clawPosition.z)
+    this.gantry.bridge.position.z = this.clawPosition.z
+    this.gantry.carriage.position.set(this.clawPosition.x, 0, this.clawPosition.z)
     const ropeLength = ROPE_ANCHOR_Y - headY
     this.articulatedClaw.setGantryPosition(this.clawPosition.x, this.clawPosition.z)
     this.articulatedClaw.setCableLength(ropeLength)
@@ -683,24 +686,6 @@ export class ClawMachineGame {
     )
     coinSlot.position.set(0.94, lowerCabinetCenterY - 0.18, 2.045)
     this.scene.add(coinSlot)
-  }
-
-  private createGantry(): void {
-    const darkMetal = new THREE.MeshStandardMaterial({ color: 0x263347, roughness: 0.22, metalness: 0.88 })
-
-    const railX = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.08, 0.1), darkMetal)
-    railX.position.y = 4.09
-    this.scene.add(railX)
-
-    const railZ = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 2.8), darkMetal)
-    railZ.position.y = 4.03
-    this.gantryRoot.add(railZ)
-
-    const carriage = new THREE.Mesh(new RoundedBoxGeometry(0.46, 0.2, 0.46, 3, 0.045), darkMetal)
-    carriage.position.y = 3.99
-    carriage.castShadow = true
-    this.gantryRoot.add(carriage)
-    this.scene.add(this.gantryRoot)
   }
 
   private createPrize(): Prize {

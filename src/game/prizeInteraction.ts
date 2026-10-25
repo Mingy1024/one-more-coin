@@ -1,4 +1,4 @@
-export const PRIZE_GRIP_OPENING = 0.68
+export const PRIZE_GRIP_OPENING = 0.55
 export const PRIZE_HALF_WIDTH = 0.4
 export const PRIZE_HALF_HEIGHT = 0.6
 export const PRIZE_HALF_DEPTH = 0.3

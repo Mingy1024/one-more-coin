@@ -200,8 +200,8 @@ export class ArticulatedClaw {
     const target = THREE.MathUtils.lerp(CLOSED_ANGLE, OPEN_ANGLE, amount)
     this.sliderLocalY = linkagePose(amount).sliderY - 0.1
     for (const finger of this.fingers) {
-      finger.joint.configureMotorPosition(target, 240, 18)
-      finger.joint.setMotorMaxForce(220)
+      finger.joint.configureMotorPosition(target, 520, 34)
+      finger.joint.setMotorMaxForce(600)
     }
   }
 

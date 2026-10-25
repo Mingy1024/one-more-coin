@@ -3,7 +3,15 @@ import * as THREE from 'three'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import { ArticulatedClaw } from './ArticulatedClaw'
-import { PRIZE_GRIP_OPENING } from './prizeInteraction'
+import { clawDescentProgress, clawOpeningForPhase } from './clawPose'
+import { MACHINE_DIMENSIONS } from './machineDimensions'
+import {
+  PRIZE_GRIP_OPENING,
+  PRIZE_HALF_DEPTH,
+  PRIZE_HALF_HEIGHT,
+  PRIZE_HALF_WIDTH,
+} from './prizeInteraction'
+import { phaseDurations } from './round'
 
 beforeAll(async () => {
   await RAPIER.init()
@@ -119,7 +127,94 @@ describe('articulated claw physics', () => {
       claw.stabilizeSwing()
     }
 
-    expect(claw.getFingerTipSpread()).toBeGreaterThanOrEqual(0.42)
+    expect(claw.getFingerTipSpread()).toBeGreaterThanOrEqual(0.52)
+  })
+
+  it('reaches a wide physical opening before the head starts descending', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    const claw = new ArticulatedClaw(world, new THREE.Scene(), {
+      anchorY: MACHINE_DIMENSIONS.ropeAnchorY,
+      headY: MACHINE_DIMENSIONS.clawTopY,
+      x: 0,
+      z: 0,
+    })
+    world.timestep = 1 / 180
+    claw.setOpening(0)
+    for (let frame = 0; frame < 180; frame += 1) world.step()
+
+    const loweringDuration = phaseDurations.lowering!
+    let narrowestSpreadNearPrize = Infinity
+    let narrowestFrame = -1
+    let previousSpread = claw.getFingerTipSpread()
+    let largestSpreadJump = 0
+    let largestDescentJump = 0
+    for (let frame = 0; frame <= Math.ceil(loweringDuration * 180); frame += 1) {
+      const progress = frame / (loweringDuration * 180)
+      const descent = clawDescentProgress(progress)
+      const headY = THREE.MathUtils.lerp(MACHINE_DIMENSIONS.clawTopY, MACHINE_DIMENSIONS.clawLowY, descent)
+      claw.setCableLength(MACHINE_DIMENSIONS.ropeAnchorY - headY)
+      claw.setOpening(clawOpeningForPhase('lowering', progress, false, PRIZE_GRIP_OPENING))
+      world.step()
+      claw.stabilizeSwing()
+      const spread = claw.getFingerTipSpread()
+      largestSpreadJump = Math.max(largestSpreadJump, Math.abs(spread - previousSpread))
+      if (progress >= 0.25) {
+        largestDescentJump = Math.max(largestDescentJump, Math.abs(spread - previousSpread))
+      }
+      previousSpread = spread
+      if (frame === Math.ceil(loweringDuration * 180 * 0.25)) {
+        expect(claw.getFingerTipSpread()).toBeGreaterThanOrEqual(0.5)
+      }
+      if (claw.getHeadPosition().y - claw.getFingerTipDrop() <= PRIZE_HALF_HEIGHT * 2) {
+        if (claw.getFingerTipSpread() < narrowestSpreadNearPrize) {
+          narrowestSpreadNearPrize = claw.getFingerTipSpread()
+          narrowestFrame = frame
+        }
+      }
+    }
+
+    expect(narrowestSpreadNearPrize, `frame ${narrowestFrame}`).toBeGreaterThanOrEqual(0.5)
+    expect(largestSpreadJump).toBeLessThan(0.08)
+    expect(largestDescentJump).toBeLessThan(0.04)
+    expect(clawDescentProgress(0.25)).toBe(0)
+  })
+
+  it('does not shove a centered prize away before the closing phase', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    const floor = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.08, 0))
+    world.createCollider(RAPIER.ColliderDesc.cuboid(1.5, 0.08, 1.5), floor)
+    const prize = world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic().setTranslation(0, PRIZE_HALF_HEIGHT + 0.02, 0),
+    )
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(PRIZE_HALF_WIDTH, PRIZE_HALF_HEIGHT, PRIZE_HALF_DEPTH),
+      prize,
+    )
+    const claw = new ArticulatedClaw(world, new THREE.Scene(), {
+      anchorY: MACHINE_DIMENSIONS.ropeAnchorY,
+      headY: MACHINE_DIMENSIONS.clawTopY,
+      x: 0,
+      z: 0,
+    })
+    world.timestep = 1 / 180
+    claw.setOpening(0)
+    for (let frame = 0; frame < 180; frame += 1) world.step()
+
+    const frameCount = Math.ceil(phaseDurations.lowering! * 180)
+    for (let frame = 0; frame <= frameCount; frame += 1) {
+      const progress = frame / frameCount
+      const headY = THREE.MathUtils.lerp(
+        MACHINE_DIMENSIONS.clawTopY,
+        MACHINE_DIMENSIONS.clawLowY,
+        clawDescentProgress(progress),
+      )
+      claw.setCableLength(MACHINE_DIMENSIONS.ropeAnchorY - headY)
+      claw.setOpening(clawOpeningForPhase('lowering', progress, false, PRIZE_GRIP_OPENING))
+      world.step()
+      claw.stabilizeSwing()
+    }
+
+    expect(Math.hypot(prize.translation().x, prize.translation().z)).toBeLessThan(0.1)
   })
 
   it('still closes the fingers after the open descent', () => {
