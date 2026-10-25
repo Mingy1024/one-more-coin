@@ -143,8 +143,22 @@ export class ArticulatedClaw {
   }
 
   getGrabPosition(): RAPIER.Vector {
+    const pose = this.getGrabPose()
+    return { x: pose.x, y: pose.y, z: pose.z }
+  }
+
+  getGrabPose(): { x: number; y: number; z: number; rotation: RAPIER.Rotation } {
     const position = this.headBody.translation()
-    return { x: position.x, y: position.y + GRIP_CENTER_Y, z: position.z }
+    const rotation = this.headBody.rotation()
+    const offset = new THREE.Vector3(0, GRIP_CENTER_Y, 0).applyQuaternion(
+      new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w),
+    )
+    return {
+      x: position.x + offset.x,
+      y: position.y + offset.y,
+      z: position.z + offset.z,
+      rotation,
+    }
   }
 
   getFingerTipSpread(): number {

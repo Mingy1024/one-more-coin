@@ -271,7 +271,7 @@ export class ClawMachineGame {
 
   private tryPickup(): void {
     const position = this.prize.body.translation()
-    const grabPosition = this.articulatedClaw.getGrabPosition()
+    const grabPosition = this.articulatedClaw.getGrabPose()
     if (!canPickupPrize(position, grabPosition)) return
 
     this.carried = true
@@ -306,7 +306,7 @@ export class ClawMachineGame {
           this.articulatedClaw.settleSwing(this.world.timestep, centerStrength)
         }
         this.prizeCarry.follow(
-          this.articulatedClaw.getGrabPosition(),
+          this.articulatedClaw.getGrabPose(),
           this.world.timestep,
           centerStrength,
         )

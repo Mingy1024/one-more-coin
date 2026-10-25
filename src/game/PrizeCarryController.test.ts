@@ -8,9 +8,9 @@ beforeAll(async () => {
   await RAPIER.init()
 })
 
-function createPrize(world: RAPIER.World, x = 0.14, z = -0.08) {
+function createPrize(world: RAPIER.World, x = 0.14, z = -0.08, y = 0.38) {
   const body = world.createRigidBody(
-    RAPIER.RigidBodyDesc.dynamic().setTranslation(x, 0.38, z),
+    RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z),
   )
   const collider = world.createCollider(
     RAPIER.ColliderDesc.cuboid(0.36, 0.36, 0.36),
@@ -30,16 +30,15 @@ describe('carried prize', () => {
     expect(prize.collider.isSensor()).toBe(true)
   })
 
-  it('keeps a small off-centre grip instead of snapping the prize to the middle', () => {
+  it('does not snap the prize toward the claw centre or down when capture begins', () => {
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
-    const prize = createPrize(world)
+    const prize = createPrize(world, 0.24, -0.08, 0.62)
     const carry = new PrizeCarryController(prize.body, prize.collider)
 
-    carry.capture({ x: 0, y: 0.38, z: 0 })
-    world.step()
+    carry.capture({ x: 0, y: 0.46, z: 0 })
 
-    expect(prize.body.translation().x).toBeGreaterThan(0.05)
-    expect(prize.body.translation().x).toBeLessThanOrEqual(0.09)
+    expect(prize.body.translation().x).toBeCloseTo(0.24)
+    expect(prize.body.translation().y).toBeCloseTo(0.62)
   })
 
   it('follows the latest claw pose without a one-frame lag', () => {
@@ -52,12 +51,12 @@ describe('carried prize', () => {
     carry.follow({ x: 0.5, y: 1.2, z: -0.2 })
 
     const position = prize.body.translation()
-    expect(position.x).toBeGreaterThan(0.55)
+    expect(position.x).toBeCloseTo(0.64)
     expect(position.y).toBeCloseTo(1.2, 5)
-    expect(Math.hypot(position.x - 0.5, position.z + 0.2)).toBeLessThanOrEqual(0.09001)
+    expect(Math.hypot(position.x - 0.5, position.z + 0.2)).toBeGreaterThan(0.1)
   })
 
-  it('steadies a badly tilted prize instead of carrying it at an awkward angle', () => {
+  it('keeps the doll fixed relative to a swinging claw instead of forcing it upright', () => {
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
     const prize = createPrize(world)
     prize.body.setRotation(
@@ -68,19 +67,23 @@ describe('carried prize', () => {
     const target = { x: 0, y: 0.38, z: 0 }
 
     carry.capture(target)
-    for (let frame = 0; frame < 120; frame += 1) carry.follow(target, 1 / 180)
+    const tilted = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.4)
+    for (let frame = 0; frame < 120; frame += 1) {
+      carry.follow({ ...target, rotation: tilted }, 1 / 180)
+    }
 
     const rotation = prize.body.rotation()
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(new THREE.Quaternion(
+    const actual = new THREE.Quaternion(
       rotation.x,
       rotation.y,
       rotation.z,
       rotation.w,
-    ))
-    expect(up.angleTo(new THREE.Vector3(0, 1, 0))).toBeLessThan(0.12)
+    )
+    const initial = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.48, 0.7, -0.4))
+    expect(actual.angleTo(tilted.multiply(initial))).toBeLessThan(0.02)
   })
 
-  it('smoothly centres the prize before releasing it over the chute', () => {
+  it('retains a supported off-centre grip while returning to the chute', () => {
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
     const prize = createPrize(world)
     const carry = new PrizeCarryController(prize.body, prize.collider)
@@ -92,7 +95,7 @@ describe('carried prize', () => {
     }
 
     const position = prize.body.translation()
-    expect(Math.hypot(position.x - target.x, position.z - target.z)).toBeLessThan(0.01)
+    expect(Math.hypot(position.x - target.x, position.z - target.z)).toBeGreaterThan(0.1)
   })
 
   it('restores physical collisions when the claw releases the prize', () => {

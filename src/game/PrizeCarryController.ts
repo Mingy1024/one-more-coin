@@ -5,12 +5,12 @@ export interface CarryTarget {
   x: number
   y: number
   z: number
+  rotation?: { x: number; y: number; z: number; w: number }
 }
 
 export class PrizeCarryController {
-  private readonly lateralOffset = new THREE.Vector2()
-  private readonly carriedRotation = new THREE.Quaternion()
-  private readonly uprightRotation = new THREE.Quaternion()
+  private readonly localOffset = new THREE.Vector3()
+  private readonly localRotation = new THREE.Quaternion()
 
   constructor(
     private readonly body: RAPIER.RigidBody,
@@ -19,37 +19,44 @@ export class PrizeCarryController {
 
   capture(grabPosition: CarryTarget): void {
     const position = this.body.translation()
-    this.lateralOffset.set(
+    const clawRotation = new THREE.Quaternion(
+      grabPosition.rotation?.x ?? 0,
+      grabPosition.rotation?.y ?? 0,
+      grabPosition.rotation?.z ?? 0,
+      grabPosition.rotation?.w ?? 1,
+    )
+    const inverseClawRotation = clawRotation.clone().invert()
+    this.localOffset.set(
       position.x - grabPosition.x,
+      position.y - grabPosition.y,
       position.z - grabPosition.z,
-    ).clampLength(0, 0.09)
+    ).applyQuaternion(inverseClawRotation)
 
     const rotation = this.body.rotation()
-    this.carriedRotation.set(rotation.x, rotation.y, rotation.z, rotation.w)
-    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.carriedRotation)
-    const yaw = Math.atan2(forward.x, forward.z)
-    this.uprightRotation.setFromEuler(new THREE.Euler(0, yaw, 0))
+    this.localRotation.set(rotation.x, rotation.y, rotation.z, rotation.w)
+      .premultiply(inverseClawRotation)
 
     this.body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true)
     this.body.setGravityScale(0, true)
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
     this.collider.setSensor(true)
-    this.follow(grabPosition)
   }
 
-  follow(grabPosition: CarryTarget, deltaSeconds = 1 / 60, centerStrength = 0): void {
-    if (centerStrength > 0) {
-      this.lateralOffset.multiplyScalar(Math.exp(-centerStrength * deltaSeconds))
-    }
+  follow(grabPosition: CarryTarget, _deltaSeconds = 1 / 60, _centerStrength = 0): void {
+    const clawRotation = new THREE.Quaternion(
+      grabPosition.rotation?.x ?? 0,
+      grabPosition.rotation?.y ?? 0,
+      grabPosition.rotation?.z ?? 0,
+      grabPosition.rotation?.w ?? 1,
+    )
+    const offset = this.localOffset.clone().applyQuaternion(clawRotation)
     this.body.setTranslation({
-      x: grabPosition.x + this.lateralOffset.x,
-      y: grabPosition.y,
-      z: grabPosition.z + this.lateralOffset.y,
+      x: grabPosition.x + offset.x,
+      y: grabPosition.y + offset.y,
+      z: grabPosition.z + offset.z,
     }, true)
-    const rotationBlend = 1 - Math.exp(-12 * deltaSeconds)
-    this.carriedRotation.slerp(this.uprightRotation, rotationBlend)
-    this.body.setRotation(this.carriedRotation, true)
+    this.body.setRotation(clawRotation.multiply(this.localRotation), true)
   }
 
   release(): void {
