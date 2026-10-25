@@ -20,9 +20,19 @@ describe('Bulbasaur plush prize', () => {
     expect(bulbBounds.max.y).toBeGreaterThan(0.4)
     expect(bulbBounds.min.y).toBeLessThan(-0.27)
     expect(bulbBounds.min.z).toBeLessThan(-0.78)
+    const vertices = bulb.geometry.getAttribute('position')
+    let widestBase = 0
+    let widestCrown = 0
+    for (let index = 0; index < vertices.count; index += 1) {
+      const width = Math.abs(vertices.getX(index))
+      const y = vertices.getY(index)
+      if (y > 0 && y < 0.16) widestBase = Math.max(widestBase, width)
+      if (y > 0.4) widestCrown = Math.max(widestCrown, width)
+    }
+    expect(widestCrown).toBeLessThan(widestBase * 0.6)
   })
 
-  it('embroiders red eyes, an open purple smile, and green spots into plush', () => {
+  it('embroiders red eyes, a closed smile, and green spots into plush', () => {
     const doll = createBulbasaurModel()
     const head = doll.getObjectByName('bulbasaur-head') as THREE.Mesh
     const material = head.material as THREE.MeshPhysicalMaterial
@@ -38,7 +48,7 @@ describe('Bulbasaur plush prize', () => {
     }
     expect(redPixels).toBeGreaterThan(100)
     expect(darkPixels).toBeGreaterThan(100)
-    expect(mouthPixels).toBeGreaterThan(300)
+    expect(mouthPixels).toBe(0)
     expect(material.roughness).toBeGreaterThan(0.9)
     expect(material.bumpMap).toBeInstanceOf(THREE.DataTexture)
     expect(doll.getObjectByName('bulbasaur-left-eye')).toBeUndefined()

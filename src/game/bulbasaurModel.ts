@@ -7,8 +7,6 @@ const SPOT = 0x338e75
 const RED = 0xb52635
 const WHITE = 0xf6f2e8
 const INK = 0x27434b
-const MOUTH = 0x76506f
-const TONGUE = 0xb9759d
 const LEAF = 0x62b84f
 const VEIN = 0x348d48
 
@@ -30,17 +28,8 @@ function headColor(x: number, y: number, z: number): number {
   const sideMark = x > 0.15 && x < 0.46 && y > 0.36 && y < 0.56 && x - y * 0.38 < 0.24
   if (forehead || sideMark) return SPOT
   if (Math.abs(Math.abs(x) - 0.17) < 0.023 && Math.abs(y + 0.14) < 0.035) return INK
-  const width = 0.59
-  const top = -0.31 + 0.15 * (Math.abs(x) / width) ** 2
-  const bottom = -0.7 + 0.48 * (Math.abs(x) / width) ** 2
-  if (Math.abs(x) < width && y < top && y > bottom) {
-    const fang = Math.abs(Math.abs(x) - 0.47) < 0.038 && y > top - 0.09
-    if (fang) return WHITE
-    if (Math.abs(y - top) < 0.025 || Math.abs(y - bottom) < 0.025) return INK
-    if (y < -0.53 && Math.abs(x) < 0.39) return TONGUE
-    return MOUTH
-  }
-  if (Math.abs(x) < width && (Math.abs(y - top) < 0.025 || Math.abs(y - bottom) < 0.023)) return INK
+  const smile = y + 0.5 - 0.1 * (x / 0.78) ** 2
+  if (Math.abs(x) < 0.78 && Math.abs(smile) < 0.015) return INK
   return TEAL
 }
 
@@ -55,10 +44,35 @@ function bodyColor(x: number, y: number, z: number): number {
 
 function bulbColor(x: number, y: number, z: number): number {
   const angle = Math.atan2(z, x)
-  const seam = Math.abs(Math.sin(angle * 3 + 0.28 * y))
-  const panel = Math.cos(angle * 3 + 0.28 * y)
-  if (y > -0.85 && seam < 0.08) return VEIN
-  return panel > 0.4 ? LEAF : 0x70c75a
+  const fold = Math.cos(angle * 8)
+  if (y > -0.55 && fold < -0.94) return VEIN
+  return fold > 0.25 ? 0x70c75a : LEAF
+}
+
+function dumplingBulb(parent: THREE.Group): THREE.Mesh {
+  const geometry = new THREE.SphereGeometry(1, 96, 64)
+  const positions = geometry.getAttribute('position')
+  for (let index = 0; index < positions.count; index += 1) {
+    const x = positions.getX(index)
+    const y = positions.getY(index)
+    const z = positions.getZ(index)
+    const angle = Math.atan2(z, x)
+    const upper = Math.max(0, y)
+    const taper = 1 - 0.48 * upper ** 1.5
+    const fold = 1 + 0.045 * Math.cos(angle * 8) * Math.max(0, y + 0.5)
+    positions.setXYZ(index,
+      0.38 * x * taper * fold,
+      0.08 + 0.42 * y,
+      -0.37 + 0.44 * z * taper * fold - 0.035 * upper,
+    )
+  }
+  geometry.computeVertexNormals()
+  const bulb = new THREE.Mesh(geometry.toNonIndexed(), fleece(bulbColor))
+  geometry.dispose()
+  bulb.name = 'bulbasaur-bulb'
+  bulb.castShadow = bulb.receiveShadow = true
+  parent.add(bulb)
+  return bulb
 }
 
 function addFuzz(parent: THREE.Group, surface: THREE.Mesh, color: number, count: number): void {
@@ -107,21 +121,16 @@ export function createBulbasaurModel(): THREE.Group {
     { min: [-0.55, -0.69, -0.78], max: [0.55, 0.2, 0.58] }, bodyCore)
   addFuzz(doll, body, TEAL, 1500)
 
-  const bulbCore: Ellipsoid = { center: [0, 0.04, -0.35], radii: [0.37, 0.33, 0.45] }
-  const bulb = fusedSurface(doll, 'bulbasaur-bulb', fleece(bulbColor), [
-    bulbCore,
-    { center: [0, 0.28, -0.43], radii: [0.25, 0.15, 0.3] },
-    { center: [0, 0.4, -0.5], radii: [0.08, 0.06, 0.1] },
-  ], 0.14, { min: [-0.5, -0.34, -0.93], max: [0.5, 0.52, 0.17] }, bulbCore)
+  const bulb = dumplingBulb(doll)
   addFuzz(doll, bulb, LEAF, 1200)
 
-  const headCore: Ellipsoid = { center: [0, -0.005, 0.27], radii: [0.4, 0.245, 0.33] }
+  const headCore: Ellipsoid = { center: [0, -0.005, 0.27], radii: [0.35, 0.275, 0.32] }
   const head = fusedSurface(doll, 'bulbasaur-head', fleece(headColor), [
     headCore,
-    { center: [0, -0.045, 0.45], radii: [0.36, 0.18, 0.2] },
-    { center: [-0.3, 0.19, 0.16], radii: [0.13, 0.12, 0.13] },
-    { center: [0.3, 0.19, 0.16], radii: [0.13, 0.12, 0.13] },
-  ], 0.11, { min: [-0.57, -0.31, -0.1], max: [0.57, 0.37, 0.72] }, headCore, 0.03)
+    { center: [0, -0.045, 0.44], radii: [0.315, 0.18, 0.2] },
+    { center: [-0.26, 0.21, 0.16], radii: [0.115, 0.13, 0.125] },
+    { center: [0.26, 0.21, 0.16], radii: [0.115, 0.13, 0.125] },
+  ], 0.11, { min: [-0.52, -0.33, -0.1], max: [0.52, 0.41, 0.7] }, headCore, 0.03)
   addFuzz(doll, head, TEAL, 1700)
   return doll
 }
