@@ -28,6 +28,8 @@ import {
   PRIZE_HALF_WIDTH,
 } from './prizeInteraction'
 import { createPrizeModel } from './prizeModel'
+import { createArcanineModel } from './arcanineModel'
+import { selectPrizeForAim } from './prizeSelection'
 import { createGantryAssembly } from './gantry'
 import {
   canTiltPickup,
@@ -51,6 +53,8 @@ interface Prize {
   body: RAPIER.RigidBody
   collider: RAPIER.Collider
   mesh: THREE.Group
+  carry: PrizeCarryController
+  start: { x: number; y: number; z: number }
 }
 
 const COLORS = {
@@ -65,6 +69,7 @@ const CLAW_TOP_Y = MACHINE_DIMENSIONS.clawTopY
 const CLAW_LOW_Y = MACHINE_DIMENSIONS.clawLowY
 const CHUTE = { x: -1.2, z: 0.96 }
 const PRIZE_START = { x: 0.48, y: 0.62, z: -0.18 }
+const ARCANINE_START = { x: -0.72, y: 0.62, z: -0.42 }
 const ROPE_ANCHOR_Y = MACHINE_DIMENSIONS.ropeAnchorY
 
 export class ClawMachineGame {
@@ -75,8 +80,7 @@ export class ClawMachineGame {
   private readonly timer = new THREE.Timer()
   private readonly gantry = createGantryAssembly()
   private readonly articulatedClaw: ArticulatedClaw
-  private readonly prize: Prize
-  private readonly prizeCarry: PrizeCarryController
+  private readonly prizes: Prize[]
   private readonly onSnapshot: (snapshot: GameSnapshot) => void
   private readonly resizeObserver: ResizeObserver
   private readonly canvas: HTMLCanvasElement
@@ -95,6 +99,7 @@ export class ClawMachineGame {
   private orbitRadius = 10
   private cameraDrag?: { pointerId: number; x: number; y: number }
   private tiltPlan?: TiltPlan
+  private activePrize?: Prize
 
   private constructor(canvas: HTMLCanvasElement, onSnapshot: (snapshot: GameSnapshot) => void) {
     this.canvas = canvas
@@ -121,8 +126,10 @@ export class ClawMachineGame {
       x: CHUTE.x,
       z: CHUTE.z,
     })
-    this.prize = this.createPrize()
-    this.prizeCarry = new PrizeCarryController(this.prize.body, this.prize.collider)
+    this.prizes = [
+      this.createPrize(PRIZE_START, createPrizeModel(), COLORS.pink),
+      this.createPrize(ARCANINE_START, createArcanineModel(), COLORS.warm),
+    ]
     this.addAmbientStars()
 
     this.resizeObserver = new ResizeObserver(() => this.resize())
@@ -157,7 +164,14 @@ export class ClawMachineGame {
     if (this.round.phase !== 'aiming') return
     this.lastGrabSucceeded = false
     this.cycleStart = { ...this.clawPosition }
-    this.tiltPlan = tiltPlanForAim(this.clawPosition, this.prize.body.translation())
+    const prizeIndex = selectPrizeForAim(
+      this.clawPosition,
+      this.prizes.map((prize) => prize.body.translation()),
+    )
+    this.activePrize = prizeIndex === undefined ? undefined : this.prizes[prizeIndex]
+    this.tiltPlan = this.activePrize
+      ? tiltPlanForAim(this.clawPosition, this.activePrize.body.translation())
+      : undefined
     this.articulatedClaw.applyImpulse({
       x: this.driveVelocity.x * 0.025,
       y: 0,
@@ -181,15 +195,18 @@ export class ClawMachineGame {
     this.carried = false
     this.lastGrabSucceeded = false
     this.tiltPlan = undefined
+    this.activePrize = undefined
     this.clawPosition = { ...CHUTE }
     this.cycleStart = { ...CHUTE }
     this.driveVelocity = { x: 0, z: 0 }
     this.articulatedClaw.reset(CHUTE.x, CHUTE.z, ROPE_ANCHOR_Y - CLAW_TOP_Y)
-    this.prizeCarry.release()
-    this.prize.body.setTranslation(PRIZE_START, true)
-    this.prize.body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true)
-    this.prize.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
-    this.prize.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
+    for (const prize of this.prizes) {
+      prize.carry.release()
+      prize.body.setTranslation(prize.start, true)
+      prize.body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true)
+      prize.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+      prize.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
+    }
     this.publishSnapshot()
   }
 
@@ -279,7 +296,8 @@ export class ClawMachineGame {
   }
 
   private tryPickup(): void {
-    const position = this.prize.body.translation()
+    if (!this.activePrize) return
+    const position = this.activePrize.body.translation()
     const grabPosition = this.articulatedClaw.getGrabPose()
     const caught = this.tiltPlan
       ? canTiltPickup(position, this.articulatedClaw.getFingerTipPositions())
@@ -288,15 +306,15 @@ export class ClawMachineGame {
 
     this.carried = true
     this.lastGrabSucceeded = true
-    this.prizeCarry.capture(grabPosition)
+    this.activePrize.carry.capture(grabPosition)
   }
 
   private releasePrize(): void {
-    if (!this.carried) return
+    if (!this.carried || !this.activePrize) return
     this.carried = false
-    this.prizeCarry.release()
-    this.prize.body.setLinvel({ x: 0, y: -0.25, z: 0 }, true)
-    this.prize.body.setAngvel(prizeReleaseAngularVelocity(), true)
+    this.activePrize.carry.release()
+    this.activePrize.body.setLinvel({ x: 0, y: -0.25, z: 0 }, true)
+    this.activePrize.body.setAngvel(prizeReleaseAngularVelocity(), true)
   }
 
   private updatePhysics(delta: number): void {
@@ -317,11 +335,11 @@ export class ClawMachineGame {
       }
       this.world.step()
       this.articulatedClaw.stabilizeSwing()
-      if (this.carried) {
+      if (this.carried && this.activePrize) {
         if (centerStrength > 0) {
           this.articulatedClaw.settleSwing(this.world.timestep, centerStrength)
         }
-        this.prizeCarry.follow(
+        this.activePrize.carry.follow(
           this.articulatedClaw.getGrabPose(),
           this.world.timestep,
           centerStrength,
@@ -330,18 +348,19 @@ export class ClawMachineGame {
     }
     this.articulatedClaw.updateVisuals()
 
-    const translation = this.prize.body.translation()
-    const rotation = this.prize.body.rotation()
-    this.prize.mesh.position.set(translation.x, translation.y, translation.z)
-    this.prize.mesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
+    for (const prize of this.prizes) {
+      const translation = prize.body.translation()
+      const rotation = prize.body.rotation()
+      prize.mesh.position.set(translation.x, translation.y, translation.z)
+      prize.mesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
+    }
   }
 
   private checkForWin(): void {
     if (this.carried || this.round.phase === 'won' || this.round.phase === 'lost') return
     if (this.round.phase !== 'releasing' && this.round.phase !== 'resetting') return
 
-    const position = this.prize.body.translation()
-    if (isPrizeCaptured(position, CHUTE)) {
+    if (this.activePrize && isPrizeCaptured(this.activePrize.body.translation(), CHUTE)) {
       this.round = stepRound(this.round, { type: 'PRIZE_DROPPED' })
       this.publishSnapshot()
     }
@@ -704,10 +723,14 @@ export class ClawMachineGame {
     this.scene.add(coinSlot)
   }
 
-  private createPrize(): Prize {
+  private createPrize(
+    start: { x: number; y: number; z: number },
+    mesh: THREE.Group,
+    glowColor: number,
+  ): Prize {
     const body = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(PRIZE_START.x, PRIZE_START.y, PRIZE_START.z)
+        .setTranslation(start.x, start.y, start.z)
         .setLinearDamping(0.35)
         .setAngularDamping(3.2),
     )
@@ -718,13 +741,12 @@ export class ClawMachineGame {
       body,
     )
 
-    const mesh = createPrizeModel()
-    const prizeGlow = new THREE.PointLight(COLORS.pink, 2.8, 2.2)
+    const prizeGlow = new THREE.PointLight(glowColor, 2.8, 2.2)
     prizeGlow.position.y = PRIZE_HALF_HEIGHT + 0.07
     mesh.add(prizeGlow)
     this.scene.add(mesh)
 
-    return { body, collider, mesh }
+    return { body, collider, mesh, carry: new PrizeCarryController(body, collider), start }
   }
 
   private addAmbientStars(): void {
@@ -759,7 +781,8 @@ export class ClawMachineGame {
       canGrab: this.round.phase === 'aiming',
       isReady: this.round.phase === 'ready',
       result: this.round.phase === 'won' || this.round.phase === 'lost' ? this.round.phase : undefined,
-      status: this.round.phase === 'aiming' && tiltPlanForAim(this.clawPosition, this.prize.body.translation())
+      status: this.round.phase === 'aiming' && this.prizes.some((prize) =>
+        tiltPlanForAim(this.clawPosition, prize.body.translation()))
         ? '偏側下爪：可試試倒爪！'
         : this.round.phase === 'lowering' && this.tiltPlan
           ? '倒爪中：一爪在上、兩爪往側下方…'

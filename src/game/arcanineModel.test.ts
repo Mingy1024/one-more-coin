@@ -12,6 +12,7 @@ describe('Arcanine plush prize', () => {
       'arcanine-left-ear', 'arcanine-right-ear', 'arcanine-left-eye',
       'arcanine-right-eye', 'arcanine-nose', 'arcanine-left-stripe',
       'arcanine-right-stripe', 'arcanine-front-left-paw', 'arcanine-front-right-paw',
+      'arcanine-front-left-stripe', 'arcanine-front-right-stripe',
     ]) {
       expect(doll.getObjectByName(part), part).toBeInstanceOf(THREE.Mesh)
     }

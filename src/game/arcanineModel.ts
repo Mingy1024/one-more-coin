@@ -101,6 +101,27 @@ function stripePatch(side: -1 | 1, zCenter: number): THREE.BufferGeometry {
   return geometry
 }
 
+function frontPawStripe(side: -1 | 1): THREE.BufferGeometry {
+  const shape = new THREE.Shape()
+  shape.moveTo(-0.065, -0.415)
+  shape.lineTo(0.03, -0.415)
+  shape.lineTo(0.005, -0.462)
+  shape.lineTo(0.06, -0.48)
+  shape.lineTo(-0.02, -0.545)
+  shape.closePath()
+  const geometry = new THREE.ShapeGeometry(shape)
+  const position = geometry.getAttribute('position')
+  for (let index = 0; index < position.count; index += 1) {
+    const localX = position.getX(index)
+    const y = position.getY(index)
+    const normalized = (localX / 0.135) ** 2 + ((y + 0.48) / 0.13) ** 2
+    const z = 0.17 + 0.16 * Math.sqrt(Math.max(0.05, 1 - normalized)) + 0.004
+    position.setXYZ(index, side * 0.235 + localX, y, z)
+  }
+  geometry.computeVertexNormals()
+  return geometry
+}
+
 function addFuzz(parent: THREE.Group, color: number, name: string, center: [number, number, number], radii: [number, number, number], count: number): void {
   const positions: number[] = []
   let seed = count * 27 + 103
@@ -167,6 +188,10 @@ export function createArcanineModel(): THREE.Group {
           [side * 0.235 + toe * 0.042, -0.56, z + 0.135], [0.014, 0.008, 0.01])
       }
     }
+    const legStripe = new THREE.Mesh(frontPawStripe(side), dark)
+    legStripe.name = `arcanine-front-${side < 0 ? 'left' : 'right'}-stripe`
+    legStripe.material.side = THREE.DoubleSide
+    root.add(legStripe)
   }
 
   ellipsoid(root, 'arcanine-muzzle', cream, [0, 0.16, 0.43], [0.19, 0.105, 0.09])
