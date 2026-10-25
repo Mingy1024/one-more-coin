@@ -7,7 +7,7 @@ const INK = 0x29282b
 
 type Paint = (x: number, y: number, z: number) => number
 
-function fleece(paint: Paint): THREE.MeshPhysicalMaterial {
+export function fleece(paint: Paint): THREE.MeshPhysicalMaterial {
   const width = 512
   const height = 256
   const colors = new Uint8Array(width * height * 4)
@@ -68,14 +68,15 @@ function headPaint(x: number, y: number, z: number): number {
   return PINK
 }
 
-type Ellipsoid = { center: [number, number, number]; radii: [number, number, number] }
+export type Ellipsoid = { center: [number, number, number]; radii: [number, number, number] }
 
 // A rounded union gives the ears and four paws volume without visible sphere seams.
-function fusedSurface(
+export function fusedSurface(
   parent: THREE.Group, name: string, material: THREE.Material,
   parts: Ellipsoid[], blend: number,
   bounds: { min: [number, number, number]; max: [number, number, number] },
   uvBody: Ellipsoid,
+  step = 0.04,
 ): THREE.Mesh {
   const distance = (point: THREE.Vector3): number => {
     let result = Infinity
@@ -108,7 +109,6 @@ function fusedSurface(
   const tetrahedra = [[0, 5, 1, 6], [0, 1, 2, 6], [0, 2, 3, 6],
     [0, 3, 7, 6], [0, 7, 4, 6], [0, 4, 5, 6]]
   const edges = [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]]
-  const step = name === 'slowpoke-head' ? 0.032 : 0.04
   const counts = bounds.min.map((low, axis) => Math.ceil((bounds.max[axis]! - low) / step))
   for (let ix = 0; ix < counts[0]!; ix += 1) {
     for (let iy = 0; iy < counts[1]!; iy += 1) {
@@ -296,7 +296,7 @@ export function createSlowpokeModel(): THREE.Group {
     { center: [0, -0.035, 0.43], radii: [0.29, 0.145, 0.19] },
     { center: [-0.265, 0.4, 0.19], radii: [0.115, 0.13, 0.1] },
     { center: [0.265, 0.4, 0.19], radii: [0.115, 0.13, 0.1] },
-  ], 0.08, { min: [-0.52, -0.27, -0.11], max: [0.52, 0.59, 0.72] }, headCore)
+  ], 0.08, { min: [-0.52, -0.27, -0.11], max: [0.52, 0.59, 0.72] }, headCore, 0.032)
   addNap(doll, head, 1800)
   return doll
 }
