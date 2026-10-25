@@ -17,8 +17,9 @@ describe('Bulbasaur plush prize', () => {
     expect(size.y).toBeLessThan(1.45)
     const bulb = doll.getObjectByName('bulbasaur-bulb') as THREE.Mesh
     const bulbBounds = new THREE.Box3().setFromObject(bulb)
-    expect(bulbBounds.max.y).toBeGreaterThan(0.65)
-    expect(bulbBounds.min.z).toBeLessThan(-0.85)
+    expect(bulbBounds.max.y).toBeGreaterThan(0.4)
+    expect(bulbBounds.min.y).toBeLessThan(-0.27)
+    expect(bulbBounds.min.z).toBeLessThan(-0.78)
   })
 
   it('embroiders red eyes, an open purple smile, and green spots into plush', () => {

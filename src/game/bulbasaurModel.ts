@@ -14,14 +14,14 @@ const VEIN = 0x348d48
 
 function headColor(x: number, y: number, z: number): number {
   if (z < 0.12) return TEAL
-  const eyeX = (Math.abs(x) - 0.55) / 0.18
-  const eyeY = (y - 0.09 + 0.07 * Math.abs(x)) / 0.29
+  const eyeX = (Math.abs(x) - 0.55) / 0.2
+  const eyeY = (y - 0.2 + 0.06 * Math.abs(x)) / 0.27
   const eye = eyeX * eyeX + eyeY * eyeY
   if (eye < 1.08) {
     if (eye > 0.96) return INK
-    const iris = ((Math.abs(x) - 0.57) / 0.12) ** 2 + ((y + 0.005) / 0.25) ** 2
+    const iris = ((Math.abs(x) - 0.57) / 0.14) ** 2 + ((y - 0.12) / 0.23) ** 2
     if (iris < 1) {
-      if (((Math.abs(x) - 0.52) / 0.04) ** 2 + ((y - 0.15) / 0.095) ** 2 < 1) return WHITE
+      if (((Math.abs(x) - 0.52) / 0.042) ** 2 + ((y - 0.23) / 0.085) ** 2 < 1) return WHITE
       return RED
     }
     return WHITE
@@ -29,15 +29,15 @@ function headColor(x: number, y: number, z: number): number {
   const forehead = Math.abs(x + 0.03) < (y - 0.36) * 0.66 && y > 0.36 && y < 0.85
   const sideMark = x > 0.15 && x < 0.46 && y > 0.36 && y < 0.56 && x - y * 0.38 < 0.24
   if (forehead || sideMark) return SPOT
-  if (Math.abs(Math.abs(x) - 0.17) < 0.023 && Math.abs(y + 0.28) < 0.035) return INK
-  const width = 0.79
-  const top = -0.37 + 0.16 * (Math.abs(x) / width) ** 2
-  const bottom = -0.7 + 0.43 * (Math.abs(x) / width) ** 2
+  if (Math.abs(Math.abs(x) - 0.17) < 0.023 && Math.abs(y + 0.14) < 0.035) return INK
+  const width = 0.59
+  const top = -0.31 + 0.15 * (Math.abs(x) / width) ** 2
+  const bottom = -0.7 + 0.48 * (Math.abs(x) / width) ** 2
   if (Math.abs(x) < width && y < top && y > bottom) {
-    const fang = Math.abs(Math.abs(x) - 0.62) < 0.05 && y > top - 0.115
+    const fang = Math.abs(Math.abs(x) - 0.47) < 0.038 && y > top - 0.09
     if (fang) return WHITE
     if (Math.abs(y - top) < 0.025 || Math.abs(y - bottom) < 0.025) return INK
-    if (y < -0.6 && Math.abs(x) < 0.39) return TONGUE
+    if (y < -0.53 && Math.abs(x) < 0.39) return TONGUE
     return MOUTH
   }
   if (Math.abs(x) < width && (Math.abs(y - top) < 0.025 || Math.abs(y - bottom) < 0.023)) return INK
@@ -107,21 +107,21 @@ export function createBulbasaurModel(): THREE.Group {
     { min: [-0.55, -0.69, -0.78], max: [0.55, 0.2, 0.58] }, bodyCore)
   addFuzz(doll, body, TEAL, 1500)
 
-  const bulbCore: Ellipsoid = { center: [0, 0.16, -0.38], radii: [0.36, 0.33, 0.43] }
+  const bulbCore: Ellipsoid = { center: [0, 0.04, -0.35], radii: [0.37, 0.33, 0.45] }
   const bulb = fusedSurface(doll, 'bulbasaur-bulb', fleece(bulbColor), [
     bulbCore,
-    { center: [0, 0.39, -0.52], radii: [0.29, 0.25, 0.36] },
-    { center: [0.02, 0.57, -0.69], radii: [0.13, 0.15, 0.18] },
-  ], 0.13, { min: [-0.49, -0.24, -0.98], max: [0.49, 0.78, 0.15] }, bulbCore)
+    { center: [0, 0.28, -0.43], radii: [0.25, 0.15, 0.3] },
+    { center: [0, 0.4, -0.5], radii: [0.08, 0.06, 0.1] },
+  ], 0.14, { min: [-0.5, -0.34, -0.93], max: [0.5, 0.52, 0.17] }, bulbCore)
   addFuzz(doll, bulb, LEAF, 1200)
 
-  const headCore: Ellipsoid = { center: [0, 0.015, 0.27], radii: [0.38, 0.24, 0.32] }
+  const headCore: Ellipsoid = { center: [0, -0.005, 0.27], radii: [0.4, 0.245, 0.33] }
   const head = fusedSurface(doll, 'bulbasaur-head', fleece(headColor), [
     headCore,
-    { center: [0, -0.09, 0.46], radii: [0.34, 0.13, 0.2] },
-    { center: [-0.29, 0.23, 0.16], radii: [0.13, 0.17, 0.13] },
-    { center: [0.29, 0.23, 0.16], radii: [0.13, 0.17, 0.13] },
-  ], 0.1, { min: [-0.56, -0.3, -0.1], max: [0.56, 0.49, 0.73] }, headCore, 0.03)
+    { center: [0, -0.045, 0.45], radii: [0.36, 0.18, 0.2] },
+    { center: [-0.3, 0.19, 0.16], radii: [0.13, 0.12, 0.13] },
+    { center: [0.3, 0.19, 0.16], radii: [0.13, 0.12, 0.13] },
+  ], 0.11, { min: [-0.57, -0.31, -0.1], max: [0.57, 0.37, 0.72] }, headCore, 0.03)
   addFuzz(doll, head, TEAL, 1700)
   return doll
 }
