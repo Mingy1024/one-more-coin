@@ -61,9 +61,9 @@ function dumplingBulb(parent: THREE.Group): THREE.Mesh {
     const taper = 1 - 0.48 * upper ** 1.5
     const fold = 1 + 0.045 * Math.cos(angle * 8) * Math.max(0, y + 0.5)
     positions.setXYZ(index,
-      0.38 * x * taper * fold,
-      0.08 + 0.42 * y,
-      -0.37 + 0.44 * z * taper * fold - 0.035 * upper,
+      0.325 * x * taper * fold,
+      0.055 + 0.36 * y,
+      -0.35 + 0.38 * z * taper * fold - 0.03 * upper,
     )
   }
   geometry.computeVertexNormals()

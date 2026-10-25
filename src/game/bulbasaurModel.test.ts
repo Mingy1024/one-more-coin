@@ -17,17 +17,20 @@ describe('Bulbasaur plush prize', () => {
     expect(size.y).toBeLessThan(1.45)
     const bulb = doll.getObjectByName('bulbasaur-bulb') as THREE.Mesh
     const bulbBounds = new THREE.Box3().setFromObject(bulb)
-    expect(bulbBounds.max.y).toBeGreaterThan(0.4)
+    const bulbSize = bulbBounds.getSize(new THREE.Vector3())
+    expect(bulbSize.x).toBeLessThan(0.73)
+    expect(bulbSize.z).toBeLessThan(0.84)
+    expect(bulbBounds.max.y).toBeGreaterThan(0.35)
     expect(bulbBounds.min.y).toBeLessThan(-0.27)
-    expect(bulbBounds.min.z).toBeLessThan(-0.78)
+    expect(bulbBounds.min.z).toBeLessThan(-0.7)
     const vertices = bulb.geometry.getAttribute('position')
     let widestBase = 0
     let widestCrown = 0
     for (let index = 0; index < vertices.count; index += 1) {
       const width = Math.abs(vertices.getX(index))
       const y = vertices.getY(index)
-      if (y > 0 && y < 0.16) widestBase = Math.max(widestBase, width)
-      if (y > 0.4) widestCrown = Math.max(widestCrown, width)
+      if (y > 0 && y < 0.13) widestBase = Math.max(widestBase, width)
+      if (y > 0.34) widestCrown = Math.max(widestCrown, width)
     }
     expect(widestCrown).toBeLessThan(widestBase * 0.6)
   })
