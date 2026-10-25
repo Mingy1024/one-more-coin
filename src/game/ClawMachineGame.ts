@@ -17,7 +17,6 @@ import { ArticulatedClaw } from './ArticulatedClaw'
 import { MACHINE_DIMENSIONS } from './machineDimensions'
 import { PrizeCarryController } from './PrizeCarryController'
 import {
-  alignPrizeWithChute,
   canPickupPrize,
   CHUTE_OPENING_HALF_X,
   CHUTE_OPENING_HALF_Z,
@@ -30,6 +29,13 @@ import {
 } from './prizeInteraction'
 import { createPrizeModel } from './prizeModel'
 import { createGantryAssembly } from './gantry'
+import {
+  canTiltPickup,
+  TILT_GRIP_OPENING,
+  tiltAmountForPhase,
+  tiltPlanForAim,
+  type TiltPlan,
+} from './tiltGrab'
 
 export interface GameSnapshot {
   attempts: number
@@ -88,6 +94,7 @@ export class ClawMachineGame {
   private orbit: OrbitState = { yaw: 0.08, pitch: 0.24 }
   private orbitRadius = 10
   private cameraDrag?: { pointerId: number; x: number; y: number }
+  private tiltPlan?: TiltPlan
 
   private constructor(canvas: HTMLCanvasElement, onSnapshot: (snapshot: GameSnapshot) => void) {
     this.canvas = canvas
@@ -150,6 +157,7 @@ export class ClawMachineGame {
     if (this.round.phase !== 'aiming') return
     this.lastGrabSucceeded = false
     this.cycleStart = { ...this.clawPosition }
+    this.tiltPlan = tiltPlanForAim(this.clawPosition, this.prize.body.translation())
     this.articulatedClaw.applyImpulse({
       x: this.driveVelocity.x * 0.025,
       y: 0,
@@ -172,6 +180,7 @@ export class ClawMachineGame {
     this.lastPhase = 'aiming'
     this.carried = false
     this.lastGrabSucceeded = false
+    this.tiltPlan = undefined
     this.clawPosition = { ...CHUTE }
     this.cycleStart = { ...CHUTE }
     this.driveVelocity = { x: 0, z: 0 }
@@ -241,7 +250,7 @@ export class ClawMachineGame {
       phase,
       phase === 'lowering' ? phaseFraction : progress,
       this.carried,
-      PRIZE_GRIP_OPENING,
+      this.tiltPlan ? TILT_GRIP_OPENING : PRIZE_GRIP_OPENING,
     )
 
     if (phase === 'lowering') {
@@ -272,7 +281,10 @@ export class ClawMachineGame {
   private tryPickup(): void {
     const position = this.prize.body.translation()
     const grabPosition = this.articulatedClaw.getGrabPose()
-    if (!canPickupPrize(position, grabPosition)) return
+    const caught = this.tiltPlan
+      ? canTiltPickup(position, this.articulatedClaw.getFingerTipPositions())
+      : canPickupPrize(position, grabPosition)
+    if (!caught) return
 
     this.carried = true
     this.lastGrabSucceeded = true
@@ -283,10 +295,6 @@ export class ClawMachineGame {
     if (!this.carried) return
     this.carried = false
     this.prizeCarry.release()
-    this.prize.body.setTranslation(
-      alignPrizeWithChute(this.prize.body.translation(), CHUTE),
-      true,
-    )
     this.prize.body.setLinvel({ x: 0, y: -0.25, z: 0 }, true)
     this.prize.body.setAngvel(prizeReleaseAngularVelocity(), true)
   }
@@ -299,6 +307,14 @@ export class ClawMachineGame {
       : 0
     const centerStrength = returnProgress > 0 ? 4 + returnProgress * 8 : 0
     for (let step = 0; step < substeps; step += 1) {
+      if (this.tiltPlan) {
+        this.articulatedClaw.applyTiltToward(
+          this.tiltPlan.directionX,
+          this.tiltPlan.directionZ,
+          this.tiltPlan.angle * tiltAmountForPhase(this.round.phase, phaseProgress(this.round)),
+          this.world.timestep,
+        )
+      }
       this.world.step()
       this.articulatedClaw.stabilizeSwing()
       if (this.carried) {
@@ -693,7 +709,7 @@ export class ClawMachineGame {
       RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(PRIZE_START.x, PRIZE_START.y, PRIZE_START.z)
         .setLinearDamping(0.35)
-        .setAngularDamping(0.6),
+        .setAngularDamping(3.2),
     )
     const collider = this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(PRIZE_HALF_WIDTH, PRIZE_HALF_HEIGHT, PRIZE_HALF_DEPTH)
@@ -743,7 +759,11 @@ export class ClawMachineGame {
       canGrab: this.round.phase === 'aiming',
       isReady: this.round.phase === 'ready',
       result: this.round.phase === 'won' || this.round.phase === 'lost' ? this.round.phase : undefined,
-      status: statusForPhase(this.round.phase),
+      status: this.round.phase === 'aiming' && tiltPlanForAim(this.clawPosition, this.prize.body.translation())
+        ? '偏側下爪：可試試倒爪！'
+        : this.round.phase === 'lowering' && this.tiltPlan
+          ? '倒爪中：一爪在上、兩爪往側下方…'
+          : statusForPhase(this.round.phase),
       timeLeft: this.round.timeLeft,
     })
   }
@@ -809,7 +829,7 @@ export class ClawMachineGame {
 function statusForPhase(phase: RoundPhase): string {
   const messages: Record<RoundPhase, string> = {
     ready: '先拖曳畫面確認目標，準備好再開始',
-    aiming: '移動搖桿，讓夾爪對準粉紅禮物',
+    aiming: '移動搖桿，讓夾爪對準娃娃',
     lowering: '夾爪下降中…',
     closing: '正在夾取！',
     lifting: '穩住，慢慢升起…',

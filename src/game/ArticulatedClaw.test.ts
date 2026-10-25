@@ -56,6 +56,28 @@ describe('articulated claw physics', () => {
     expect(claw.getHeadPosition().x).toBeGreaterThan(initialX + 0.02)
   })
 
+  it('leans the lower claws toward a side-aimed prize instead of staying vertical', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    const claw = new ArticulatedClaw(
+      world,
+      new THREE.Scene(),
+      { anchorY: 4.05, headY: 1.4, x: 0, z: 0 },
+    )
+    world.timestep = 1 / 180
+    claw.setOpening(1)
+    for (let frame = 0; frame < 180; frame += 1) {
+      claw.applyTiltToward(1, 0, 0.75, world.timestep)
+      world.step()
+    }
+
+    const rotation = claw.getGrabPose().rotation
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(new THREE.Quaternion(
+      rotation.x, rotation.y, rotation.z, rotation.w,
+    ))
+    expect(up.x).toBeLessThan(-0.35)
+    expect(up.y).toBeGreaterThan(0.4)
+  })
+
   it('keeps a strong lateral input inside a restrained pendulum arc', () => {
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
     const claw = new ArticulatedClaw(

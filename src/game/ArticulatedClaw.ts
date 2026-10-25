@@ -15,6 +15,7 @@ const MAX_SWING_RADIUS = 0.34
 const MAX_SWING_ANGLE = Math.PI / 4
 const MAX_HEAD_ANGULAR_SPEED = 2.2
 const GRIP_CENTER_Y = -0.82
+const FINGER_YAW = Math.PI / 2
 const HEAD_BOUNDS = {
   minX: -1.45,
   maxX: 1.45,
@@ -163,8 +164,13 @@ export class ArticulatedClaw {
 
   getFingerTipSpread(): number {
     const head = this.headBody.translation()
+    return Math.max(...this.getFingerTipPositions().map((tip) =>
+      Math.hypot(tip.x - head.x, tip.z - head.z)))
+  }
+
+  getFingerTipPositions(): RAPIER.Vector[] {
     const tip = FINGER_VISUAL_PATH[FINGER_VISUAL_PATH.length - 1]!
-    return Math.max(...this.fingers.map((finger) => {
+    return this.fingers.map((finger) => {
       const position = finger.body.translation()
       const rotation = finger.body.rotation()
       const worldTip = tip.clone().applyQuaternion(new THREE.Quaternion(
@@ -174,25 +180,13 @@ export class ArticulatedClaw {
         rotation.w,
       ))
       worldTip.add(new THREE.Vector3(position.x, position.y, position.z))
-      return Math.hypot(worldTip.x - head.x, worldTip.z - head.z)
-    }))
+      return { x: worldTip.x, y: worldTip.y, z: worldTip.z }
+    })
   }
 
   getFingerTipDrop(): number {
     const head = this.headBody.translation()
-    const tip = FINGER_VISUAL_PATH[FINGER_VISUAL_PATH.length - 1]!
-    return Math.max(...this.fingers.map((finger) => {
-      const position = finger.body.translation()
-      const rotation = finger.body.rotation()
-      const worldTip = tip.clone().applyQuaternion(new THREE.Quaternion(
-        rotation.x,
-        rotation.y,
-        rotation.z,
-        rotation.w,
-      ))
-      worldTip.add(new THREE.Vector3(position.x, position.y, position.z))
-      return head.y - worldTip.y
-    }))
+    return Math.max(...this.getFingerTipPositions().map((tip) => head.y - tip.y))
   }
 
   setGantryPosition(x: number, z: number): void {
@@ -229,6 +223,27 @@ export class ArticulatedClaw {
       y: impulse.y,
       z: impulse.z * scale,
     }, true)
+  }
+
+  applyTiltToward(directionX: number, directionZ: number, targetAngle: number, deltaSeconds: number): void {
+    const directionLength = Math.hypot(directionX, directionZ)
+    if (directionLength < 0.001) return
+    const dx = directionX / directionLength
+    const dz = directionZ / directionLength
+    const axis = new THREE.Vector3(-dz, 0, dx)
+    const rotation = this.headBody.rotation()
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(new THREE.Quaternion(
+      rotation.x, rotation.y, rotation.z, rotation.w,
+    ))
+    const currentAngle = Math.atan2(-(up.x * dx + up.z * dz), up.y)
+    const angularVelocity = this.headBody.angvel()
+    const axisSpeed = angularVelocity.x * axis.x + angularVelocity.z * axis.z
+    const torque = THREE.MathUtils.clamp(
+      (targetAngle - currentAngle) * 25 - axisSpeed * 7,
+      -8,
+      8,
+    ) * deltaSeconds
+    this.headBody.applyTorqueImpulse({ x: axis.x * torque, y: 0, z: axis.z * torque }, true)
   }
 
   stabilizeSwing(): void {
@@ -385,7 +400,7 @@ export class ArticulatedClaw {
     this.headBody.setAngvel({ x: 0, y: 0, z: 0 }, true)
     this.headBody.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true)
     this.fingers.forEach((finger, index) => {
-      const angle = (index * Math.PI * 2) / 3
+      const angle = FINGER_YAW + (index * Math.PI * 2) / 3
       finger.body.setTranslation({
         x: x + HINGE_RADIUS * Math.cos(angle),
         y: headY + HINGE_Y,
@@ -434,7 +449,7 @@ export class ArticulatedClaw {
       finger.visual.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
 
       const sliderAnchor = new THREE.Vector3(0.07, this.sliderLocalY, 0)
-        .applyAxisAngle(new THREE.Vector3(0, 1, 0), (index * Math.PI * 2) / 3)
+        .applyAxisAngle(new THREE.Vector3(0, 1, 0), FINGER_YAW + (index * Math.PI * 2) / 3)
         .applyQuaternion(this.headVisual.quaternion)
         .add(this.headVisual.position)
       const knuckle = new THREE.Vector3(0.17, -0.24, 0)
@@ -513,7 +528,7 @@ export class ArticulatedClaw {
     }
 
     for (let index = 0; index < 3; index += 1) {
-      const angle = (index * Math.PI * 2) / 3
+      const angle = FINGER_YAW + (index * Math.PI * 2) / 3
       const bracket = new THREE.Mesh(
         new THREE.BoxGeometry(0.085, 0.07, 0.055),
         chrome,
@@ -547,7 +562,7 @@ export class ArticulatedClaw {
   }
 
   private createFinger(index: number): FingerAssembly {
-    const angle = (index * Math.PI * 2) / 3
+    const angle = FINGER_YAW + (index * Math.PI * 2) / 3
     const radialX = Math.cos(angle)
     const radialZ = -Math.sin(angle)
     const body = this.world.createRigidBody(

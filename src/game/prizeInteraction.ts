@@ -1,12 +1,12 @@
 export const PRIZE_GRIP_OPENING = 0.55
 export const PRIZE_HALF_WIDTH = 0.4
 export const PRIZE_HALF_HEIGHT = 0.6
-export const PRIZE_HALF_DEPTH = 0.3
+export const PRIZE_HALF_DEPTH = 0.39
 export const CHUTE_CAPTURE_Y = -PRIZE_HALF_HEIGHT - 0.05
 export const CHUTE_OPENING_HALF_X = 0.7
 export const CHUTE_OPENING_HALF_Z = 0.72
 export const PRIZE_HALF_DIAGONAL = Math.hypot(PRIZE_HALF_WIDTH, PRIZE_HALF_DEPTH)
-const PICKUP_RADIUS = 0.55
+const PICKUP_RADIUS = 0.26
 const PICKUP_MAX_CENTER_Y = PRIZE_HALF_HEIGHT + 0.15
 
 export interface PrizePosition {
@@ -22,13 +22,6 @@ export interface ChutePosition {
 
 export function prizeReleaseAngularVelocity(): { x: number; y: number; z: number } {
   return { x: 0, y: 0.35, z: 0 }
-}
-
-export function alignPrizeWithChute(
-  position: PrizePosition,
-  chute: ChutePosition,
-): PrizePosition {
-  return { x: chute.x, y: position.y, z: chute.z }
 }
 
 export function canPickupPrize(position: PrizePosition, grabPosition: PrizePosition): boolean {
