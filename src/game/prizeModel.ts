@@ -104,6 +104,44 @@ function createSurfacePatch(
   return geometry
 }
 
+function createTearPatch(): THREE.BufferGeometry {
+  const segments = 48
+  const rings = 6
+  const centerX = 0.11
+  const centerY = 0.157
+  const positions = [centerX, centerY, faceFront(centerX, centerY) + 0.01]
+  const indices: number[] = []
+
+  for (let ring = 1; ring <= rings; ring += 1) {
+    const radius = ring / rings
+    for (let segment = 0; segment < segments; segment += 1) {
+      const angle = segment / segments * Math.PI * 2
+      const vertical = Math.sin(angle)
+      const x = centerX + Math.cos(angle) * 0.0145 * radius * (1 - 0.35 * vertical * radius)
+        - 0.006 * vertical * radius
+      const y = centerY + vertical * 0.035 * radius
+      const z = faceFront(x, y) + 0.005 + 0.005 * (1 - radius * radius)
+      positions.push(x, y, z)
+
+      const next = (segment + 1) % segments
+      if (ring === 1) indices.push(0, 1 + segment, 1 + next)
+      else {
+        const inner = 1 + (ring - 2) * segments + segment
+        const outer = 1 + (ring - 1) * segments + segment
+        const innerNext = 1 + (ring - 2) * segments + next
+        const outerNext = 1 + (ring - 1) * segments + next
+        indices.push(inner, outer, outerNext, inner, outerNext, innerNext)
+      }
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  return geometry
+}
+
 function createCollarBand(): THREE.BufferGeometry {
   const segments = 48
   const positions: number[] = []
@@ -185,10 +223,9 @@ export function createPrizeModel(): THREE.Group {
   const yellow = plushMaterial(YELLOW, 0.9)
   const black = plushMaterial(0x242127, 0.98)
   const tear = new THREE.MeshPhysicalMaterial({
-    color: 0x8ed8ed,
-    roughness: 0.22,
-    transmission: 0.12,
-    clearcoat: 0.75,
+    color: 0x5bbbd7,
+    roughness: 0.32,
+    clearcoat: 0.65,
   })
 
   addPart(doll, 'doll-body', new THREE.SphereGeometry(0.2, 32, 24), blue, [0, -0.14, 0], [0.88, 1.04, 0.76])
@@ -203,11 +240,11 @@ export function createPrizeModel(): THREE.Group {
   for (const side of [-1, 1] as const) {
     const eye = addPart(doll, side < 0 ? 'doll-left-eye' : 'doll-right-eye',
       new THREE.SphereGeometry(0.055, 28, 20), white,
-      [side * 0.043, 0.217, 0.132], [0.78, 1.5, 1.12])
-    eye.rotation.x = -0.6
+      [side * 0.043, 0.218, 0.135], [0.88, 0.92, 0.5])
+    eye.rotation.x = -0.45
     addPart(doll, side < 0 ? 'doll-left-pupil' : 'doll-right-pupil',
       new THREE.SphereGeometry(0.014, 18, 14), black,
-      [side * 0.036, 0.231, 0.19], [0.78, 1.08, 0.5])
+      [side * 0.036, 0.224, 0.168], [0.85, 0.85, 0.5])
   }
 
   addPart(doll, 'doll-nose', new THREE.SphereGeometry(0.034, 24, 18), red, [0, 0.177, 0.185])
@@ -245,10 +282,7 @@ export function createPrizeModel(): THREE.Group {
     }
   }
 
-  const tearDrop = addPart(doll, 'doll-tear',
-    new THREE.SphereGeometry(0.035, 22, 16), tear,
-    [0.115, 0.17, 0.16], [0.58, 1.22, 0.38])
-  tearDrop.rotation.z = -0.55
+  addPart(doll, 'doll-tear', createTearPatch(), tear, [0, 0, 0])
   addFuzzLayer(doll)
 
   return root
