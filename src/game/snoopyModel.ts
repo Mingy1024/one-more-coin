@@ -2,6 +2,7 @@ import * as THREE from 'three'
 
 const IVORY = 0xf1ede3
 const BLACK = 0x17191c
+const PURPLE = 0x76539f
 const RED = 0xa92b30
 
 function fabric(paint?: (x: number, y: number, z: number) => number): THREE.MeshPhysicalMaterial {
@@ -144,7 +145,7 @@ export function createSnoopyModel(): THREE.Group {
   const doll = new THREE.Group()
   doll.name = 'snoopy-prize'
   const white = fabric()
-  const dark = fabric(() => BLACK)
+  const purple = fabric(() => PURPLE)
 
   const body = plushPart(doll, 'snoopy-body', white, [0, -0.25, -0.1], [0.28, 0.32, 0.28])
   shortNap(doll, body, IVORY, 1400)
@@ -172,11 +173,11 @@ export function createSnoopyModel(): THREE.Group {
   shortNap(doll, head, IVORY, 2100)
   for (const side of [-1, 1]) {
     const label = side < 0 ? 'left' : 'right'
-    const ear = plushPart(doll, `snoopy-${label}-ear`, dark,
+    const ear = plushPart(doll, `snoopy-${label}-ear`, purple,
       [side * 0.305, 0.195, 0.115], [0.115, 0.245, 0.09], floppyEar(side))
-    shortNap(doll, ear, 0x343438, 500)
+    shortNap(doll, ear, 0x9875b9, 500)
   }
-  plushPart(doll, 'snoopy-nose', dark,
+  plushPart(doll, 'snoopy-nose', purple,
     [0, 0.105, 0.59], [0.065, 0.056, 0.058])
   return doll
 }

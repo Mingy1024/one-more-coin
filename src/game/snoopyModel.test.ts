@@ -32,4 +32,15 @@ describe('Snoopy plush prize', () => {
     expect(material.bumpMap).toBeInstanceOf(THREE.DataTexture)
     expect(doll.getObjectByName('snoopy-left-eye')).toBeUndefined()
   })
+
+  it('colors both ears and the nose purple while keeping the eyes dark', () => {
+    const doll = createSnoopyModel()
+    for (const name of ['snoopy-left-ear', 'snoopy-right-ear', 'snoopy-nose']) {
+      const mesh = doll.getObjectByName(name) as THREE.Mesh
+      const material = mesh.material as THREE.MeshPhysicalMaterial
+      const pixels = (material.map as THREE.DataTexture).image.data!
+      expect(pixels[2]).toBeGreaterThan(pixels[0]!)
+      expect(pixels[0]).toBeGreaterThan(pixels[1]!)
+    }
+  })
 })
