@@ -29,6 +29,7 @@ import {
 } from './prizeInteraction'
 import { createPrizeModel } from './prizeModel'
 import { createArcanineModel } from './arcanineModel'
+import { createSnoopyModel } from './snoopyModel'
 import { selectPrizeForAim } from './prizeSelection'
 import { createGantryAssembly } from './gantry'
 import {
@@ -70,6 +71,7 @@ const CLAW_LOW_Y = MACHINE_DIMENSIONS.clawLowY
 const CHUTE = { x: -1.2, z: 0.96 }
 const PRIZE_START = { x: 0.48, y: 0.62, z: -0.18 }
 const ARCANINE_START = { x: -0.72, y: 0.62, z: -0.42 }
+const SNOOPY_START = { x: 1.18, y: 0.62, z: -0.35 }
 const ROPE_ANCHOR_Y = MACHINE_DIMENSIONS.ropeAnchorY
 
 export class ClawMachineGame {
@@ -129,6 +131,7 @@ export class ClawMachineGame {
     this.prizes = [
       this.createPrize(PRIZE_START, createPrizeModel(), COLORS.pink),
       this.createPrize(ARCANINE_START, createArcanineModel(), COLORS.warm, 0.35),
+      this.createPrize(SNOOPY_START, createSnoopyModel(), COLORS.aqua, 0.35),
     ]
     this.addAmbientStars()
 
