@@ -4,12 +4,14 @@ import { describe, expect, it } from 'vitest'
 import { createSlowpokeModel } from './slowpokeModel'
 
 describe('Slowpoke plush prize', () => {
-  it('has its large face, four paws and upward curved tail in one carryable group', () => {
+  it('has rounded paws and ears fused into the body and head surfaces', () => {
     const doll = createSlowpokeModel()
-    for (const name of ['slowpoke-body', 'slowpoke-head', 'slowpoke-tail',
-      'slowpoke-left-ear', 'slowpoke-right-ear', 'slowpoke-front-left-leg',
-      'slowpoke-rear-right-leg']) {
+    for (const name of ['slowpoke-body', 'slowpoke-head', 'slowpoke-tail']) {
       expect(doll.getObjectByName(name), name).toBeInstanceOf(THREE.Mesh)
+    }
+    expect(doll.children.filter(child => child instanceof THREE.Mesh)).toHaveLength(3)
+    for (const name of ['slowpoke-left-ear', 'slowpoke-front-left-leg']) {
+      expect(doll.getObjectByName(name)).toBeUndefined()
     }
     const bounds = new THREE.Box3().setFromObject(doll)
     const size = bounds.getSize(new THREE.Vector3())

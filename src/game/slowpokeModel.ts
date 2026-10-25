@@ -35,6 +35,7 @@ function fleece(paint: Paint): THREE.MeshPhysicalMaterial {
   }
   const map = new THREE.DataTexture(colors, width, height)
   map.colorSpace = THREE.SRGBColorSpace
+  map.wrapS = THREE.RepeatWrapping
   map.minFilter = THREE.LinearMipmapLinearFilter
   map.magFilter = THREE.LinearFilter
   map.generateMipmaps = true
@@ -67,33 +68,112 @@ function headPaint(x: number, y: number, z: number): number {
   return PINK
 }
 
-function oval(
+type Ellipsoid = { center: [number, number, number]; radii: [number, number, number] }
+
+// A rounded union gives the ears and four paws volume without visible sphere seams.
+function fusedSurface(
   parent: THREE.Group, name: string, material: THREE.Material,
-  center: [number, number, number], radii: [number, number, number],
-  sculpt?: (x: number, y: number, z: number) => [number, number, number],
+  parts: Ellipsoid[], blend: number,
+  bounds: { min: [number, number, number]; max: [number, number, number] },
+  uvBody: Ellipsoid,
 ): THREE.Mesh {
-  const geometry = new THREE.SphereGeometry(1, sculpt ? 80 : 48, sculpt ? 56 : 32)
-  if (sculpt) {
-    const positions = geometry.getAttribute('position')
-    for (let index = 0; index < positions.count; index += 1) {
-      positions.setXYZ(index, ...sculpt(positions.getX(index), positions.getY(index), positions.getZ(index)))
+  const distance = (point: THREE.Vector3): number => {
+    let result = Infinity
+    for (const part of parts) {
+      const [cx, cy, cz] = part.center
+      const [rx, ry, rz] = part.radii
+      const dx = (point.x - cx) / rx
+      const dy = (point.y - cy) / ry
+      const dz = (point.z - cz) / rz
+      const next = (Math.hypot(dx, dy, dz) - 1) * Math.min(rx, ry, rz)
+      if (result === Infinity) { result = next; continue }
+      const h = Math.max(0, blend - Math.abs(result - next)) / blend
+      result = Math.min(result, next) - h * h * blend * 0.25
     }
-    geometry.computeVertexNormals()
+    return result
   }
+  const normalAt = (point: THREE.Vector3): THREE.Vector3 => {
+    const e = 0.003
+    return new THREE.Vector3(
+      distance(new THREE.Vector3(point.x + e, point.y, point.z)) - distance(new THREE.Vector3(point.x - e, point.y, point.z)),
+      distance(new THREE.Vector3(point.x, point.y + e, point.z)) - distance(new THREE.Vector3(point.x, point.y - e, point.z)),
+      distance(new THREE.Vector3(point.x, point.y, point.z + e)) - distance(new THREE.Vector3(point.x, point.y, point.z - e)),
+    ).normalize()
+  }
+  const positions: number[] = []
+  const normals: number[] = []
+  const uvs: number[] = []
+  const corners = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
+    [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]]
+  const tetrahedra = [[0, 5, 1, 6], [0, 1, 2, 6], [0, 2, 3, 6],
+    [0, 3, 7, 6], [0, 7, 4, 6], [0, 4, 5, 6]]
+  const edges = [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]]
+  const step = name === 'slowpoke-head' ? 0.032 : 0.04
+  const counts = bounds.min.map((low, axis) => Math.ceil((bounds.max[axis]! - low) / step))
+  for (let ix = 0; ix < counts[0]!; ix += 1) {
+    for (let iy = 0; iy < counts[1]!; iy += 1) {
+      for (let iz = 0; iz < counts[2]!; iz += 1) {
+        const points = corners.map(([dx, dy, dz]) => new THREE.Vector3(
+          bounds.min[0] + (ix + dx!) * step,
+          bounds.min[1] + (iy + dy!) * step,
+          bounds.min[2] + (iz + dz!) * step,
+        ))
+        const values = points.map(distance)
+        if (values.every(value => value > 0) || values.every(value => value <= 0)) continue
+        for (const tetra of tetrahedra) {
+          const crossings: THREE.Vector3[] = []
+          for (const [a, b] of edges) {
+            const first = tetra[a!]!
+            const second = tetra[b!]!
+            const va = values[first]!
+            const vb = values[second]!
+            if ((va <= 0) === (vb <= 0)) continue
+            crossings.push(points[first]!.clone().lerp(points[second]!, va / (va - vb)))
+          }
+          if (crossings.length < 3) continue
+          const center = crossings.reduce((sum, point) => sum.add(point), new THREE.Vector3())
+            .multiplyScalar(1 / crossings.length)
+          const faceNormal = normalAt(center)
+          const tangent = crossings[0]!.clone().sub(center).normalize()
+          const bitangent = new THREE.Vector3().crossVectors(faceNormal, tangent).normalize()
+          crossings.sort((a, b) => {
+            const pa = a.clone().sub(center)
+            const pb = b.clone().sub(center)
+            return Math.atan2(pa.dot(bitangent), pa.dot(tangent))
+              - Math.atan2(pb.dot(bitangent), pb.dot(tangent))
+          })
+          for (let index = 1; index < crossings.length - 1; index += 1) {
+            const triangle = [crossings[0]!, crossings[index]!, crossings[index + 1]!]
+            const triangleUvs = triangle.map(point => {
+              const unit = new THREE.Vector3(
+                (point.x - uvBody.center[0]) / uvBody.radii[0],
+                (point.y - uvBody.center[1]) / uvBody.radii[1],
+                (point.z - uvBody.center[2]) / uvBody.radii[2],
+              ).normalize()
+              const phi = (Math.atan2(unit.z, -unit.x) + Math.PI * 2) % (Math.PI * 2)
+              return [phi / (Math.PI * 2), 1 - Math.acos(THREE.MathUtils.clamp(unit.y, -1, 1)) / Math.PI]
+            })
+            const seam = Math.max(...triangleUvs.map(uv => uv[0]!)) - Math.min(...triangleUvs.map(uv => uv[0]!)) > 0.5
+            triangle.forEach((point, corner) => {
+              positions.push(...point.toArray())
+              normals.push(...normalAt(point).toArray())
+              const [u, v] = triangleUvs[corner]!
+              uvs.push(seam && u! < 0.5 ? u! + 1 : u!, v!)
+            })
+          }
+        }
+      }
+    }
+  }
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
   const mesh = new THREE.Mesh(geometry, material)
   mesh.name = name
-  mesh.position.set(...center)
-  mesh.scale.set(...radii)
   mesh.castShadow = mesh.receiveShadow = true
   parent.add(mesh)
   return mesh
-}
-
-function sculptHead(x: number, y: number, z: number): [number, number, number] {
-  const front = Math.max(0, z)
-  const muzzle = Math.exp(-(((y + 0.43) / 0.56) ** 4))
-  return [x * (1 + 0.1 * muzzle * front), y - 0.03 * muzzle * front,
-    z + 0.24 * front ** 0.8 * muzzle]
 }
 
 function addNap(parent: THREE.Group, surface: THREE.Mesh, count: number): void {
@@ -101,14 +181,16 @@ function addNap(parent: THREE.Group, surface: THREE.Mesh, count: number): void {
   const geometry = surface.geometry
   const vertices = geometry.getAttribute('position')
   const normals = geometry.getAttribute('normal')
-  const indices = geometry.index!
+  const indices = geometry.index
   const normalMatrix = new THREE.Matrix3().getNormalMatrix(surface.matrix)
   const strands: number[] = []
   let seed = 4861
   const random = (): number => { seed = seed * 16807 % 2147483647; return seed / 2147483647 }
   for (let strand = 0; strand < count; strand += 1) {
-    const triangle = Math.floor(random() * indices.count / 3) * 3
-    const corners = [indices.getX(triangle), indices.getX(triangle + 1), indices.getX(triangle + 2)]
+    const triangle = Math.floor(random() * (indices?.count ?? vertices.count) / 3) * 3
+    const corners = indices
+      ? [indices.getX(triangle), indices.getX(triangle + 1), indices.getX(triangle + 2)]
+      : [triangle, triangle + 1, triangle + 2]
     const u = Math.sqrt(random())
     const v = random()
     const weights = [1 - u, u * (1 - v), u * v]
@@ -193,25 +275,28 @@ export function createSlowpokeModel(): THREE.Group {
   const doll = new THREE.Group()
   doll.name = 'slowpoke-prize'
   const pink = fleece(() => PINK)
-  const feet = fleece((_x, y, z) => y < -0.58 && z > 0.24 ? WHITE : PINK)
+  const bodyFabric = fleece((x, y, z) =>
+    y < -0.65 && Math.abs(x) > 0.3 && Math.abs(z) > 0.4 ? WHITE : PINK)
 
-  const body = oval(doll, 'slowpoke-body', pink, [0, -0.2, -0.16], [0.34, 0.29, 0.39])
+  const bodyCore: Ellipsoid = { center: [0, -0.2, -0.16], radii: [0.34, 0.29, 0.39] }
+  const bodyParts: Ellipsoid[] = [bodyCore]
+  for (const side of [-1, 1]) {
+    bodyParts.push(
+      { center: [side * 0.24, -0.39, 0.28], radii: [0.145, 0.2, 0.18] },
+      { center: [side * 0.24, -0.38, -0.38], radii: [0.15, 0.19, 0.18] },
+    )
+  }
+  const body = fusedSurface(doll, 'slowpoke-body', bodyFabric, bodyParts, 0.12,
+    { min: [-0.55, -0.7, -0.8], max: [0.55, 0.25, 0.6] }, bodyCore)
   addNap(doll, body, 1600)
   curvedTail(doll, pink.bumpMap!)
-  for (const side of [-1, 1]) {
-    const label = side < 0 ? 'left' : 'right'
-    oval(doll, `slowpoke-front-${label}-leg`, feet,
-      [side * 0.24, -0.37, 0.28], [0.135, 0.19, 0.18])
-    oval(doll, `slowpoke-rear-${label}-leg`, feet,
-      [side * 0.24, -0.36, -0.38], [0.15, 0.19, 0.18])
-  }
-  const head = oval(doll, 'slowpoke-head', fleece(headPaint),
-    [0, 0.1, 0.24], [0.325, 0.27, 0.29], sculptHead)
+  const headCore: Ellipsoid = { center: [0, 0.1, 0.24], radii: [0.325, 0.27, 0.29] }
+  const head = fusedSurface(doll, 'slowpoke-head', fleece(headPaint), [
+    headCore,
+    { center: [0, -0.035, 0.43], radii: [0.29, 0.145, 0.19] },
+    { center: [-0.265, 0.4, 0.19], radii: [0.115, 0.13, 0.1] },
+    { center: [0.265, 0.4, 0.19], radii: [0.115, 0.13, 0.1] },
+  ], 0.08, { min: [-0.52, -0.27, -0.11], max: [0.52, 0.59, 0.72] }, headCore)
   addNap(doll, head, 1800)
-  for (const side of [-1, 1]) {
-    const label = side < 0 ? 'left' : 'right'
-    oval(doll, `slowpoke-${label}-ear`, pink,
-      [side * 0.25, 0.34, 0.19], [0.11, 0.12, 0.09])
-  }
   return doll
 }
