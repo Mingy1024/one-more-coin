@@ -58,7 +58,6 @@ interface Prize {
   collider: RAPIER.Collider
   mesh: THREE.Group
   carry: PrizeCarryController
-  start: { x: number; y: number; z: number }
 }
 
 const COLORS = {
@@ -214,10 +213,6 @@ export class ClawMachineGame {
     this.articulatedClaw.reset(CHUTE.x, CHUTE.z, ROPE_ANCHOR_Y - CLAW_TOP_Y)
     for (const prize of this.prizes) {
       prize.carry.release()
-      prize.body.setTranslation(prize.start, true)
-      prize.body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true)
-      prize.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
-      prize.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
     }
     this.publishSnapshot()
   }
@@ -759,7 +754,7 @@ export class ClawMachineGame {
     mesh.add(prizeGlow)
     this.scene.add(mesh)
 
-    return { body, collider, mesh, carry: new PrizeCarryController(body, collider), start }
+    return { body, collider, mesh, carry: new PrizeCarryController(body, collider) }
   }
 
   private addAmbientStars(): void {
