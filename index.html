@@ -15,6 +15,9 @@
         <button id="reset-button" class="reset-button" type="button" aria-label="重置娃娃位置並補回獎品" title="重置娃娃位置並補回獎品">
           <span aria-hidden="true">↻</span> 重置
         </button>
+        <button id="titles-button" class="titles-button" type="button" aria-haspopup="dialog" aria-controls="titles-dialog">
+          <span aria-hidden="true">✦</span> 稱號
+        </button>
         <div class="hud" aria-live="polite">
           <div class="timer-hud"><span class="hud-label">剩餘秒數</span><strong id="time-value">30</strong></div>
           <div><span class="hud-label">出爪</span><strong id="attempt-value">0</strong></div>
@@ -88,6 +91,20 @@
         </div>
       </section>
     </main>
+    <dialog id="titles-dialog" class="titles-dialog" aria-labelledby="titles-dialog-title" aria-describedby="titles-dialog-copy">
+      <div class="titles-dialog-inner">
+        <div class="titles-dialog-header">
+          <span class="titles-dialog-kicker">COIN RECORD / 01</span>
+          <button id="titles-close" class="titles-close" type="button" aria-label="關閉稱號一覽">×</button>
+          <span class="titles-dialog-emblem" aria-hidden="true">✦</span>
+          <h2 id="titles-dialog-title">稱號一覽</h2>
+          <p id="titles-dialog-copy">每一枚十元，都是你和機台的共同回憶。</p>
+          <span id="titles-count" class="titles-count">已獲得 0 / 8</span>
+        </div>
+        <ol id="titles-list" class="titles-list" aria-label="已獲得的稱號"></ol>
+        <p id="titles-empty" class="titles-empty">還沒有獲得稱號。投入第一枚 10 元，從試水溫開始！</p>
+      </div>
+    </dialog>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

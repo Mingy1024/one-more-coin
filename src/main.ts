@@ -2,7 +2,7 @@ import './style.css'
 
 import { ClawMachineGame, type GameSnapshot } from './game/ClawMachineGame'
 import { BanterPresenter, type BanterRender } from './game/banterPresenter'
-import { CoinLedger, type SpendSnapshot, type SpendTitle } from './game/coinLedger'
+import { CoinLedger, spendTitles, type SpendSnapshot, type SpendTitle } from './game/coinLedger'
 
 const canvas = requireElement<HTMLCanvasElement>('game-canvas')
 const timeValue = requireElement<HTMLElement>('time-value')
@@ -14,6 +14,12 @@ const grabButton = requireElement<HTMLButtonElement>('grab-button')
 const grabLabel = requireElement<HTMLElement>('grab-label')
 const startButton = requireElement<HTMLButtonElement>('start-button')
 const resetButton = requireElement<HTMLButtonElement>('reset-button')
+const titlesButton = requireElement<HTMLButtonElement>('titles-button')
+const titlesDialog = requireElement<HTMLDialogElement>('titles-dialog')
+const titlesClose = requireElement<HTMLButtonElement>('titles-close')
+const titlesCount = requireElement<HTMLElement>('titles-count')
+const titlesList = requireElement<HTMLOListElement>('titles-list')
+const titlesEmpty = requireElement<HTMLElement>('titles-empty')
 const startPanel = requireElement<HTMLElement>('start-panel')
 const gameControls = requireElement<HTMLElement>('game-controls')
 const banterCard = requireElement<HTMLElement>('banter-card')
@@ -65,6 +71,20 @@ grabButton.addEventListener('click', () => game.grab())
 resetButton.addEventListener('click', () => {
   game.resetPrizes()
   statusText.textContent = '娃娃已補回並重新擺放'
+})
+titlesButton.addEventListener('click', () => {
+  renderTitleGallery()
+  game.setPaused(true)
+  titlesDialog.showModal()
+  titlesClose.focus({ preventScroll: true })
+})
+titlesClose.addEventListener('click', () => titlesDialog.close())
+titlesDialog.addEventListener('close', () => {
+  game.setPaused(false)
+  titlesButton.focus({ preventScroll: true })
+})
+titlesDialog.addEventListener('click', (event) => {
+  if (event.target === titlesDialog) titlesDialog.close()
 })
 startButton.addEventListener('click', () => {
   const spend = coinLedger.insertCoin()
@@ -176,6 +196,33 @@ function updateHud(snapshot: GameSnapshot): void {
 function renderSpend(spend: SpendSnapshot): void {
   spendValue.textContent = String(spend.amount)
   spendTitle.textContent = spend.title
+}
+
+function renderTitleGallery(): void {
+  const unlocked = coinLedger.unlockedTitles()
+  titlesCount.textContent = `已獲得 ${unlocked.length} / ${spendTitles.length}`
+  titlesEmpty.hidden = unlocked.length > 0
+  titlesList.replaceChildren(...unlocked.map((title) => {
+    const item = document.createElement('li')
+    item.className = 'title-entry'
+
+    const icon = document.createElement('span')
+    icon.className = 'title-entry-icon'
+    icon.textContent = title.emoji
+    icon.setAttribute('aria-hidden', 'true')
+
+    const copy = document.createElement('div')
+    copy.className = 'title-entry-copy'
+    const name = document.createElement('strong')
+    name.textContent = title.name
+    const detail = document.createElement('p')
+    detail.textContent = title.description
+    const requirement = document.createElement('small')
+    requirement.textContent = `單次夾出前累計投入 NT$${title.threshold} 達成`
+    copy.append(name, detail, requirement)
+    item.append(icon, copy)
+    return item
+  }))
 }
 
 function showAchievement(title: SpendTitle, amount: number): void {

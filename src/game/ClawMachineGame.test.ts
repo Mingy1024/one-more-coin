@@ -7,6 +7,24 @@ import { canPickupPrize } from './prizeInteraction'
 import { createRound, phaseProgress, stepRound, type RoundState } from './round'
 
 describe('claw machine session', () => {
+  it('does not advance a paid round while the title gallery is open', () => {
+    const round = stepRound(createRound(), { type: 'START' })
+    const render = vi.fn()
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round,
+      timer: { update: vi.fn(), getDelta: () => 2 },
+      renderer: { render },
+      scene: {},
+      camera: {},
+    }) as ClawMachineGame
+
+    game.setPaused(true)
+    ;(game as unknown as { update(): void }).update()
+
+    expect((game as unknown as { round: RoundState }).round).toBe(round)
+    expect(render).toHaveBeenCalledOnce()
+  })
+
   it('starts with a reachable side-lying prize and other varied angles', () => {
     const rotations = INITIAL_PRIZE_PLACEMENTS.map((placement) => placement.rotation)
     expect(rotations.some((rotation) => Math.abs(rotation.z) > 0.6)).toBe(true)

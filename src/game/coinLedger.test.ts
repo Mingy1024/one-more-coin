@@ -51,4 +51,33 @@ describe('coin spend ledger', () => {
 
     expect(ledger.snapshot().title).toBe('今晚真的不用睡')
   })
+
+  it('keeps unlocked titles after a successful grab resets the spend counter', () => {
+    const ledger = new CoinLedger()
+    for (let count = 0; count < 5; count += 1) ledger.insertCoin()
+
+    ledger.settleWin()
+
+    expect(ledger.snapshot().amount).toBe(0)
+    expect(ledger.unlockedTitles().map((title) => title.name)).toEqual([
+      '試水溫選手', '再一枚就好', '上好美盤',
+    ])
+    expect(ledger.unlockedTitles()[2]).toMatchObject({ threshold: 50 })
+    expect(ledger.unlockedTitles()[2]?.description).toBeTruthy()
+  })
+
+  it('restores earned titles on the same device without restoring the current spend', () => {
+    const saved = new Map<string, string>()
+    const storage = {
+      getItem: (key: string) => saved.get(key) ?? null,
+      setItem: (key: string, value: string) => { saved.set(key, value) },
+    }
+    const firstSession = new CoinLedger(storage)
+    for (let count = 0; count < 3; count += 1) firstSession.insertCoin()
+
+    const nextSession = new CoinLedger(storage)
+
+    expect(nextSession.snapshot().amount).toBe(0)
+    expect(nextSession.unlockedTitles().map((title) => title.threshold)).toEqual([10, 30])
+  })
 })

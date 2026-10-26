@@ -118,6 +118,7 @@ export class ClawMachineGame {
   private carried = false
   private lastGrabSucceeded = false
   private running = false
+  private paused = false
   private lastPublishedSecond = -1
   private lastPhase: RoundPhase = 'aiming'
   private orbit: OrbitState = { yaw: 0.08, pitch: 0.24 }
@@ -182,6 +183,10 @@ export class ClawMachineGame {
     this.running = true
     this.timer.reset()
     this.renderer.setAnimationLoop(() => this.update())
+  }
+
+  setPaused(paused: boolean): void {
+    this.paused = paused
   }
 
   setMovement(x: number, z: number): void {
@@ -264,6 +269,10 @@ export class ClawMachineGame {
   private update(): void {
     this.timer.update()
     const delta = Math.min(this.timer.getDelta(), 1 / 20)
+    if (this.paused) {
+      this.renderer.render(this.scene, this.camera)
+      return
+    }
     const previousPhase = this.round.phase
 
     this.round = stepRound(this.round, { type: 'TICK', deltaSeconds: delta })
