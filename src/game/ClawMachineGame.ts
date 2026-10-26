@@ -32,6 +32,7 @@ import { createArcanineModel } from './arcanineModel'
 import { createSnoopyModel } from './snoopyModel'
 import { createSlowpokeModel } from './slowpokeModel'
 import { createBulbasaurModel } from './bulbasaurModel'
+import { createAlienModel } from './alienModel'
 import { selectPrizeForAim } from './prizeSelection'
 import { createGantryAssembly } from './gantry'
 import {
@@ -72,10 +73,11 @@ const CLAW_TOP_Y = MACHINE_DIMENSIONS.clawTopY
 const CLAW_LOW_Y = MACHINE_DIMENSIONS.clawLowY
 const CHUTE = { x: -1.2, z: 0.96 }
 const PRIZE_START = { x: 0.48, y: 0.62, z: -0.18 }
-const ARCANINE_START = { x: -0.72, y: 0.62, z: -0.42 }
+const ARCANINE_START = { x: -0.2, y: 0.62, z: -1.14 }
 const SNOOPY_START = { x: 1.18, y: 0.62, z: -0.35 }
 const SLOWPOKE_START = { x: -0.08, y: 0.62, z: 0.53 }
 const BULBASAUR_START = { x: 0.88, y: 0.62, z: 0.62 }
+const ALIEN_START = { x: -1.25, y: 0.62, z: -0.35 }
 const ROPE_ANCHOR_Y = MACHINE_DIMENSIONS.ropeAnchorY
 
 export class ClawMachineGame {
@@ -138,6 +140,7 @@ export class ClawMachineGame {
       this.createPrize(SNOOPY_START, createSnoopyModel(), COLORS.aqua, 0.35),
       this.createPrize(SLOWPOKE_START, createSlowpokeModel(), COLORS.warm, 0.25),
       this.createPrize(BULBASAUR_START, createBulbasaurModel(), COLORS.aqua, 0.3),
+      this.createPrize(ALIEN_START, createAlienModel(), COLORS.warm, 0.25),
     ]
     this.addAmbientStars()
 
