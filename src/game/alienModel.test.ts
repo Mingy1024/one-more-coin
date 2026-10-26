@@ -36,4 +36,21 @@ describe('three-eyed alien plush', () => {
       expect(doll.getObjectByName(name), name).toBeInstanceOf(THREE.Mesh)
     }
   })
+
+  it('has a rounded, plush belly with a waist at least half as wide as the head', () => {
+    const doll = createAlienModel()
+    const suit = doll.getObjectByName('alien-suit') as THREE.Mesh
+    const head = doll.getObjectByName('alien-head') as THREE.Mesh
+    const positions = suit.geometry.getAttribute('position')
+    let waistHalfWidth = 0
+    let waistHalfDepth = 0
+    for (let index = 0; index < positions.count; index += 1) {
+      if (Math.abs(positions.getY(index) + 0.4) > 0.025) continue
+      waistHalfWidth = Math.max(waistHalfWidth, Math.abs(positions.getX(index)))
+      waistHalfDepth = Math.max(waistHalfDepth, Math.abs(positions.getZ(index)))
+    }
+    const headWidth = new THREE.Box3().setFromObject(head).getSize(new THREE.Vector3()).x
+    expect(waistHalfWidth * 2 * doll.scale.x / headWidth).toBeGreaterThan(0.48)
+    expect(waistHalfDepth * 2 * doll.scale.z).toBeGreaterThan(0.45)
+  })
 })

@@ -82,14 +82,14 @@ export function createAlienModel(): THREE.Group {
   plushOval(doll, 'alien-eye-2', eyeFabric, [0, 0.33, 0.29], [0.087, 0.094, 0.045])
   plushOval(doll, 'alien-eye-3', eyeFabric, [0.18, 0.26, 0.27], [0.083, 0.091, 0.045])
 
-  const torso: Ellipsoid = { center: [0, -0.3, 0], radii: [0.255, 0.27, 0.22] }
+  const torso: Ellipsoid = { center: [0, -0.29, 0], radii: [0.34, 0.29, 0.27] }
   const suitMesh = fusedSurface(doll, 'alien-suit', fleece(() => CYAN), [torso,
     { center: [0, -0.075, 0], radii: [0.16, 0.13, 0.15] },
     { center: [-0.34, -0.27, 0], radii: [0.19, 0.085, 0.105] },
     { center: [0.34, -0.27, 0], radii: [0.19, 0.085, 0.105] },
     { center: [-0.13, -0.49, 0.02], radii: [0.135, 0.12, 0.16] },
     { center: [0.13, -0.49, 0.02], radii: [0.135, 0.12, 0.16] },
-  ], 0.055, { min: [-0.6, -0.66, -0.27], max: [0.6, 0.03, 0.28] }, torso, 0.043)
+  ], 0.055, { min: [-0.6, -0.66, -0.31], max: [0.6, 0.04, 0.32] }, torso, 0.043)
   addFuzz(doll, suitMesh, CYAN, 1200)
 
   const handFabric = fleece(() => LIME)
@@ -114,13 +114,14 @@ export function createAlienModel(): THREE.Group {
   doll.add(collar)
 
   const blueFabric = fleece(() => BLUE)
-  const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.246, 0.249, 0.068, 48, 1, true), blueFabric)
+  const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.075, 48, 1, true), blueFabric)
   belt.name = 'alien-belt'
   belt.position.y = -0.395
+  belt.scale.z = 0.79
   belt.castShadow = true
   doll.add(belt)
-  plushOval(doll, 'alien-left-foot', blueFabric, [-0.145, -0.565, 0.075], [0.153, 0.07, 0.192])
-  plushOval(doll, 'alien-right-foot', blueFabric, [0.145, -0.565, 0.075], [0.153, 0.07, 0.192])
+  plushOval(doll, 'alien-left-foot', blueFabric, [-0.15, -0.565, 0.09], [0.168, 0.07, 0.192])
+  plushOval(doll, 'alien-right-foot', blueFabric, [0.15, -0.565, 0.09], [0.168, 0.07, 0.192])
 
   doll.scale.setScalar(0.94)
   return doll
