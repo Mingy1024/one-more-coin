@@ -117,6 +117,8 @@ const PRIZE_GRIP_PROFILES = [
   { retention: 0.94, mass: 0.45 },
 ] as const
 const ROPE_ANCHOR_Y = MACHINE_DIMENSIONS.ropeAnchorY
+const PHYSICS_STEP = 1 / 120
+const MAX_PHYSICS_STEPS = 6
 
 export class ClawMachineGame {
   private readonly scene = new THREE.Scene()
@@ -130,6 +132,7 @@ export class ClawMachineGame {
   private readonly onSnapshot: (snapshot: GameSnapshot) => void
   private readonly resizeObserver: ResizeObserver
   private readonly canvas: HTMLCanvasElement
+  private readonly compactDisplay: boolean
   private prizePortraits?: string[]
   private frameCallbacks: Array<() => void> = []
 
@@ -157,12 +160,14 @@ export class ClawMachineGame {
   private gripStrength = 0
   private gripMass = 0.5
   private slipped = false
+  private physicsRemainder = 0
 
   private constructor(canvas: HTMLCanvasElement, onSnapshot: (snapshot: GameSnapshot) => void) {
     this.canvas = canvas
     this.onSnapshot = onSnapshot
+    this.compactDisplay = Math.min(window.innerWidth, window.innerHeight) <= 600
     this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75))
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.compactDisplay ? 1.5 : 1.75))
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFShadowMap
@@ -478,12 +483,14 @@ export class ClawMachineGame {
     const previousPhase = this.round.phase
 
     this.round = stepRound(this.round, { type: 'TICK', deltaSeconds: delta })
+    const pickupFrame = previousPhase === 'closing' && this.round.phase === 'lifting'
     if (this.round.phase !== previousPhase) this.handlePhaseChange(previousPhase, this.round.phase)
 
     if (this.round.phase === 'aiming') this.updatePlayerMovement(delta)
     else this.driveVelocity = approachVelocity(this.driveVelocity, { x: 0, z: 0 }, delta)
-    this.updateClawAnimation()
-    this.updatePhysics(delta)
+    this.updateClawAnimation(pickupFrame)
+    this.updatePhysics(delta, pickupFrame)
+    if (pickupFrame) this.tryPickup()
     this.advanceGrip(delta)
     this.clearStaleChutePrizes()
     this.checkForWin()
@@ -501,7 +508,9 @@ export class ClawMachineGame {
 
   private renderFrame(): void {
     this.renderer.render(this.scene, this.camera)
-    for (const callback of this.frameCallbacks?.splice(0) ?? []) callback()
+    if (this.frameCallbacks?.length) {
+      for (const callback of this.frameCallbacks.splice(0)) callback()
+    }
   }
 
   private updatePlayerMovement(delta: number): void {
@@ -528,10 +537,10 @@ export class ClawMachineGame {
     this.clawPosition.z = nextZ
   }
 
-  private updateClawAnimation(): void {
-    const phaseFraction = phaseProgress(this.round)
+  private updateClawAnimation(pickupFrame = false): void {
+    const phaseFraction = pickupFrame ? 1 : phaseProgress(this.round)
     const progress = smoothStep(phaseFraction)
-    const phase = this.round.phase
+    const phase = pickupFrame ? 'closing' : this.round.phase
     const headY = clawHeadHeight(phase, phaseFraction, this.closingHeight)
     const holdingOpening = (this.tiltPlan ? TILT_GRIP_OPENING : PRIZE_GRIP_OPENING)
       + (this.carried ? Math.max(0, 0.4 - this.gripStrength) * 0.25 : 0)
@@ -557,28 +566,37 @@ export class ClawMachineGame {
   }
 
   private handlePhaseChange(previous: RoundPhase, next: RoundPhase): void {
-    if (previous === 'closing' && next === 'lifting') this.tryPickup()
     if (previous === 'returning' && next === 'releasing') this.releasePrize()
   }
 
   private tryPickup(): void {
-    if (!this.activePrize || this.activePrize.claimed) return
-    const position = this.activePrize.body.translation()
     const grabPosition = this.articulatedClaw.getGrabPose()
-    const quality = evaluateGrip(
-      { position, rotation: this.activePrize.body.rotation() },
-      grabPosition, this.articulatedClaw.getFingerTipPositions(), this.tiltPlan ? 'tilt' : 'normal',
-    )
-    if (quality < CAPTURE_QUALITY) return
-    const profile = PRIZE_GRIP_PROFILES[this.prizes.indexOf(this.activePrize)] ?? PRIZE_GRIP_PROFILES[0]
-    this.gripQuality = quality
-    this.gripStrength = quality * profile.retention
+    const tips = this.articulatedClaw.getFingerTipPositions()
+    let selected: Prize | undefined
+    let bestQuality = 0
+    for (const prize of this.prizes) {
+      if (prize.claimed || this.stalePrizes?.has(prize)) continue
+      const quality = evaluateGrip(
+        { position: prize.body.translation(), rotation: prize.body.rotation() },
+        grabPosition, tips, prize === this.activePrize && this.tiltPlan ? 'tilt' : 'normal',
+      )
+      if (quality > bestQuality) {
+        selected = prize
+        bestQuality = quality
+      }
+    }
+    if (!selected || bestQuality < CAPTURE_QUALITY) return
+    if (selected !== this.activePrize) this.tiltPlan = undefined
+    this.activePrize = selected
+    const profile = PRIZE_GRIP_PROFILES[this.prizes.indexOf(selected)] ?? PRIZE_GRIP_PROFILES[0]
+    this.gripQuality = bestQuality
+    this.gripStrength = bestQuality * profile.retention
     this.gripMass = profile.mass
 
     this.carried = true
     this.lastGrabSucceeded = true
     this.articulatedClaw.holdCurrentGrip()
-    this.activePrize.carry.capture(grabPosition)
+    selected.carry.capture(grabPosition)
   }
 
   private advanceGrip(delta: number): void {
@@ -622,14 +640,16 @@ export class ClawMachineGame {
     this.activePrize.body.setAngvel(prizeReleaseAngularVelocity(), true)
   }
 
-  private updatePhysics(delta: number): void {
-    const substeps = 3
-    this.world.timestep = delta / substeps
+  private updatePhysics(delta: number, forceStep = false): void {
+    this.physicsRemainder = Math.min((this.physicsRemainder ?? 0) + delta, PHYSICS_STEP * MAX_PHYSICS_STEPS)
+    this.world.timestep = PHYSICS_STEP
+    const steps = Math.max(forceStep ? 1 : 0, Math.floor((this.physicsRemainder + 1e-9) / PHYSICS_STEP))
+    this.physicsRemainder = Math.max(0, this.physicsRemainder - steps * PHYSICS_STEP)
     const returnProgress = this.round.phase === 'returning'
       ? smoothStep(phaseProgress(this.round))
       : 0
     const centerStrength = returnProgress > 0 ? 4 + returnProgress * 8 : 0
-    for (let step = 0; step < substeps; step += 1) {
+    for (let step = 0; step < steps; step += 1) {
       if (this.tiltPlan) {
         this.articulatedClaw.applyTiltToward(
           this.tiltPlan.directionX,
@@ -719,7 +739,7 @@ export class ClawMachineGame {
     const key = new THREE.DirectionalLight(0xffffff, 3.2)
     key.position.set(3, 7, 4)
     key.castShadow = true
-    key.shadow.mapSize.set(1024, 1024)
+    key.shadow.mapSize.set(this.compactDisplay ? 512 : 1024, this.compactDisplay ? 512 : 1024)
     this.scene.add(key)
 
     const pink = new THREE.PointLight(COLORS.pink, 35, 8)

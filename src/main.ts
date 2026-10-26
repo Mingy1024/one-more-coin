@@ -206,12 +206,12 @@ game.start()
 function setupJoystick(): void {
   const joystick = requireElement<HTMLElement>('joystick')
   const knob = requireElement<HTMLElement>('joystick-knob')
-  const maxDistance = 34
+  let activePointerId: number | undefined
+  let centerX = 0
+  let centerY = 0
+  let maxDistance = 1
 
   const move = (event: PointerEvent): void => {
-    const bounds = joystick.getBoundingClientRect()
-    const centerX = bounds.left + bounds.width / 2
-    const centerY = bounds.top + bounds.height / 2
     const rawX = event.clientX - centerX
     const rawY = event.clientY - centerY
     const distance = Math.hypot(rawX, rawY)
@@ -225,25 +225,38 @@ function setupJoystick(): void {
     updateMovement()
   }
 
-  const stop = (event: PointerEvent): void => {
-    if (joystick.hasPointerCapture(event.pointerId)) {
-      joystick.releasePointerCapture(event.pointerId)
-    }
+  const reset = (): void => {
+    if (activePointerId === undefined) return
+    const pointerId = activePointerId
+    activePointerId = undefined
+    if (joystick.hasPointerCapture(pointerId)) joystick.releasePointerCapture(pointerId)
     knob.style.transform = 'translate(0, 0)'
     joystickAxis.x = 0
     joystickAxis.z = 0
     updateMovement()
   }
+  const stop = (event: PointerEvent): void => {
+    if (event.pointerId === activePointerId) reset()
+  }
 
   joystick.addEventListener('pointerdown', (event) => {
+    if (activePointerId !== undefined) return
+    const bounds = joystick.getBoundingClientRect()
+    centerX = bounds.left + bounds.width / 2
+    centerY = bounds.top + bounds.height / 2
+    maxDistance = Math.max(1, (bounds.width - knob.offsetWidth) / 2 - 4)
+    activePointerId = event.pointerId
     joystick.setPointerCapture(event.pointerId)
     move(event)
   })
   joystick.addEventListener('pointermove', (event) => {
-    if (joystick.hasPointerCapture(event.pointerId)) move(event)
+    if (event.pointerId === activePointerId) move(event)
   })
   joystick.addEventListener('pointerup', stop)
   joystick.addEventListener('pointercancel', stop)
+  joystick.addEventListener('lostpointercapture', stop)
+  window.addEventListener('blur', reset)
+  window.addEventListener('resize', reset)
 }
 
 function updateMovement(): void {

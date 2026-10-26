@@ -7,6 +7,72 @@ import { canPickupPrize } from './prizeInteraction'
 import { createRound, phaseProgress, stepRound, type RoundState } from './round'
 
 describe('claw machine session', () => {
+  it('uses the final physical finger positions before deciding a pickup', () => {
+    const calls: string[] = []
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round: { ...createRound(), phase: 'closing', phaseElapsed: 0.99 },
+      timer: { update: vi.fn(), getDelta: () => 0.02 },
+      driveVelocity: { x: 0, z: 0 },
+      updateClawAnimation: (pickupFrame: boolean) => calls.push(`animate:${pickupFrame}`),
+      updatePhysics: (_delta: number, forceStep: boolean) => calls.push(`physics:${forceStep}`),
+      tryPickup: () => calls.push('pickup'),
+      advanceGrip: vi.fn(), clearStaleChutePrizes: vi.fn(), checkForWin: vi.fn(),
+      advancePrizeExit: vi.fn(), publishSnapshot: vi.fn(), renderFrame: vi.fn(),
+    }) as ClawMachineGame
+
+    ;(game as unknown as { update(): void }).update()
+
+    expect(calls).toEqual(['animate:true', 'physics:true', 'pickup'])
+  })
+
+  it('captures the doll actually supported by the fingers when the initial target has shifted', () => {
+    const makePrize = (x: number) => ({
+      claimed: false,
+      body: { translation: () => ({ x, y: 0.62, z: 0 }), rotation: () => ({ x: 0, y: 0, z: 0, w: 1 }) },
+      carry: { capture: vi.fn() },
+    })
+    const initialTarget = makePrize(0.7)
+    const contactedPrize = makePrize(0)
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      prizes: [initialTarget, contactedPrize], activePrize: initialTarget,
+      articulatedClaw: {
+        getGrabPose: () => ({ x: 0, y: 0.46, z: 0 }),
+        getFingerTipPositions: () => [
+          { x: 0.34, y: 0.34, z: 0 },
+          { x: -0.17, y: 0.34, z: 0.294 },
+          { x: -0.17, y: 0.34, z: -0.294 },
+        ],
+        holdCurrentGrip: vi.fn(),
+      },
+    }) as ClawMachineGame
+
+    ;(game as unknown as { tryPickup(): void }).tryPickup()
+
+    expect(initialTarget.carry.capture).not.toHaveBeenCalled()
+    expect(contactedPrize.carry.capture).toHaveBeenCalledOnce()
+    expect((game as unknown as { activePrize: unknown }).activePrize).toBe(contactedPrize)
+  })
+
+  it('runs fixed physics steps across different display refresh rates', () => {
+    const step = vi.fn()
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round: createRound(), world: { step, timestep: 0 }, prizes: [],
+      articulatedClaw: { stabilizeSwing: vi.fn(), updateVisuals: vi.fn() },
+    }) as ClawMachineGame
+    const updatePhysics = (delta: number, forceStep = false) =>
+      (game as unknown as { updatePhysics(delta: number, forceStep: boolean): void }).updatePhysics(delta, forceStep)
+
+    updatePhysics(1 / 60)
+    expect(step).toHaveBeenCalledTimes(2)
+    expect((game as unknown as { world: { timestep: number } }).world.timestep).toBeCloseTo(1 / 120)
+    updatePhysics(1 / 240)
+    expect(step).toHaveBeenCalledTimes(2)
+    updatePhysics(1 / 240)
+    expect(step).toHaveBeenCalledTimes(3)
+    updatePhysics(1 / 240, true)
+    expect(step).toHaveBeenCalledTimes(4)
+  })
+
   it('notifies the loading screen only after a frame has rendered', () => {
     const events: string[] = []
     const game = Object.assign(Object.create(ClawMachineGame.prototype), {

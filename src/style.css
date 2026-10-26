@@ -31,8 +31,8 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 4px; }
 .game-shell {
   position: relative;
   width: 100%;
+  height: 100vh;
   height: 100dvh;
-  min-height: 520px;
   overflow: hidden;
   isolation: isolate;
   background: linear-gradient(180deg, #607b82, #354d59);
@@ -46,9 +46,9 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 4px; }
 .topbar {
   position: absolute;
   z-index: 5;
-  top: max(10px, env(safe-area-inset-top));
-  right: 10px;
-  left: 10px;
+  top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
+  right: max(10px, calc(env(safe-area-inset-right, 0px) + 8px));
+  left: max(10px, calc(env(safe-area-inset-left, 0px) + 8px));
   display: flex;
   align-items: stretch;
   gap: 6px;
@@ -235,12 +235,12 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 4px; }
 .controls {
   position: absolute;
   z-index: 5;
-  right: max(14px, env(safe-area-inset-right));
-  bottom: max(12px, calc(env(safe-area-inset-bottom) + 6px));
-  left: max(12px, env(safe-area-inset-left));
+  right: max(14px, calc(env(safe-area-inset-right, 0px) + 8px));
+  bottom: max(30px, calc(env(safe-area-inset-bottom, 0px) + 28px));
+  left: max(12px, calc(env(safe-area-inset-left, 0px) + 8px));
   display: flex;
   min-height: 0;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   padding: 0 8px 5px;
   background: transparent;
@@ -250,12 +250,14 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 4px; }
 
 .controls::before { content: none; }
 .controls.is-locked { filter: saturate(0.42) brightness(0.82); pointer-events: none; }
-.joystick-wrap { display: grid; justify-items: center; gap: 4px; color: #d7e8ef; font-size: 12px; font-weight: 900; text-shadow: 0 1px 4px #061522; }
+.joystick-wrap { position: relative; color: #d7e8ef; font-size: 12px; font-weight: 900; text-shadow: 0 1px 4px #061522; }
+.joystick-wrap > span { position: absolute; top: calc(100% + 4px); left: 50%; white-space: nowrap; transform: translateX(-50%); }
 
 .joystick {
   position: relative;
   width: 94px;
   height: 94px;
+  touch-action: none;
   border: 4px solid #20374c;
   border-radius: 50%;
   background: repeating-conic-gradient(from 22.5deg, #162a40 0 43deg, #203a50 43deg 45deg);
@@ -295,6 +297,7 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 4px; }
   background: radial-gradient(circle at 35% 25%, #ffb4c8, #ef5f83 33%, #c52f5c 70%);
   box-shadow: inset -8px -10px 14px rgba(116, 14, 50, 0.35), 0 0 0 5px #eaf0f3, 0 0 0 8px #263d54, 0 7px 0 #7c1d3e;
   cursor: pointer;
+  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -373,7 +376,7 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 4px; }
 
 @keyframes achievement-flash { from { opacity: 1; } to { opacity: 0; } }
 
-.result-modal { position: absolute; z-index: 10; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(5, 14, 26, 0.76); }
+.result-modal { position: absolute; z-index: 10; inset: 0; display: grid; place-items: center; padding: max(24px, calc(env(safe-area-inset-top, 0px) + 12px)) max(24px, calc(env(safe-area-inset-right, 0px) + 12px)) max(24px, calc(env(safe-area-inset-bottom, 0px) + 12px)) max(24px, calc(env(safe-area-inset-left, 0px) + 12px)); background: rgba(5, 14, 26, 0.76); }
 .result-panel { width: min(100%, 370px); padding: 30px 24px 24px; text-align: center; color: #f5fbff; background: linear-gradient(180deg, #1b314a, #102238); border: 4px solid #dfe9ee; border-radius: 10px; box-shadow: 0 0 0 3px #2c455c, -4px 0 0 var(--aqua), 4px 0 0 var(--coral), 0 28px 70px rgba(0, 0, 0, 0.55); }
 .result-icon { display: grid; width: 64px; height: 64px; margin: 0 auto 14px; place-items: center; color: var(--ink); font-size: 34px; background: var(--coin); border: 3px solid white; border-radius: 50%; box-shadow: 0 0 0 3px #b6830d; }
 .eyebrow { margin: 0 0 6px; color: #81dcee; font-size: 12px; font-weight: 800; }
@@ -386,7 +389,8 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 4px; }
 
 .titles-dialog {
   width: min(410px, calc(100% - 24px));
-  max-height: calc(100dvh - 32px);
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - max(12px, env(safe-area-inset-top, 0px)) - max(12px, env(safe-area-inset-bottom, 0px)) - 24px);
   padding: 0;
   overflow: hidden;
   color: #eff9fc;
@@ -394,6 +398,7 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 4px; }
   border: 2px solid #d5e9ec;
   border-radius: 10px;
   box-shadow: 0 0 0 3px #2e4c61, -4px 0 var(--aqua), 4px 0 var(--coin), 0 24px 64px rgba(2, 10, 20, 0.72);
+  transform: translateY(calc((env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 2));
 }
 .titles-dialog:not([open]) { display: none; }
 .titles-dialog::backdrop { background: rgba(3, 12, 25, 0.82); backdrop-filter: blur(5px); }
@@ -424,7 +429,8 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 4px; }
 
 .clerk-dialog {
   width: min(410px, calc(100% - 20px));
-  max-height: calc(100dvh - 24px);
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - max(12px, env(safe-area-inset-top, 0px)) - max(12px, env(safe-area-inset-bottom, 0px)) - 24px);
   padding: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -434,6 +440,7 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 4px; }
   border-radius: 9px;
   box-shadow: 0 0 0 4px #1b3449, -7px 7px 0 var(--coral), 0 26px 70px rgba(2, 10, 20, 0.75);
   touch-action: pan-y;
+  transform: translateY(calc((env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 2));
 }
 .clerk-dialog:not([open]) { display: none; }
 .clerk-dialog::backdrop { background: rgba(3, 12, 25, 0.84); backdrop-filter: blur(4px); }
@@ -540,13 +547,13 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 4px; }
   .joystick, .grab-button { width: 82px; height: 82px; }
 }
 
-@media (min-width: 800px) {
-  .topbar { top: 22px; right: 28px; left: 28px; }
+@media (min-width: 800px) and (min-height: 700px) {
+  .topbar { top: max(22px, calc(env(safe-area-inset-top, 0px) + 8px)); right: max(28px, calc(env(safe-area-inset-right, 0px) + 8px)); left: max(28px, calc(env(safe-area-inset-left, 0px) + 8px)); }
   .hud > div { min-width: 64px; }
   .hud > div:nth-child(2) { display: grid; }
   .status-card { top: 28px; }
   .start-panel { top: 67px; }
-  .controls { right: auto; bottom: 30px; left: 50%; width: 440px; padding-inline: 24px; transform: translateX(-50%); }
+  .controls { right: auto; bottom: max(30px, calc(env(safe-area-inset-bottom, 0px) + 20px)); left: 50%; width: 440px; padding-inline: 24px; transform: translateX(-50%); }
   .joystick, .grab-button { width: 108px; height: 108px; }
   .banter-card { top: 67px; width: min(360px, calc(100% - 40px)); }
   .desktop-hint { bottom: 8px; display: block; }
@@ -554,8 +561,10 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 4px; }
 }
 
 @media (max-height: 620px) and (orientation: landscape) {
-  .start-panel { top: 73px; }
-  .controls { right: 18px; bottom: 10px; left: 18px; padding-block: 0; }
+  .topbar { top: max(8px, calc(env(safe-area-inset-top, 0px) + 6px)); }
+  .status-card { display: none; }
+  .start-panel { top: max(73px, calc(env(safe-area-inset-top, 0px) + 60px)); }
+  .controls { right: max(18px, calc(env(safe-area-inset-right, 0px) + 8px)); bottom: max(10px, calc(env(safe-area-inset-bottom, 0px) + 8px)); left: max(18px, calc(env(safe-area-inset-left, 0px) + 8px)); width: auto; padding-block: 0; transform: none; }
   .joystick, .grab-button { width: 78px; height: 78px; }
   .joystick-knob { top: calc(50% - 21px); left: calc(50% - 21px); width: 42px; height: 42px; }
   .joystick-wrap > span, .view-hint, .desktop-hint { display: none; }
@@ -564,7 +573,6 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 4px; }
 
 @media (max-height: 620px) and (orientation: portrait) {
   .banter-card { top: calc(max(10px, env(safe-area-inset-top)) + 96px); }
-  .view-hint { bottom: 54px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
