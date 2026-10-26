@@ -3,7 +3,10 @@ import './style.css'
 import { ClawMachineGame, type GameSnapshot } from './game/ClawMachineGame'
 import { BanterPresenter, type BanterRender } from './game/banterPresenter'
 import { CoinLedger, spendTitles, type SpendSnapshot, type SpendTitle } from './game/coinLedger'
+import { ClerkAssistTrigger } from './game/clerkAssist'
 
+const loadingScreen = requireElement<HTMLElement>('loading-screen')
+const loadingCopy = requireElement<HTMLElement>('loading-copy')
 const canvas = requireElement<HTMLCanvasElement>('game-canvas')
 const timeValue = requireElement<HTMLElement>('time-value')
 const attemptValue = requireElement<HTMLElement>('attempt-value')
@@ -20,6 +23,18 @@ const titlesClose = requireElement<HTMLButtonElement>('titles-close')
 const titlesCount = requireElement<HTMLElement>('titles-count')
 const titlesList = requireElement<HTMLOListElement>('titles-list')
 const titlesEmpty = requireElement<HTMLElement>('titles-empty')
+const clerkDialog = requireElement<HTMLDialogElement>('clerk-dialog')
+const clerkCopy = requireElement<HTMLElement>('clerk-dialog-copy')
+const clerkSound = requireElement<HTMLElement>('clerk-sound')
+const clerkChoices = requireElement<HTMLElement>('clerk-choices')
+const clerkDecline = requireElement<HTMLButtonElement>('clerk-decline')
+const clerkCallButton = requireElement<HTMLButtonElement>('clerk-call-button')
+const resultClerkButton = requireElement<HTMLButtonElement>('result-clerk-button')
+const clerkCallDialog = requireElement<HTMLDialogElement>('clerk-call-dialog')
+const clerkCallClose = requireElement<HTMLButtonElement>('clerk-call-close')
+const clerkRescueButton = requireElement<HTMLButtonElement>('clerk-rescue-button')
+const clerkPlacementButton = requireElement<HTMLButtonElement>('clerk-placement-button')
+const clerkCallFeedback = requireElement<HTMLElement>('clerk-call-feedback')
 const startPanel = requireElement<HTMLElement>('start-panel')
 const gameControls = requireElement<HTMLElement>('game-controls')
 const banterCard = requireElement<HTMLElement>('banter-card')
@@ -38,8 +53,39 @@ const achievementTitle = requireElement<HTMLElement>('achievement-title')
 const achievementCopy = requireElement<HTMLElement>('achievement-copy')
 const banterPresenter = new BanterPresenter(renderBanter)
 const coinLedger = new CoinLedger()
+const clerkAssist = new ClerkAssistTrigger()
+let currentSnapshot: GameSnapshot | undefined
+let contextLost = false
 
-const game = await ClawMachineGame.create(canvas, updateHud)
+function showLoading(message: string): void {
+  loadingCopy.textContent = message
+  document.body.dataset.loading = ''
+  loadingScreen.hidden = false
+}
+
+function hideLoading(): void {
+  if (contextLost) return
+  loadingScreen.hidden = true
+  document.body.removeAttribute('data-loading')
+}
+
+let game: ClawMachineGame
+try {
+  game = await ClawMachineGame.create(canvas, updateHud)
+} catch (error) {
+  loadingCopy.textContent = '機台暫時無法啟動，請重新整理再試一次。'
+  throw error
+}
+
+canvas.addEventListener('webglcontextlost', () => {
+  contextLost = true
+  showLoading('機台畫面中斷，正在重新連接…')
+})
+canvas.addEventListener('webglcontextrestored', () => {
+  contextLost = false
+  showLoading('正在重新點亮機台…')
+  game.onNextRenderedFrame(hideLoading)
+})
 
 const keyboard = new Set<string>()
 const joystickAxis = { x: 0, z: 0 }
@@ -47,6 +93,7 @@ let lastResult: GameSnapshot['result']
 let achievementTimeout: ReturnType<typeof setTimeout> | undefined
 
 window.addEventListener('keydown', (event) => {
+  if (titlesDialog.open || clerkDialog.open || clerkCallDialog.open || !resultModal.hidden) return
   keyboard.add(event.code)
   if (event.code === 'Space') {
     event.preventDefault()
@@ -86,6 +133,57 @@ titlesDialog.addEventListener('close', () => {
 titlesDialog.addEventListener('click', (event) => {
   if (event.target === titlesDialog) titlesDialog.close()
 })
+clerkDecline.addEventListener('click', () => clerkDialog.close())
+const openClerkCall = (): void => {
+  if (clerkCallDialog.open || clerkDialog.open) return
+  clerkCallFeedback.hidden = true
+  clerkCallFeedback.textContent = ''
+  game.setPaused(true)
+  clerkCallDialog.showModal()
+  clerkRescueButton.focus({ preventScroll: true })
+}
+clerkCallButton.addEventListener('click', openClerkCall)
+resultClerkButton.addEventListener('click', openClerkCall)
+clerkCallClose.addEventListener('click', () => clerkCallDialog.close())
+clerkCallDialog.addEventListener('close', () => {
+  if (!clerkDialog.open) {
+    game.setPaused(false)
+    if (!resultModal.hidden) resultClerkButton.focus({ preventScroll: true })
+    else clerkCallButton.focus({ preventScroll: true })
+  }
+})
+clerkRescueButton.addEventListener('click', () => {
+  const rescued = game.rescueStuckPrizeForClerk()
+  clerkCallFeedback.textContent = rescued
+    ? `店員把${rescued}撈出來：「牠是來給你夾，還是來洞口租房子？好啦，這局算你夾到！」`
+    : '店員探頭看了看：「卡住的目前只有你的期待。娃娃沒卡在洞口啦。」'
+  clerkCallFeedback.hidden = false
+})
+clerkPlacementButton.addEventListener('click', () => {
+  const amount = coinLedger.snapshot().amount
+  if (!currentSnapshot?.isReady && currentSnapshot?.result !== 'lost') {
+    clerkCallFeedback.textContent = '店員指著忙碌的夾爪：「現在進去喬位置？我有上班，不是有九條命欸。」'
+    clerkCallFeedback.hidden = false
+    return
+  }
+  if (!clerkAssist.canRequestPlacement(amount)) {
+    clerkCallFeedback.textContent = amount < 100
+      ? '店員看你一眼：「我們才剛認識，你就要我幫你喬娃娃？先跟機台培養感情啦。」'
+      : '店員雙手一攤：「剛剛不是才幫過？這裡是夾娃娃機，不是娃娃搬家公司欸。」'
+    clerkCallFeedback.hidden = false
+    return
+  }
+  clerkCallDialog.close()
+  resultModal.hidden = true
+  showClerkAssist()
+})
+clerkDialog.addEventListener('close', () => {
+  clerkDialog.removeAttribute('data-phase')
+  game.setPaused(false)
+  game.restart()
+  lastResult = undefined
+  startButton.focus({ preventScroll: true })
+})
 startButton.addEventListener('click', () => {
   const spend = coinLedger.insertCoin()
   renderSpend(spend)
@@ -102,6 +200,7 @@ restartButton.addEventListener('click', () => {
 })
 
 setupJoystick()
+game.onNextRenderedFrame(hideLoading)
 game.start()
 
 function setupJoystick(): void {
@@ -160,6 +259,7 @@ function updateMovement(): void {
 }
 
 function updateHud(snapshot: GameSnapshot): void {
+  currentSnapshot = snapshot
   timeValue.textContent = String(Math.ceil(snapshot.timeLeft))
   attemptValue.textContent = String(snapshot.attempts)
   statusText.textContent = snapshot.status
@@ -177,20 +277,72 @@ function updateHud(snapshot: GameSnapshot): void {
   })
 
   if (snapshot.result) {
-    resultModal.hidden = false
     const won = snapshot.result === 'won'
     if (snapshot.result !== lastResult) {
       const spend = won ? coinLedger.settleWin() : coinLedger.snapshot()
+      const shouldOfferHelp = snapshot.result === 'lost' && game.hasStuckPrizeAtChute()
+        ? false
+        : clerkAssist.onResult(snapshot.result, spend.amount)
+      if (shouldOfferHelp && game.availablePrizesForClerk().length > 0) {
+        lastResult = snapshot.result
+        resultModal.hidden = true
+        showClerkAssist()
+        return
+      }
       resultSpend.textContent = won
         ? `這份獎品共投入 NT$${spend.amount} · ${spend.title}`
         : `目前已投入 NT$${spend.amount} · ${spend.title}`
       lastResult = snapshot.result
-      requestAnimationFrame(() => restartButton.focus({ preventScroll: true }))
+      if (!clerkCallDialog.open) requestAnimationFrame(() => restartButton.focus({ preventScroll: true }))
     }
+    if (clerkDialog.open) return
+    resultModal.hidden = false
     resultIcon.textContent = won ? '★' : '↻'
     resultTitle.textContent = won ? '成功夾到了！' : '差一點點！'
-    resultCopy.textContent = snapshot.banter.text
+    resultCopy.textContent = !won && game.hasStuckPrizeAtChute()
+      ? '娃娃好像卡在洞口了？呼叫店員確認，就不必白白再投一枚。'
+      : snapshot.banter.text
+    resultClerkButton.hidden = won
   }
+}
+
+function showClerkAssist(): void {
+  clerkDialog.removeAttribute('data-phase')
+  clerkSound.textContent = '欸！'
+  clerkCopy.textContent = '店員盯著你和機台看了很久，終於嘆了口氣：「好啦，這局我當你場外教練。想喬哪一隻？」'
+  clerkDecline.textContent = '不用，我自己來'
+  clerkChoices.replaceChildren(...game.availablePrizesForClerk().map(({ index, name }) => {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'clerk-choice'
+    button.setAttribute('aria-label', `請店員移動${name}`)
+    const icon = document.createElement('img')
+    icon.className = 'clerk-choice-portrait'
+    icon.src = game.prizePortrait(index)
+    icon.alt = ''
+    icon.width = 48
+    icon.height = 48
+    const label = document.createElement('span')
+    label.textContent = name
+    button.append(icon, label)
+    button.addEventListener('click', () => {
+      const placement = game.placePrizeForClerk(index)
+      if (!placement) return
+      clerkAssist.completePlacement()
+      clerkDialog.dataset.phase = 'placing'
+      clerkSound.textContent = placement.type === 'swapped' ? '對調！' : '咻！'
+      clerkCopy.textContent = placement.type === 'swapped'
+        ? `店員把${name}和洞口旁的${placement.displaced}對調：「位置喬好了，運氣我可沒辦法喬。」`
+        : `店員把${name}擺到洞口旁：「都送到門口了，再夾不到我也只能幫你鼓掌。」`
+      for (const choice of clerkChoices.querySelectorAll('button')) choice.disabled = true
+      clerkDecline.textContent = '完成擺位，繼續玩'
+      clerkDecline.focus({ preventScroll: true })
+    })
+    return button
+  }))
+  game.setPaused(true)
+  clerkDialog.showModal()
+  clerkChoices.querySelector('button')?.focus({ preventScroll: true })
 }
 
 function renderSpend(spend: SpendSnapshot): void {

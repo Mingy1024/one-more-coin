@@ -6,17 +6,56 @@
     <meta name="theme-color" content="#18384c" />
     <meta name="description" content="《再十塊就夾到》是一款行動優先的搞笑 3D 網頁夾娃娃機遊戲" />
     <title>再十塊就夾到｜One More Coin</title>
+    <style>
+      html, body { margin: 0; min-height: 100%; background: #102538; }
+      body[data-loading] > :not(#loading-screen) { visibility: hidden; }
+      #loading-screen {
+        position: fixed; inset: 0; z-index: 2147483647; display: grid; place-items: center;
+        padding: 24px; box-sizing: border-box; overflow: hidden;
+        color: #f7f2dc; font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans TC", system-ui, sans-serif;
+        text-align: center; background: radial-gradient(circle at 50% 37%, #26516a, #102538 68%);
+      }
+      #loading-screen[hidden], body:not([data-loading]) #loading-screen { display: none; }
+      .loading-card { width: min(300px, 100%); }
+      .loading-kicker { display: block; margin-bottom: 22px; color: #7cdae7; font-size: 11px; font-weight: 800; letter-spacing: .2em; }
+      .loading-coin {
+        display: grid; width: 82px; height: 82px; margin: auto; place-items: center;
+        color: #44320a; font-size: 29px; font-weight: 950;
+        background: radial-gradient(circle at 35% 30%, #fff1b0, #e9b84c 63%, #ad7528);
+        border: 5px solid #f5d987; border-radius: 50%; box-shadow: 0 0 0 5px #213e54, 0 0 30px #e9b84c55;
+      }
+      .loading-title { display: block; margin: 25px 0 7px; color: #ffe29a; font-size: 23px; font-weight: 900; letter-spacing: .08em; }
+      .loading-copy { display: block; min-height: 22px; color: #d5e5e9; font-size: 13px; }
+      .loading-track { height: 5px; margin: 27px auto 0; overflow: hidden; background: #345169; border-radius: 5px; }
+      .loading-track::before { content: ""; display: block; width: 34%; height: 100%; background: #62d9e9; border-radius: inherit; animation: loading-slide 1.4s ease-in-out infinite alternate; }
+      .loading-retry { display: inline-block; margin-top: 18px; color: #b8d1d9; font-size: 12px; text-underline-offset: 3px; }
+      @keyframes loading-slide { from { transform: translateX(-100%); } to { transform: translateX(295%); } }
+      @media (prefers-reduced-motion: reduce) { .loading-track::before { animation: none; width: 100%; } }
+    </style>
   </head>
-  <body>
+  <body data-loading>
+    <section id="loading-screen" role="status" aria-live="polite" aria-label="遊戲載入中">
+      <div class="loading-card">
+        <span class="loading-kicker">ONE MORE COIN · 開機中</span>
+        <span class="loading-coin" aria-hidden="true">10</span>
+        <strong class="loading-title">機台準備中</strong>
+        <span id="loading-copy" class="loading-copy">正在擺好娃娃，先別急著投幣…</span>
+        <div class="loading-track" aria-hidden="true"></div>
+        <a class="loading-retry" href="">載入太久？重新整理</a>
+      </div>
+    </section>
     <main class="game-shell">
       <canvas id="game-canvas" aria-label="3D 夾娃娃機遊戲畫面"></canvas>
 
       <header class="topbar">
         <button id="reset-button" class="reset-button" type="button" aria-label="重置娃娃位置並補回獎品" title="重置娃娃位置並補回獎品">
-          <span aria-hidden="true">↻</span> 重置
+          <span aria-hidden="true">↻</span><span class="topbar-button-label">重置</span>
         </button>
         <button id="titles-button" class="titles-button" type="button" aria-haspopup="dialog" aria-controls="titles-dialog">
-          <span aria-hidden="true">✦</span> 稱號
+          <span aria-hidden="true">✦</span><span class="topbar-button-label">稱號一覽</span>
+        </button>
+        <button id="clerk-call-button" class="clerk-call-button" type="button" aria-label="呼叫店員" aria-haspopup="dialog" aria-controls="clerk-call-dialog">
+          <span aria-hidden="true">☎</span><span class="topbar-button-label">呼叫店員</span>
         </button>
         <div class="hud" aria-live="polite">
           <div class="timer-hud"><span class="hud-label">剩餘秒數</span><strong id="time-value">30</strong></div>
@@ -77,7 +116,7 @@
         </button>
       </section>
 
-      <p class="view-hint">↔ 拖曳畫面旋轉視角</p>
+      <p class="view-hint">↔ 拖曳旋轉視角</p>
       <p class="desktop-hint">拖曳畫面旋轉・WASD / 方向鍵移動・空白鍵出爪／二收</p>
 
       <section id="result-modal" class="result-modal" role="dialog" aria-modal="true" aria-labelledby="result-title" hidden>
@@ -88,6 +127,7 @@
           <p id="result-copy">禮物已安全抵達取物口。</p>
           <p id="result-spend" class="result-spend">本次投入 NT$10</p>
           <button id="restart-button" type="button">再玩一次</button>
+          <button id="result-clerk-button" class="result-clerk-button" type="button">呼叫店員</button>
         </div>
       </section>
     </main>
@@ -103,6 +143,39 @@
         </div>
         <ol id="titles-list" class="titles-list" aria-label="已獲得的稱號"></ol>
         <p id="titles-empty" class="titles-empty">還沒有獲得稱號。投入第一枚 10 元，從試水溫開始！</p>
+      </div>
+    </dialog>
+    <dialog id="clerk-dialog" class="clerk-dialog" aria-labelledby="clerk-dialog-title" aria-describedby="clerk-dialog-copy">
+      <div class="clerk-scene" aria-hidden="true">
+        <span class="clerk-speedlines"></span>
+        <span class="clerk-character">🧑‍💼</span>
+        <span id="clerk-sound" class="clerk-sound">欸！</span>
+      </div>
+      <div class="clerk-content">
+        <span class="clerk-kicker">HIDDEN EVENT · 店員介入</span>
+        <h2 id="clerk-dialog-title">店員看不下去了！</h2>
+        <p id="clerk-dialog-copy">店員盯著你和機台看了很久，終於嘆了口氣：「好啦，這局我當你場外教練。想喬哪一隻？」</p>
+        <p class="clerk-prompt">想請店員幫哪一隻？</p>
+        <div id="clerk-choices" class="clerk-choices" role="group" aria-label="選擇要移動的娃娃"></div>
+        <button id="clerk-decline" class="clerk-decline" type="button">不用，我自己來</button>
+      </div>
+    </dialog>
+    <dialog id="clerk-call-dialog" class="clerk-dialog clerk-call-dialog" aria-labelledby="clerk-call-title" aria-describedby="clerk-call-copy">
+      <div class="clerk-scene" aria-hidden="true">
+        <span class="clerk-speedlines"></span>
+        <span class="clerk-character">🧑‍💼</span>
+        <span class="clerk-sound">嗯？</span>
+      </div>
+      <div class="clerk-content">
+        <span class="clerk-kicker">STAFF CALL · 現場支援</span>
+        <h2 id="clerk-call-title">呼叫店員</h2>
+        <p id="clerk-call-copy">這位客人，請問需要什麼協助？</p>
+        <div class="clerk-call-options">
+          <button id="clerk-rescue-button" class="clerk-choice" type="button">🧸 娃娃卡在洞口，幫我拿取</button>
+          <button id="clerk-placement-button" class="clerk-choice" type="button">↔ 請幫忙擺娃娃位置</button>
+        </div>
+        <p id="clerk-call-feedback" class="clerk-call-feedback" role="status" aria-live="polite" hidden></p>
+        <button id="clerk-call-close" class="clerk-decline" type="button">關閉</button>
       </div>
     </dialog>
     <script type="module" src="/src/main.ts"></script>
