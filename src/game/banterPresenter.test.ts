@@ -23,7 +23,7 @@ describe('banter presenter', () => {
 
     presenter.show(firstLine)
     presenter.show(secondLine)
-    vi.advanceTimersByTime(2_999)
+    vi.advanceTimersByTime(4_499)
 
     expect(rendered.at(-1)?.line).toEqual(firstLine)
 
@@ -37,7 +37,7 @@ describe('banter presenter', () => {
     presenter.show(firstLine)
     presenter.show(secondLine)
     presenter.show(thirdLine)
-    vi.advanceTimersByTime(6_000)
+    vi.advanceTimersByTime(9_000)
 
     expect(rendered.map(({ line }) => line.text)).toEqual([
       firstLine.text,
@@ -65,8 +65,45 @@ describe('banter presenter', () => {
     presenter.show(firstLine)
     presenter.show(secondLine)
     presenter.show(secondLine)
-    vi.advanceTimersByTime(6_000)
+    vi.advanceTimersByTime(9_000)
 
     expect(rendered.map(({ line }) => line.text)).toEqual([firstLine.text, secondLine.text])
+  })
+
+  it('hides a line after reading time when no more chatter is queued', () => {
+    const hide = vi.fn()
+    const presenter = new BanterPresenter((render) => rendered.push(render), undefined, hide)
+
+    presenter.show(firstLine)
+    vi.advanceTimersByTime(4_499)
+    expect(hide).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(1)
+    expect(hide).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the overlay visible while the next line is queued', () => {
+    const hide = vi.fn()
+    const presenter = new BanterPresenter((render) => rendered.push(render), undefined, hide)
+
+    presenter.show(firstLine)
+    presenter.show(secondLine)
+    vi.advanceTimersByTime(4_500)
+
+    expect(rendered.at(-1)?.line).toEqual(secondLine)
+    expect(hide).not.toHaveBeenCalled()
+  })
+
+  it('can clear a covered line so it is shown anew after another overlay closes', () => {
+    const hide = vi.fn()
+    const presenter = new BanterPresenter((render) => rendered.push(render), undefined, hide)
+
+    presenter.show(firstLine)
+    presenter.clear()
+    vi.advanceTimersByTime(4_500)
+    expect(hide).toHaveBeenCalledOnce()
+
+    presenter.show(firstLine)
+    expect(rendered.map(({ line }) => line.text)).toEqual([firstLine.text, firstLine.text])
   })
 })

@@ -53,7 +53,7 @@ describe('claw machine round', () => {
   it('leaves enough time to watch the prize fall into the chute', () => {
     const dropWindow = (phaseDurations.releasing ?? 0) + (phaseDurations.resetting ?? 0)
 
-    expect(dropWindow).toBeGreaterThanOrEqual(1.6)
+    expect(dropWindow).toBeGreaterThanOrEqual(2.4)
   })
 
   it('ignores a second grab while the claw is busy', () => {
@@ -99,5 +99,20 @@ describe('claw machine round', () => {
 
     expect(round.phase).toBe('lost')
     expect(round.timeLeft).toBe(0)
+  })
+
+  it('lets an already-triggered grab finish releasing its doll after the countdown reaches zero', () => {
+    let round = stepRound(createRound(0.1), { type: 'START' })
+    round = stepRound(round, { type: 'GRAB' })
+    round = stepRound(round, { type: 'TICK', deltaSeconds: 0.2 })
+
+    expect(round.phase).toBe('lowering')
+    expect(round.timeLeft).toBe(0)
+
+    for (let i = 0; i < 300; i += 1) {
+      round = stepRound(round, { type: 'TICK', deltaSeconds: 1 / 30 })
+      if (round.phase === 'lost') break
+    }
+    expect(round.phase).toBe('lost')
   })
 })

@@ -31,5 +31,6 @@ export function clawOpeningForPhase(
   if (phase === 'closing') return 1 + (gripOpening - 1) * progress
   if (phase === 'lifting' || phase === 'returning') return carried ? gripOpening : 0
   if (phase === 'releasing') return gripOpening + (1 - gripOpening) * progress
-  return 1
+  if (phase === 'resetting') return 1 - Math.max(0, (progress - 0.5) * 2)
+  return 0
 }

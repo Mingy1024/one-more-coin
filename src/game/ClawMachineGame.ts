@@ -40,6 +40,7 @@ import { createAlienModel } from './alienModel'
 import { selectPrizeForAim } from './prizeSelection'
 import { createGantryAssembly } from './gantry'
 import { createArcadeRoom } from './arcadeRoom'
+import { createSideStickers } from './sideStickers'
 import { chooseClerkPlacement, findClerkSwapIndex } from './clerkAssist'
 import {
   TILT_GRIP_OPENING,
@@ -151,6 +152,7 @@ export class ClawMachineGame {
   private tiltPlan?: TiltPlan
   private activePrize?: Prize
   private pendingPrizeExit?: { prize: Prize; elapsed: number }
+  private stalePrizes = new Set<Prize>()
   private gripQuality = 0
   private gripStrength = 0
   private gripMass = 0.5
@@ -263,7 +265,8 @@ export class ClawMachineGame {
     this.cycleStart = { ...this.clawPosition }
     const prizeIndex = selectPrizeForAim(
       this.clawPosition,
-      this.prizes.map((prize) => prize.claimed ? undefined : prize.body.translation()),
+      this.prizes.map((prize) => prize.claimed || this.stalePrizes.has(prize)
+        ? undefined : prize.body.translation()),
     )
     this.activePrize = prizeIndex === undefined ? undefined : this.prizes[prizeIndex]
     this.tiltPlan = this.activePrize
@@ -293,6 +296,10 @@ export class ClawMachineGame {
 
   restart(): void {
     this.advancePrizeExit(PRIZE_EXIT_MAX_SECONDS)
+    if (this.activePrize && !this.activePrize.claimed) {
+      this.stalePrizes ??= new Set()
+      this.stalePrizes.add(this.activePrize)
+    }
     this.slipped = false
     this.gripStrength = 0
     this.round = createRound()
@@ -316,6 +323,7 @@ export class ClawMachineGame {
   resetPrizes(): void {
     if (this.round.phase !== 'ready') return
     this.pendingPrizeExit = undefined
+    this.stalePrizes?.clear()
     for (const prize of this.prizes) {
       prize.claimed = false
       prize.mesh.visible = true
@@ -477,6 +485,7 @@ export class ClawMachineGame {
     this.updateClawAnimation()
     this.updatePhysics(delta)
     this.advanceGrip(delta)
+    this.clearStaleChutePrizes()
     this.checkForWin()
     this.advancePrizeExit(delta)
 
@@ -662,13 +671,32 @@ export class ClawMachineGame {
     if (this.carried || this.round.phase === 'won' || this.round.phase === 'lost') return
     if (this.round.phase !== 'releasing' && this.round.phase !== 'resetting' && !this.slipped) return
 
-    if (this.activePrize && isPrizeCaptured(this.activePrize.body.translation(), CHUTE)) {
+    if (this.activePrize && !this.stalePrizes?.has(this.activePrize)
+      && isPrizeCaptured(this.activePrize.body.translation(), CHUTE)) {
       this.activePrize.claimed = true
       // Leave the prize non-colliding while it visibly falls into the chute.
       this.setPrizeSensor(this.activePrize, true)
       this.pendingPrizeExit = { prize: this.activePrize, elapsed: 0 }
       this.round = stepRound(this.round, { type: 'PRIZE_DROPPED' })
       this.publishSnapshot()
+    }
+  }
+
+  private clearStaleChutePrizes(): void {
+    for (const prize of this.stalePrizes ?? []) {
+      const position = prize.body.translation()
+      if (isPrizeCaptured(position, CHUTE)) {
+        prize.claimed = true
+        prize.carry.release()
+        prize.mesh.visible = false
+        prize.body.setEnabled(false)
+        this.stalePrizes.delete(prize)
+      } else if (position.y < 0.95 && !isPrizeEnteringChute(position, CHUTE)) {
+        const velocity = prize.body.linvel()
+        if (Math.hypot(velocity.x, velocity.y, velocity.z) < 0.25) {
+          this.stalePrizes.delete(prize)
+        }
+      }
     }
   }
 
@@ -1054,6 +1082,7 @@ export class ClawMachineGame {
       shell.add(block)
     }
     this.scene.add(shell)
+    this.scene.add(createSideStickers())
 
     const frontPanel = new THREE.Mesh(
       new RoundedBoxGeometry(3.62, MACHINE_DIMENSIONS.lowerCabinetHeight - 0.28, 0.1, 4, 0.07),
@@ -1126,6 +1155,51 @@ export class ClawMachineGame {
     )
     coinSlot.position.set(0.94, lowerCabinetCenterY - 0.18, 2.045)
     this.scene.add(coinSlot)
+
+    // A shallow physical console mirrors the touchscreen controls without stealing their input.
+    const controlDeck = new THREE.Group()
+    controlDeck.name = 'machine-control-deck'
+    const shelf = new THREE.Mesh(new RoundedBoxGeometry(2.96, 0.15, 0.62, 4, 0.05), frameMaterial)
+    shelf.name = 'machine-control-shelf'
+    shelf.position.set(0, -0.32, 2.035)
+    shelf.castShadow = true
+    controlDeck.add(shelf)
+
+    const deckTop = new THREE.Mesh(new RoundedBoxGeometry(2.78, 0.035, 0.5, 3, 0.017), baseMaterial)
+    deckTop.position.set(0, -0.225, 2.04)
+    controlDeck.add(deckTop)
+
+    const metal = new THREE.MeshStandardMaterial({ color: 0xa7bac7, roughness: 0.26, metalness: 0.8 })
+    const rubber = new THREE.MeshStandardMaterial({ color: 0x122338, roughness: 0.78 })
+    const joystick = new THREE.Group()
+    joystick.name = 'machine-joystick'
+    joystick.position.set(-0.82, -0.19, 2.08)
+    const stickBezel = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.035, 32), metal)
+    const stickBoot = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.19, 0.085, 24), rubber)
+    stickBoot.position.y = 0.06
+    const stickShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 0.2, 16), metal)
+    stickShaft.position.y = 0.19
+    const stickKnob = new THREE.Mesh(new THREE.SphereGeometry(0.15, 24, 16), new THREE.MeshPhysicalMaterial({
+      color: COLORS.aqua, roughness: 0.18, metalness: 0.1, clearcoat: 1,
+    }))
+    stickKnob.position.y = 0.32
+    joystick.add(stickBezel, stickBoot, stickShaft, stickKnob)
+    controlDeck.add(joystick)
+
+    const grabControl = new THREE.Group()
+    grabControl.name = 'machine-grab-button'
+    grabControl.position.set(0.78, -0.18, 2.08)
+    const buttonBezel = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.045, 36), metal)
+    const buttonRim = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.23, 0.055, 36), rubber)
+    buttonRim.position.y = 0.04
+    const buttonCap = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.19, 0.09, 36), new THREE.MeshPhysicalMaterial({
+      color: COLORS.pink, emissive: COLORS.pink, emissiveIntensity: 0.28,
+      roughness: 0.2, metalness: 0.05, clearcoat: 1,
+    }))
+    buttonCap.position.y = 0.095
+    grabControl.add(buttonBezel, buttonRim, buttonCap)
+    controlDeck.add(grabControl)
+    this.scene.add(controlDeck)
   }
 
   private createPrize(

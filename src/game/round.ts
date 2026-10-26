@@ -31,7 +31,7 @@ export const phaseDurations: Partial<Record<RoundPhase, number>> = {
   lifting: 1.25,
   returning: 1.4,
   releasing: 0.65,
-  resetting: 1.15,
+  resetting: 1.8,
 }
 
 export function phaseProgress(state: RoundState): number {
@@ -91,7 +91,7 @@ export function stepRound(state: RoundState, action: RoundAction): RoundState {
   }
 
   const timeLeft = Math.max(0, state.timeLeft - action.deltaSeconds)
-  if (timeLeft === 0) {
+  if (timeLeft === 0 && state.phase === 'aiming') {
     return { ...state, phase: 'lost', phaseElapsed: 0, timeLeft }
   }
 

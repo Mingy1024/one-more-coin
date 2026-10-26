@@ -16,6 +16,61 @@ function cabinet() {
 }
 
 describe('cabinet containment and chute', () => {
+  it('displays four unique trip-quote stickers across both side panels without overlap', () => {
+    const { scene } = cabinet()
+    const stickers = scene.getObjectByName('cabinet-side-stickers') as THREE.Group | undefined
+    expect(stickers).toBeDefined()
+    expect(stickers!.children).toHaveLength(4)
+    expect(stickers!.children.map(sticker => sticker.userData.text)).toEqual([
+      '超濃起司', '佐藤巧', '金近廉', '海的另一端有的，是敵人',
+    ])
+
+    const sides = { left: 0, right: 0 }
+    for (const sticker of stickers!.children) {
+      const { side, width, height, angle } = sticker.userData as {
+        side: 'left' | 'right'; width: number; height: number; angle: number
+      }
+      sides[side] += 1
+      const halfZ = Math.abs(Math.cos(angle)) * width / 2 + Math.abs(Math.sin(angle)) * height / 2
+      const halfY = Math.abs(Math.sin(angle)) * width / 2 + Math.abs(Math.cos(angle)) * height / 2
+      expect(Math.abs(sticker.position.z) + halfZ).toBeLessThan(1.82)
+      expect(sticker.position.y + halfY).toBeLessThan(-0.08)
+      expect(sticker.position.y - halfY).toBeGreaterThan(-1.6)
+    }
+    expect(sides).toEqual({ left: 2, right: 2 })
+
+    for (const side of ['left', 'right']) {
+      const pair = stickers!.children.filter(sticker => sticker.userData.side === side)
+      const bounds = pair.map(sticker => {
+        const { width, height, angle } = sticker.userData as { width: number; height: number; angle: number }
+        const halfZ = Math.abs(Math.cos(angle)) * width / 2 + Math.abs(Math.sin(angle)) * height / 2
+        const halfY = Math.abs(Math.sin(angle)) * width / 2 + Math.abs(Math.cos(angle)) * height / 2
+        return { minZ: sticker.position.z - halfZ, maxZ: sticker.position.z + halfZ, minY: sticker.position.y - halfY, maxY: sticker.position.y + halfY }
+      })
+      expect(bounds[0]!.maxZ < bounds[1]!.minZ || bounds[1]!.maxZ < bounds[0]!.minZ
+        || bounds[0]!.maxY < bounds[1]!.minY || bounds[1]!.maxY < bounds[0]!.minY).toBe(true)
+    }
+  })
+
+  it('has a raised control deck with a visible stick and grab button on the front', () => {
+    const { scene } = cabinet()
+    const deck = scene.getObjectByName('machine-control-deck')!
+    const stick = deck.getObjectByName('machine-joystick')!
+    const button = deck.getObjectByName('machine-grab-button')!
+    const shelf = deck.getObjectByName('machine-control-shelf')!
+    scene.updateMatrixWorld(true)
+
+    expect(deck).toBeDefined()
+    expect(stick).toBeDefined()
+    expect(button).toBeDefined()
+    expect(shelf).toBeDefined()
+    expect(stick.position.x).toBeLessThan(button.position.x)
+    expect(stick.position.z).toBeGreaterThan(1.8)
+    expect(button.position.z).toBeGreaterThan(1.8)
+    const front = new THREE.Box3().setFromObject(deck)
+    expect(front.max.z).toBeGreaterThan(2.1)
+  })
+
   it('has physical walls on all four sides of the prize chamber', () => {
     const { world } = cabinet()
     const walls: THREE.Vector3[] = []

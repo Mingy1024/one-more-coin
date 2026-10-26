@@ -64,6 +64,65 @@ describe('claw machine session', () => {
     expect((game as unknown as { round: RoundState }).round.phase).toBe('won')
   })
 
+  it('does not award the next round for a still-falling doll from the previous one', () => {
+    const prize = {
+      claimed: false,
+      body: { translation: () => ({ x: -1.2, y: -0.72, z: 0.96 }), setEnabled: vi.fn() },
+      collider: { setSensor: vi.fn() },
+      carry: { release: vi.fn() },
+      mesh: { visible: true },
+    }
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round: { ...createRound(), phase: 'releasing' },
+      carried: false,
+      activePrize: prize,
+      prizes: [prize],
+      stalePrizes: new Set([prize]),
+      publishSnapshot: vi.fn(),
+    }) as ClawMachineGame
+    const internals = game as unknown as { checkForWin(): void; clearStaleChutePrizes(): void; round: RoundState }
+
+    internals.checkForWin()
+    expect(internals.round.phase).toBe('releasing')
+    internals.clearStaleChutePrizes()
+    expect(prize.claimed).toBe(true)
+    expect(prize.mesh.visible).toBe(false)
+    expect(prize.body.setEnabled).toHaveBeenCalledWith(false)
+    expect(internals.round.phase).toBe('releasing')
+  })
+
+  it('retires a still-carried doll when restarting and clears it if it later reaches the chute', () => {
+    let position = { x: -1.2, y: 2.2, z: 0.96 }
+    const prize = {
+      claimed: false,
+      body: {
+        translation: () => position,
+        linvel: () => ({ x: 0, y: -1, z: 0 }),
+        setEnabled: vi.fn(),
+      },
+      carry: { release: vi.fn() },
+      mesh: { visible: true },
+    }
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round: { ...createRound(), phase: 'lost' },
+      carried: true, activePrize: prize, prizes: [prize],
+      articulatedClaw: { reset: vi.fn() },
+      publishSnapshot: vi.fn(),
+    }) as ClawMachineGame
+    const internals = game as unknown as { stalePrizes: Set<typeof prize>; clearStaleChutePrizes(): void }
+
+    game.restart()
+    expect(prize.carry.release).toHaveBeenCalled()
+    expect(internals.stalePrizes.has(prize)).toBe(true)
+
+    position = { x: -1.2, y: -0.72, z: 0.96 }
+    internals.clearStaleChutePrizes()
+    expect(prize.claimed).toBe(true)
+    expect(prize.mesh.visible).toBe(false)
+    expect(prize.body.setEnabled).toHaveBeenCalledWith(false)
+    expect(internals.stalePrizes.has(prize)).toBe(false)
+  })
+
   it('does not advance a paid round while the title gallery is open', () => {
     const round = stepRound(createRound(), { type: 'START' })
     const render = vi.fn()

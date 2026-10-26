@@ -51,7 +51,7 @@ const achievementToast = requireElement<HTMLElement>('achievement-toast')
 const achievementIcon = requireElement<HTMLElement>('achievement-icon')
 const achievementTitle = requireElement<HTMLElement>('achievement-title')
 const achievementCopy = requireElement<HTMLElement>('achievement-copy')
-const banterPresenter = new BanterPresenter(renderBanter)
+const banterPresenter = new BanterPresenter(renderBanter, undefined, hideBanter)
 const coinLedger = new CoinLedger()
 const clerkAssist = new ClerkAssistTrigger()
 let currentSnapshot: GameSnapshot | undefined
@@ -270,11 +270,14 @@ function updateHud(snapshot: GameSnapshot): void {
   gameControls.classList.toggle('is-locked', snapshot.isReady)
   gameControls.setAttribute('aria-disabled', String(snapshot.isReady))
 
-  banterPresenter.show(snapshot.banter, {
-    interrupt: snapshot.isReady
-      || snapshot.result !== undefined
-      || (snapshot.attempts === 0 && snapshot.canGrab),
-  })
+  if (achievementToast.hidden) {
+    banterPresenter.show(snapshot.banter, {
+      interrupt: snapshot.isReady
+        || snapshot.result !== undefined
+        || (snapshot.attempts === 0 && snapshot.canGrab),
+    })
+  }
+  if (snapshot.isReady || snapshot.result) hideBanter()
 
   if (snapshot.result) {
     const won = snapshot.result === 'won'
@@ -379,6 +382,7 @@ function renderTitleGallery(): void {
 
 function showAchievement(title: SpendTitle, amount: number): void {
   if (achievementTimeout !== undefined) clearTimeout(achievementTimeout)
+  banterPresenter.clear()
   achievementIcon.textContent = title.emoji
   achievementTitle.textContent = title.name
   achievementCopy.textContent = `累計投入 NT$${amount}`
@@ -396,16 +400,26 @@ function showAchievement(title: SpendTitle, amount: number): void {
     achievementToast.classList.remove('is-showing')
     document.querySelector('.game-shell')?.classList.remove('is-achievement')
     achievementTimeout = undefined
+    if (currentSnapshot && !currentSnapshot.isReady && !currentSnapshot.result) {
+      banterPresenter.show(currentSnapshot.banter)
+    }
   }, 3_200)
 }
 
 function renderBanter({ durationMs, line }: BanterRender): void {
+  if (currentSnapshot?.isReady || currentSnapshot?.result) return
   banterEmoji.textContent = line.emoji
   banterSpeaker.textContent = line.speaker
   banterText.textContent = line.text
   banterCard.style.setProperty('--banter-duration', `${durationMs}ms`)
+  banterCard.hidden = false
   banterCard.classList.remove('is-entering')
   requestAnimationFrame(() => banterCard.classList.add('is-entering'))
+}
+
+function hideBanter(): void {
+  banterCard.hidden = true
+  banterCard.classList.remove('is-entering')
 }
 
 function requireElement<T extends HTMLElement>(id: string): T {

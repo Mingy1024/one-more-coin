@@ -26,6 +26,15 @@ describe('claw pose by round phase', () => {
     expect(clawOpeningForPhase('closing', 1, false, gripOpening)).toBe(gripOpening)
   })
 
+  it('closes after releasing so an empty claw rests shut at the end of a failed round', () => {
+    expect(clawOpeningForPhase('releasing', 1, false, gripOpening)).toBe(1)
+    expect(clawOpeningForPhase('resetting', 0, false, gripOpening)).toBe(1)
+    expect(clawOpeningForPhase('resetting', 0.5, false, gripOpening)).toBe(1)
+    expect(clawOpeningForPhase('resetting', 0.75, false, gripOpening)).toBeCloseTo(0.5)
+    expect(clawOpeningForPhase('resetting', 1, false, gripOpening)).toBe(0)
+    expect(clawOpeningForPhase('lost', 0, false, gripOpening)).toBe(0)
+  })
+
   it('holds the current height for an early second grab and lifts from there', () => {
     const midairHeight = clawHeadHeight('lowering', 0.7, MACHINE_DIMENSIONS.clawLowY)
     expect(midairHeight).toBeGreaterThan(MACHINE_DIMENSIONS.clawLowY)
