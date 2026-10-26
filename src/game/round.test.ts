@@ -5,6 +5,11 @@ import { createRound, phaseDurations, stepRound } from './round'
 const fullCycleSeconds = Object.values(phaseDurations).reduce((sum, duration) => sum + duration, 0)
 
 describe('claw machine round', () => {
+  it('allows a clerk to correct a lost round after a verified rescue', () => {
+    const lost = { ...createRound(), phase: 'lost' as const }
+    expect(stepRound(lost, { type: 'CLERK_RESCUE' }).phase).toBe('won')
+    expect(stepRound(createRound(), { type: 'CLERK_RESCUE' }).phase).toBe('ready')
+  })
   it('keeps the timer and claw locked until the player starts the round', () => {
     let round = createRound(30)
 

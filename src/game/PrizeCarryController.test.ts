@@ -30,6 +30,24 @@ describe('carried prize', () => {
     expect(prize.collider.isSensor()).toBe(true)
   })
 
+  it('disables every protruding-part collider while held and restores them on release', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    const prize = createPrize(world)
+    const tail = world.createCollider(
+      RAPIER.ColliderDesc.ball(0.14).setTranslation(0.2, 0.24, -0.5),
+      prize.body,
+    )
+    const carry = new PrizeCarryController(prize.body, [prize.collider, tail])
+
+    carry.capture({ x: 0, y: 0.38, z: 0 })
+    expect(prize.collider.isSensor()).toBe(true)
+    expect(tail.isSensor()).toBe(true)
+
+    carry.release()
+    expect(prize.collider.isSensor()).toBe(false)
+    expect(tail.isSensor()).toBe(false)
+  })
+
   it('does not snap the prize toward the claw centre or down when capture begins', () => {
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
     const prize = createPrize(world, 0.24, -0.08, 0.62)
@@ -108,5 +126,21 @@ describe('carried prize', () => {
 
     expect(prize.collider.isSensor()).toBe(false)
     expect(prize.body.bodyType()).toBe(RAPIER.RigidBodyType.Dynamic)
+  })
+
+  it('shows a weakening grip slipping down before returning to physical falling', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    const prize = createPrize(world)
+    const carry = new PrizeCarryController(prize.body, prize.collider)
+    const target = { x: 0, y: 1.4, z: 0 }
+    carry.capture({ x: 0, y: 0.38, z: 0 })
+    carry.follow(target)
+    const heldY = prize.body.translation().y
+    carry.loosen(0.06)
+    carry.follow(target)
+    expect(prize.body.translation().y).toBeCloseTo(heldY - 0.06)
+    carry.release()
+    for (let frame = 0; frame < 30; frame += 1) world.step()
+    expect(prize.body.translation().y).toBeLessThan(heldY - 0.2)
   })
 })

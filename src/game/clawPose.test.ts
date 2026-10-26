@@ -34,4 +34,8 @@ describe('claw pose by round phase', () => {
     expect(clawHeadHeight('lifting', 0, midairHeight)).toBe(midairHeight)
     expect(clawHeadHeight('lifting', 1, midairHeight)).toBe(MACHINE_DIMENSIONS.clawTopY)
   })
+
+  it('stops the descent at the selected plush shoulder height', () => {
+    expect(clawHeadHeight('lowering', 1, 1.7)).toBe(1.7)
+  })
 })

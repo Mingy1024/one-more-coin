@@ -23,6 +23,7 @@ export type RoundAction =
   | { type: 'SECOND_GRAB' }
   | { type: 'TICK'; deltaSeconds: number }
   | { type: 'PRIZE_DROPPED' }
+  | { type: 'CLERK_RESCUE' }
 
 export const phaseDurations: Partial<Record<RoundPhase, number>> = {
   lowering: 1.75,
@@ -58,6 +59,9 @@ export function createRound(durationSeconds = 30): RoundState {
 }
 
 export function stepRound(state: RoundState, action: RoundAction): RoundState {
+  if (action.type === 'CLERK_RESCUE') {
+    return state.phase === 'lost' ? { ...state, phase: 'won', phaseElapsed: 0 } : state
+  }
   if (state.phase === 'won' || state.phase === 'lost') return state
 
   if (action.type === 'START') {

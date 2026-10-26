@@ -7,8 +7,8 @@ export function clawDescentProgress(progress: number): number {
 }
 
 export function clawHeadHeight(phase: RoundPhase, progress: number, closingHeight: number): number {
-  const { clawTopY, clawLowY } = MACHINE_DIMENSIONS
-  if (phase === 'lowering') return clawTopY + (clawLowY - clawTopY) * clawDescentProgress(progress)
+  const { clawTopY } = MACHINE_DIMENSIONS
+  if (phase === 'lowering') return clawTopY + (closingHeight - clawTopY) * clawDescentProgress(progress)
   if (phase === 'closing') return closingHeight
   if (phase === 'lifting') {
     const lift = progress * progress * (3 - 2 * progress)

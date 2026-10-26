@@ -66,6 +66,7 @@ export class ArticulatedClaw {
   private cableJoint: RAPIER.ImpulseJoint
   private cableLength: number
   private sliderLocalY = -0.3
+  private heldFingerAngles?: number[]
 
   constructor(
     world: RAPIER.World,
@@ -207,10 +208,29 @@ export class ArticulatedClaw {
     const amount = THREE.MathUtils.clamp(opening, 0, 1)
     const target = THREE.MathUtils.lerp(CLOSED_ANGLE, OPEN_ANGLE, amount)
     this.sliderLocalY = linkagePose(amount).sliderY - 0.1
-    for (const finger of this.fingers) {
-      finger.joint.configureMotorPosition(target, 520, 34)
+    for (const [index, finger] of this.fingers.entries()) {
+      const contactAngle = this.heldFingerAngles?.[index]
+      finger.joint.configureMotorPosition(contactAngle === undefined ? target : Math.max(target, contactAngle), 520, 34)
       finger.joint.setMotorMaxForce(600)
     }
+  }
+
+  holdCurrentGrip(): void {
+    const head = this.headBody.rotation()
+    const inverseHead = new THREE.Quaternion(head.x, head.y, head.z, head.w).invert()
+    this.heldFingerAngles = this.fingers.map((finger, index) => {
+      const rotation = finger.body.rotation()
+      const local = new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w)
+        .premultiply(inverseHead)
+        .premultiply(new THREE.Quaternion().setFromAxisAngle(
+          new THREE.Vector3(0, 1, 0), -(FINGER_YAW + index * Math.PI * 2 / 3),
+        ))
+      return Math.atan2(2 * (local.w * local.z + local.x * local.y), 1 - 2 * (local.y ** 2 + local.z ** 2))
+    })
+  }
+
+  releaseGrip(): void {
+    this.heldFingerAngles = undefined
   }
 
   applyImpulse(impulse: RAPIER.Vector): void {
@@ -391,6 +411,7 @@ export class ArticulatedClaw {
   }
 
   reset(x: number, z: number, cableLength: number): void {
+    this.releaseGrip()
     const anchor = this.gantryBody.translation()
     const headY = anchor.y - cableLength
     this.gantryBody.setTranslation({ x, y: anchor.y, z }, true)

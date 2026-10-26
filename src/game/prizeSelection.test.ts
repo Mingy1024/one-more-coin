@@ -17,4 +17,8 @@ describe('selectPrizeForAim', () => {
   it('does not select a doll when the claw drops in empty space', () => {
     expect(selectPrizeForAim({ x: -1.2, z: 0.96 }, prizes)).toBeUndefined()
   })
+
+  it('skips a collected doll even when it is closest to the claw', () => {
+    expect(selectPrizeForAim({ x: 0.4, z: -0.18 }, [undefined, { x: 0.5, z: -0.18 }])).toBe(1)
+  })
 })

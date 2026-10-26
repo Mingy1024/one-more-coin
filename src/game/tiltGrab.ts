@@ -17,9 +17,9 @@ interface Point3 {
 
 export function canTiltPickup(prize: Point3, tips: Point3[]): boolean {
   const topContact = tips.some((tip) =>
-    tip.y >= prize.y + 0.4
+    tip.y >= prize.y + 0.3
       && tip.y <= prize.y + 0.75
-      && Math.hypot(tip.x - prize.x, tip.z - prize.z) <= 0.48)
+      && Math.hypot(tip.x - prize.x, tip.z - prize.z) <= 0.54)
   if (!topContact) return false
 
   const supports = tips.filter((tip) =>

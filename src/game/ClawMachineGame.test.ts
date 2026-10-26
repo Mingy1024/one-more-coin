@@ -1,12 +1,69 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { ClawMachineGame, INITIAL_PRIZE_PLACEMENTS } from './ClawMachineGame'
+import { ClawMachineGame, INITIAL_PRIZE_PLACEMENTS, PRIZE_NAMES } from './ClawMachineGame'
 import { clawHeadHeight } from './clawPose'
 import { MACHINE_DIMENSIONS } from './machineDimensions'
 import { canPickupPrize } from './prizeInteraction'
 import { createRound, phaseProgress, stepRound, type RoundState } from './round'
 
 describe('claw machine session', () => {
+  it('notifies the loading screen only after a frame has rendered', () => {
+    const events: string[] = []
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round: createRound(),
+      timer: { update: vi.fn(), getDelta: () => 0 },
+      renderer: { render: () => events.push('render') },
+      scene: {}, camera: {},
+    }) as ClawMachineGame
+
+    game.setPaused(true)
+    game.onNextRenderedFrame(() => events.push('ready'))
+    expect(events).toEqual([])
+
+    ;(game as unknown as { update(): void }).update()
+    expect(events).toEqual(['render', 'ready'])
+
+    ;(game as unknown as { update(): void }).update()
+    expect(events).toEqual(['render', 'ready', 'render'])
+  })
+
+  it('releases a weak grip into a physical fall without awarding a win', () => {
+    const prize = {
+      carry: { loosen: vi.fn(), release: vi.fn() },
+      body: { setLinvel: vi.fn(), setAngvel: vi.fn(), setTranslation: vi.fn() },
+    }
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round: { ...createRound(), phase: 'returning', phaseElapsed: 0.7 },
+      carried: true, activePrize: prize, lastGrabSucceeded: true,
+      gripStrength: 0.181, gripQuality: 0.56, gripMass: 0.8,
+      cycleStart: { x: 0.8, z: -0.2 }, clawPosition: { x: -0.2, z: 0.38 },
+      articulatedClaw: { getHeadPosition: () => ({ x: 0, y: 3.5, z: 0.5 }), releaseGrip: vi.fn() },
+      publishSnapshot: vi.fn(),
+    }) as ClawMachineGame
+    const internals = game as unknown as { advanceGrip(delta: number): void; carried: boolean; slipped: boolean; round: RoundState }
+    internals.advanceGrip(0.05)
+    expect(internals.carried).toBe(false)
+    expect(internals.slipped).toBe(true)
+    expect(internals.round.phase).toBe('returning')
+    expect(prize.carry.release).toHaveBeenCalledOnce()
+    expect(prize.body.setLinvel).toHaveBeenCalledOnce()
+    expect(prize.body.setTranslation).not.toHaveBeenCalled()
+  })
+
+  it('can award a late slip that actually falls into the chute during the return', () => {
+    const prize = {
+      claimed: false, body: { translation: () => ({ x: -1.2, y: -0.72, z: 0.96 }) },
+      collider: { setSensor: vi.fn() },
+    }
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round: { ...createRound(), phase: 'returning' }, carried: false, slipped: true,
+      activePrize: prize, publishSnapshot: vi.fn(),
+    }) as ClawMachineGame
+    ;(game as unknown as { checkForWin(): void }).checkForWin()
+    expect(prize.claimed).toBe(true)
+    expect((game as unknown as { round: RoundState }).round.phase).toBe('won')
+  })
+
   it('does not advance a paid round while the title gallery is open', () => {
     const round = stepRound(createRound(), { type: 'START' })
     const render = vi.fn()
@@ -75,6 +132,7 @@ describe('claw machine session', () => {
         setRotation: vi.fn(),
         setLinvel: vi.fn(),
         setAngvel: vi.fn(),
+        setEnabled: vi.fn(),
       }
       return {
         start: { position: { x: startX, y: 0.5, z: -0.5 }, rotation: { x: 0, y: 0, z: 0.7, w: 0.71 } },
@@ -106,6 +164,45 @@ describe('claw machine session', () => {
     }
   })
 
+  it('clears a won doll after it falls into the chute, without clearing the other dolls', () => {
+    let prizeY = -0.7
+    const prize = {
+      claimed: false,
+      body: {
+        translation: () => ({ x: -1.2, y: prizeY, z: 0.96 }),
+        setEnabled: vi.fn(),
+      },
+      collider: { setSensor: vi.fn() },
+      mesh: { visible: true },
+    }
+    const otherPrize = { mesh: { visible: true }, body: { setEnabled: vi.fn() } }
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round: { ...createRound(), phase: 'releasing' },
+      activePrize: prize,
+      prizes: [prize, otherPrize],
+      carried: false,
+      publishSnapshot: vi.fn(),
+    }) as ClawMachineGame
+    const internals = game as unknown as {
+      checkForWin(): void
+      advancePrizeExit(delta: number): void
+    }
+
+    internals.checkForWin()
+    expect(prize.claimed).toBe(true)
+    expect(prize.mesh.visible).toBe(true)
+    expect(prize.body.setEnabled).not.toHaveBeenCalled()
+
+    internals.advancePrizeExit(0.2)
+    expect(prize.mesh.visible).toBe(true)
+    prizeY = -1.1
+    internals.advancePrizeExit(0.1)
+    expect(prize.mesh.visible).toBe(false)
+    expect(prize.body.setEnabled).toHaveBeenCalledWith(false)
+    expect(otherPrize.mesh.visible).toBe(true)
+    expect(otherPrize.body.setEnabled).not.toHaveBeenCalled()
+  })
+
   it('uses the current descent height for the second-stage close', () => {
     let round = stepRound(createRound(), { type: 'START' })
     round = stepRound(round, { type: 'GRAB' })
@@ -124,5 +221,106 @@ describe('claw machine session', () => {
     expect(state.round.attempts).toBe(1)
     expect(state.closingHeight).toBeCloseTo(expectedHeight)
     expect(state.closingHeight).toBeGreaterThan(MACHINE_DIMENSIONS.clawLowY)
+  })
+
+  it('names all six dolls and excludes already won prizes from the clerk choices', () => {
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      prizes: [{ claimed: false }, { claimed: true }, { claimed: false }, { claimed: false }, { claimed: false }, { claimed: false }],
+    }) as ClawMachineGame
+
+    expect(PRIZE_NAMES).toHaveLength(6)
+    expect(game.availablePrizesForClerk()).toEqual([
+      { index: 0, name: '哆啦A夢' },
+      { index: 2, name: '史努比' },
+      { index: 3, name: '呆呆獸' },
+      { index: 4, name: '妙蛙種子' },
+      { index: 5, name: '三眼怪' },
+    ])
+  })
+
+  it('uses a free spot near the chute when no doll is already there', () => {
+    const selected = {
+      claimed: false,
+      body: {
+        translation: () => ({ x: 1, y: 0.6, z: -0.8 }),
+        setTranslation: vi.fn(), setRotation: vi.fn(), setLinvel: vi.fn(), setAngvel: vi.fn(),
+      },
+      mesh: { position: { set: vi.fn() }, quaternion: { set: vi.fn() } },
+      carry: { release: vi.fn() },
+    }
+    const neighbor = {
+      claimed: false,
+      body: { translation: () => ({ x: 1, y: 0.6, z: -0.8 }), setTranslation: vi.fn() },
+    }
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round: { ...createRound(), phase: 'lost' },
+      prizes: [selected, neighbor],
+      publishSnapshot: vi.fn(),
+    }) as ClawMachineGame
+
+    expect(game.placePrizeForClerk(0)).toEqual({ type: 'placed' })
+    expect(selected.body.setTranslation).toHaveBeenCalledOnce()
+    expect(neighbor.body.setTranslation).not.toHaveBeenCalled()
+    const position = selected.body.setTranslation.mock.calls[0]?.[0] as { x: number; y: number; z: number }
+    expect(position.x).toBeGreaterThan(-0.3)
+    expect(position.y).toBeCloseTo(0.62)
+    expect(Math.hypot(position.x - 1, position.z + 0.8)).toBeGreaterThan(0.7)
+  })
+
+  it('swaps complete poses with an existing doll near the chute', () => {
+    const makePrize = (position: { x: number; y: number; z: number }, rotation: { x: number; y: number; z: number; w: number }) => ({
+      claimed: false,
+      body: {
+        translation: () => position, rotation: () => rotation,
+        setTranslation: vi.fn(), setRotation: vi.fn(), setLinvel: vi.fn(), setAngvel: vi.fn(),
+      },
+      mesh: { position: { set: vi.fn() }, quaternion: { set: vi.fn() } },
+      carry: { release: vi.fn() },
+    })
+    const far = makePrize({ x: 1.1, y: 0.6, z: -1 }, { x: 0, y: 0, z: 0, w: 1 })
+    const near = makePrize({ x: -0.08, y: 0.6, z: 0.53 }, { x: 0, y: 0.3, z: 0, w: 0.954 })
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round: { ...createRound(), phase: 'lost' },
+      prizes: [far, near],
+    }) as ClawMachineGame
+
+    expect(game.placePrizeForClerk(0)).toEqual({ type: 'swapped', displaced: '風速狗' })
+    expect(far.body.setTranslation).toHaveBeenCalledWith({ x: -0.08, y: 0.6, z: 0.53 }, true)
+    expect(near.body.setTranslation).toHaveBeenCalledWith({ x: 1.1, y: 0.6, z: -1 }, true)
+    expect(far.body.setRotation).toHaveBeenCalledWith({ x: 0, y: 0.3, z: 0, w: 0.954 }, true)
+    expect(near.body.setRotation).toHaveBeenCalledWith({ x: 0, y: 0, z: 0, w: 1 }, true)
+  })
+
+  it('lets the clerk rescue only the released doll genuinely stuck at the chute', () => {
+    const prize = {
+      claimed: false,
+      body: { translation: () => ({ x: -1.2, y: 0.25, z: 0.96 }), linvel: () => ({ x: 0, y: 0, z: 0 }), setLinvel: vi.fn(), setAngvel: vi.fn(), setEnabled: vi.fn() },
+      carry: { release: vi.fn() },
+      collider: { setSensor: vi.fn() },
+      mesh: { visible: true },
+    }
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round: { ...createRound(), phase: 'lost' },
+      prizes: [prize], activePrize: prize, lastGrabSucceeded: true,
+      publishSnapshot: vi.fn(),
+    }) as ClawMachineGame
+
+    expect(game.rescueStuckPrizeForClerk()).toBe('哆啦A夢')
+    expect(prize.claimed).toBe(true)
+    expect((game as unknown as { round: RoundState }).round.phase).toBe('won')
+    expect(game.rescueStuckPrizeForClerk()).toBeUndefined()
+  })
+
+  it('rejects clerk rescue when the doll merely lies near the chute without a successful grab', () => {
+    const prize = {
+      claimed: false,
+      body: { translation: () => ({ x: -1.2, y: 0.25, z: 0.96 }), linvel: () => ({ x: 0, y: 0, z: 0 }) },
+    }
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round: { ...createRound(), phase: 'lost' }, prizes: [prize], activePrize: prize,
+      lastGrabSucceeded: false,
+    }) as ClawMachineGame
+
+    expect(game.rescueStuckPrizeForClerk()).toBeUndefined()
   })
 })

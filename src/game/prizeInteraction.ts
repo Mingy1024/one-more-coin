@@ -34,3 +34,22 @@ export function isPrizeCaptured(position: PrizePosition, chute: ChutePosition): 
     && Math.abs(position.z - chute.z) < CHUTE_OPENING_HALF_Z - 0.08
     && position.y < CHUTE_CAPTURE_Y
 }
+
+export function isPrizeEnteringChute(position: PrizePosition, chute: ChutePosition): boolean {
+  return Math.abs(position.x - chute.x) < CHUTE_OPENING_HALF_X - 0.08
+    && Math.abs(position.z - chute.z) < CHUTE_OPENING_HALF_Z - 0.08
+    && position.y < 0.95
+    && position.y > CHUTE_CAPTURE_Y
+}
+
+export function isPrizeStuckAtChute(
+  position: PrizePosition,
+  velocity: PrizePosition,
+  chute: ChutePosition,
+): boolean {
+  return Math.abs(position.x - chute.x) < CHUTE_OPENING_HALF_X + 0.16
+    && Math.abs(position.z - chute.z) < CHUTE_OPENING_HALF_Z + 0.16
+    && position.y >= CHUTE_CAPTURE_Y
+    && position.y < 0.95
+    && Math.hypot(velocity.x, velocity.y, velocity.z) < 0.35
+}

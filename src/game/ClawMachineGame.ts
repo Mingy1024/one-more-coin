@@ -4,6 +4,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 
 import {
   createRound,
+  phaseDurations,
   phaseProgress,
   stepRound,
   type RoundPhase,
@@ -17,15 +18,18 @@ import { ArticulatedClaw } from './ArticulatedClaw'
 import { MACHINE_DIMENSIONS } from './machineDimensions'
 import { PrizeCarryController } from './PrizeCarryController'
 import {
-  canPickupPrize,
+  CAPTURE_QUALITY, DROP_STRENGTH, evaluateGrip, nextGripStrength, normalGripHeight,
+  PLUSH_HALF_SEGMENT, PLUSH_RADIUS, transportStress,
+} from './gripMechanics'
+import {
   CHUTE_OPENING_HALF_X,
   CHUTE_OPENING_HALF_Z,
   isPrizeCaptured,
+  isPrizeEnteringChute,
+  isPrizeStuckAtChute,
   prizeReleaseAngularVelocity,
   PRIZE_GRIP_OPENING,
-  PRIZE_HALF_DEPTH,
   PRIZE_HALF_HEIGHT,
-  PRIZE_HALF_WIDTH,
 } from './prizeInteraction'
 import { createPrizeModel } from './prizeModel'
 import { createArcanineModel } from './arcanineModel'
@@ -35,8 +39,9 @@ import { createBulbasaurModel } from './bulbasaurModel'
 import { createAlienModel } from './alienModel'
 import { selectPrizeForAim } from './prizeSelection'
 import { createGantryAssembly } from './gantry'
+import { createArcadeRoom } from './arcadeRoom'
+import { chooseClerkPlacement, findClerkSwapIndex } from './clerkAssist'
 import {
-  canTiltPickup,
   TILT_GRIP_OPENING,
   tiltAmountForPhase,
   tiltPlanForAim,
@@ -57,9 +62,11 @@ export interface GameSnapshot {
 interface Prize {
   body: RAPIER.RigidBody
   collider: RAPIER.Collider
+  colliders: RAPIER.Collider[]
   mesh: THREE.Group
   carry: PrizeCarryController
   start: PrizePlacement
+  claimed: boolean
 }
 
 interface PrizePlacement {
@@ -78,6 +85,10 @@ const COLORS = {
 const CLAW_TOP_Y = MACHINE_DIMENSIONS.clawTopY
 const CLAW_LOW_Y = MACHINE_DIMENSIONS.clawLowY
 const CHUTE = { x: -1.2, z: 0.96 }
+const PRIZE_EXIT_Y = -1.05
+const PRIZE_EXIT_MIN_SECONDS = 0.18
+const PRIZE_EXIT_MAX_SECONDS = 0.65
+const CHUTE_GUARD_HEIGHT = PRIZE_HALF_HEIGHT * 2 / 3
 function prizePlacement(
   x: number, y: number, z: number,
   tiltX = 0, yaw = 0, tiltZ = 0,
@@ -90,9 +101,19 @@ export const INITIAL_PRIZE_PLACEMENTS = [
   prizePlacement(0.48, 0.62, -0.18),
   prizePlacement(-0.2, 0.62, -1.14, 0, 0.3),
   prizePlacement(1.18, 0.43, -1.12, 0, 0, Math.PI / 2),
-  prizePlacement(-0.08, 0.68, 0.53, 0.2, -0.2),
-  prizePlacement(0.88, 0.62, 0.62, 0, 0.22),
+  prizePlacement(0.15, 0.68, 0.8, 0.2, 0.5),
+  prizePlacement(1.12, 0.62, 0.68, 0, 0.22),
   prizePlacement(-1.25, 0.62, -0.35, 0, -0.32),
+] as const
+export const PRIZE_NAMES = ['哆啦A夢', '風速狗', '史努比', '呆呆獸', '妙蛙種子', '三眼怪'] as const
+// Round, bulky plushes retain less grip; these tune difficulty without rolling a win probability.
+const PRIZE_GRIP_PROFILES = [
+  { retention: 0.92, mass: 0.55 },
+  { retention: 0.9, mass: 0.6 },
+  { retention: 0.98, mass: 0.35 },
+  { retention: 0.84, mass: 0.8 },
+  { retention: 0.82, mass: 0.75 },
+  { retention: 0.94, mass: 0.45 },
 ] as const
 const ROPE_ANCHOR_Y = MACHINE_DIMENSIONS.ropeAnchorY
 
@@ -108,6 +129,8 @@ export class ClawMachineGame {
   private readonly onSnapshot: (snapshot: GameSnapshot) => void
   private readonly resizeObserver: ResizeObserver
   private readonly canvas: HTMLCanvasElement
+  private prizePortraits?: string[]
+  private frameCallbacks: Array<() => void> = []
 
   private round: RoundState = createRound()
   private movement = { x: 0, z: 0 }
@@ -117,6 +140,7 @@ export class ClawMachineGame {
   private driveVelocity: PlanarMotion = { x: 0, z: 0 }
   private carried = false
   private lastGrabSucceeded = false
+  private enteredChute = false
   private running = false
   private paused = false
   private lastPublishedSecond = -1
@@ -126,6 +150,11 @@ export class ClawMachineGame {
   private cameraDrag?: { pointerId: number; x: number; y: number }
   private tiltPlan?: TiltPlan
   private activePrize?: Prize
+  private pendingPrizeExit?: { prize: Prize; elapsed: number }
+  private gripQuality = 0
+  private gripStrength = 0
+  private gripMass = 0.5
+  private slipped = false
 
   private constructor(canvas: HTMLCanvasElement, onSnapshot: (snapshot: GameSnapshot) => void) {
     this.canvas = canvas
@@ -138,12 +167,12 @@ export class ClawMachineGame {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.3
 
-    this.scene.background = null
-    this.scene.fog = new THREE.Fog(COLORS.navy, 13, 23)
+    this.scene.background = new THREE.Color(0x536e77)
     this.camera.position.set(5.9, 4.6, 7.8)
     this.camera.lookAt(0, 1.6, 0)
 
     this.addLights()
+    this.scene.add(createArcadeRoom())
     this.addCabinet()
     this.scene.add(this.gantry.root)
     this.articulatedClaw = new ArticulatedClaw(this.world, this.scene, {
@@ -156,11 +185,11 @@ export class ClawMachineGame {
       this.createPrize(INITIAL_PRIZE_PLACEMENTS[0], createPrizeModel(), COLORS.pink),
       this.createPrize(INITIAL_PRIZE_PLACEMENTS[1], createArcanineModel(), COLORS.warm, 0.35),
       this.createPrize(INITIAL_PRIZE_PLACEMENTS[2], createSnoopyModel(), COLORS.aqua, 0.35),
-      this.createPrize(INITIAL_PRIZE_PLACEMENTS[3], createSlowpokeModel(), COLORS.warm, 0.25),
+      this.createPrize(INITIAL_PRIZE_PLACEMENTS[3], createSlowpokeModel(), COLORS.warm, 0.25, 'slowpoke'),
       this.createPrize(INITIAL_PRIZE_PLACEMENTS[4], createBulbasaurModel(), COLORS.aqua, 0.3),
       this.createPrize(INITIAL_PRIZE_PLACEMENTS[5], createAlienModel(), COLORS.warm, 0.25),
     ]
-    this.addAmbientStars()
+    this.settleInitialPrizes()
 
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(canvas)
@@ -178,11 +207,35 @@ export class ClawMachineGame {
     return new ClawMachineGame(canvas, onSnapshot)
   }
 
+  private settleInitialPrizes(): void {
+    // Resolve gravity, floor contact and neighboring plushes before the first visible frame.
+    this.articulatedClaw.setOpening(0)
+    this.world.timestep = 1 / 60
+    for (let step = 0; step < 600; step += 1) {
+      this.world.step()
+      this.articulatedClaw.stabilizeSwing()
+      if (this.prizes.every((prize) => prize.body.isSleeping())) break
+    }
+    for (const prize of this.prizes) {
+      const position = prize.body.translation()
+      const rotation = prize.body.rotation()
+      prize.start = { position: { ...position }, rotation: { ...rotation } }
+      prize.mesh.position.set(position.x, position.y, position.z)
+      prize.mesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
+    }
+    this.articulatedClaw.updateVisuals()
+  }
+
   start(): void {
     if (this.running) return
     this.running = true
     this.timer.reset()
     this.renderer.setAnimationLoop(() => this.update())
+  }
+
+  onNextRenderedFrame(callback: () => void): void {
+    this.frameCallbacks ??= []
+    this.frameCallbacks.push(callback)
   }
 
   setPaused(paused: boolean): void {
@@ -196,7 +249,7 @@ export class ClawMachineGame {
 
   grab(): void {
     if (this.round.phase === 'lowering') {
-      this.closingHeight = clawHeadHeight('lowering', phaseProgress(this.round), CLAW_LOW_Y)
+      this.closingHeight = clawHeadHeight('lowering', phaseProgress(this.round), this.closingHeight)
       this.round = stepRound(this.round, { type: 'SECOND_GRAB' })
       this.publishSnapshot()
       return
@@ -204,15 +257,23 @@ export class ClawMachineGame {
     if (this.round.phase !== 'aiming') return
     this.closingHeight = CLAW_LOW_Y
     this.lastGrabSucceeded = false
+    this.enteredChute = false
+    this.slipped = false
+    this.gripStrength = 0
     this.cycleStart = { ...this.clawPosition }
     const prizeIndex = selectPrizeForAim(
       this.clawPosition,
-      this.prizes.map((prize) => prize.body.translation()),
+      this.prizes.map((prize) => prize.claimed ? undefined : prize.body.translation()),
     )
     this.activePrize = prizeIndex === undefined ? undefined : this.prizes[prizeIndex]
     this.tiltPlan = this.activePrize
       ? tiltPlanForAim(this.clawPosition, this.activePrize.body.translation())
       : undefined
+    if (this.activePrize && !this.tiltPlan) {
+      this.closingHeight = normalGripHeight({
+        position: this.activePrize.body.translation(), rotation: this.activePrize.body.rotation(),
+      })
+    }
     this.articulatedClaw.applyImpulse({
       x: this.driveVelocity.x * 0.025,
       y: 0,
@@ -231,10 +292,14 @@ export class ClawMachineGame {
   }
 
   restart(): void {
+    this.advancePrizeExit(PRIZE_EXIT_MAX_SECONDS)
+    this.slipped = false
+    this.gripStrength = 0
     this.round = createRound()
     this.lastPhase = 'aiming'
     this.carried = false
     this.lastGrabSucceeded = false
+    this.enteredChute = false
     this.tiltPlan = undefined
     this.activePrize = undefined
     this.clawPosition = { ...CHUTE }
@@ -250,7 +315,11 @@ export class ClawMachineGame {
 
   resetPrizes(): void {
     if (this.round.phase !== 'ready') return
+    this.pendingPrizeExit = undefined
     for (const prize of this.prizes) {
+      prize.claimed = false
+      prize.mesh.visible = true
+      prize.body.setEnabled(true)
       prize.carry.release()
       prize.body.setTranslation(prize.start.position, true)
       prize.body.setRotation(prize.start.rotation, true)
@@ -266,11 +335,136 @@ export class ClawMachineGame {
     this.publishSnapshot()
   }
 
+  availablePrizesForClerk(): Array<{ index: number; name: string }> {
+    return this.prizes.flatMap((prize, index) =>
+      prize.claimed ? [] : [{ index, name: PRIZE_NAMES[index]! }])
+  }
+
+  prizePortrait(index: number): string {
+    if (!this.prizePortraits) this.prizePortraits = this.renderPrizePortraits()
+    return this.prizePortraits[index] ?? ''
+  }
+
+  private renderPrizePortraits(): string[] {
+    const size = 160
+    const target = new THREE.WebGLRenderTarget(size, size)
+    const pixels = new Uint8Array(size * size * 4)
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = size
+    const context = canvas.getContext('2d')!
+    const image = context.createImageData(size, size)
+    const scene = new THREE.Scene()
+    scene.add(new THREE.AmbientLight(0xffffff, 2.1))
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.4)
+    keyLight.position.set(-2, 4, 5)
+    scene.add(keyLight)
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 20)
+    camera.position.set(0.3, 0.2, 6)
+    camera.lookAt(0, 0, 0)
+    const previousTarget = this.renderer.getRenderTarget()
+    const previousColor = this.renderer.getClearColor(new THREE.Color())
+    const previousAlpha = this.renderer.getClearAlpha()
+    const portraits: string[] = []
+
+    try {
+      this.renderer.setClearColor(0x000000, 0)
+      this.renderer.setRenderTarget(target)
+      for (const prize of this.prizes) {
+        const model = prize.mesh.clone(true)
+        model.position.set(0, 0, 0)
+        model.quaternion.identity()
+        model.traverse((part) => { if (part instanceof THREE.Light) part.visible = false })
+        const bounds = new THREE.Box3().setFromObject(model)
+        const center = bounds.getCenter(new THREE.Vector3())
+        const extent = bounds.getSize(new THREE.Vector3())
+        const scale = 1.7 / Math.max(extent.x, extent.y)
+        const frame = new THREE.Group()
+        model.position.sub(center)
+        frame.scale.setScalar(scale)
+        frame.add(model)
+        scene.add(frame)
+        this.renderer.render(scene, camera)
+        this.renderer.readRenderTargetPixels(target, 0, 0, size, size, pixels)
+        for (let y = 0; y < size; y += 1) {
+          const source = (size - 1 - y) * size * 4
+          image.data.set(pixels.subarray(source, source + size * 4), y * size * 4)
+        }
+        context.putImageData(image, 0, 0)
+        portraits.push(canvas.toDataURL('image/png'))
+        scene.remove(frame)
+      }
+    } finally {
+      this.renderer.setRenderTarget(previousTarget)
+      this.renderer.setClearColor(previousColor, previousAlpha)
+      target.dispose()
+    }
+
+    return portraits
+  }
+
+  placePrizeForClerk(index: number): { type: 'swapped'; displaced: string } | { type: 'placed' } | undefined {
+    const prize = this.prizes[index]
+    if ((this.round.phase !== 'lost' && this.round.phase !== 'ready') || !prize || prize.claimed) return undefined
+    const positions = this.prizes.map((entry) => entry.claimed ? undefined : entry.body.translation())
+    const swapIndex = findClerkSwapIndex(index, positions)
+    if (swapIndex !== undefined) {
+      const neighbor = this.prizes[swapIndex]!
+      const selectedPose = { position: { ...prize.body.translation() }, rotation: { ...prize.body.rotation() } }
+      const neighborPose = { position: { ...neighbor.body.translation() }, rotation: { ...neighbor.body.rotation() } }
+      this.setPrizePose(prize, neighborPose.position, neighborPose.rotation)
+      this.setPrizePose(neighbor, selectedPose.position, selectedPose.rotation)
+      return { type: 'swapped', displaced: PRIZE_NAMES[swapIndex]! }
+    }
+    const neighbors = this.prizes.filter((other) => other !== prize && !other.claimed)
+      .map((other) => other.body.translation())
+    const destination = chooseClerkPlacement(neighbors)
+    const upright = { x: 0, y: 0, z: 0, w: 1 }
+
+    this.setPrizePose(prize, destination, upright)
+    return { type: 'placed' }
+  }
+
+  rescueStuckPrizeForClerk(): string | undefined {
+    if (!this.hasStuckPrizeAtChute() || !this.activePrize) return undefined
+    const prize = this.activePrize
+    if (!isPrizeStuckAtChute(prize.body.translation(), prize.body.linvel(), CHUTE)) return undefined
+    prize.claimed = true
+    prize.carry.release()
+    this.setPrizeSensor(prize, true)
+    prize.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+    prize.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
+    prize.body.setEnabled(false)
+    prize.mesh.visible = false
+    this.round = stepRound(this.round, { type: 'CLERK_RESCUE' })
+    this.publishSnapshot()
+    return PRIZE_NAMES[this.prizes.indexOf(prize)]
+  }
+
+  hasStuckPrizeAtChute(): boolean {
+    return this.round.phase === 'lost' && this.lastGrabSucceeded
+      && !!this.activePrize && !this.activePrize.claimed
+      && isPrizeStuckAtChute(this.activePrize.body.translation(), this.activePrize.body.linvel(), CHUTE)
+  }
+
+  private setPrizePose(
+    prize: Prize,
+    position: { x: number; y: number; z: number },
+    rotation: { x: number; y: number; z: number; w: number },
+  ): void {
+    prize.carry.release()
+    prize.body.setTranslation(position, true)
+    prize.body.setRotation(rotation, true)
+    prize.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+    prize.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
+    prize.mesh.position.set(position.x, position.y, position.z)
+    prize.mesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
+  }
+
   private update(): void {
     this.timer.update()
     const delta = Math.min(this.timer.getDelta(), 1 / 20)
     if (this.paused) {
-      this.renderer.render(this.scene, this.camera)
+      this.renderFrame()
       return
     }
     const previousPhase = this.round.phase
@@ -282,7 +476,9 @@ export class ClawMachineGame {
     else this.driveVelocity = approachVelocity(this.driveVelocity, { x: 0, z: 0 }, delta)
     this.updateClawAnimation()
     this.updatePhysics(delta)
+    this.advanceGrip(delta)
     this.checkForWin()
+    this.advancePrizeExit(delta)
 
     const displayedSecond = Math.ceil(this.round.timeLeft)
     if (displayedSecond !== this.lastPublishedSecond || this.round.phase !== this.lastPhase) {
@@ -291,7 +487,12 @@ export class ClawMachineGame {
       this.lastPhase = this.round.phase
     }
 
+    this.renderFrame()
+  }
+
+  private renderFrame(): void {
     this.renderer.render(this.scene, this.camera)
+    for (const callback of this.frameCallbacks?.splice(0) ?? []) callback()
   }
 
   private updatePlayerMovement(delta: number): void {
@@ -323,11 +524,13 @@ export class ClawMachineGame {
     const progress = smoothStep(phaseFraction)
     const phase = this.round.phase
     const headY = clawHeadHeight(phase, phaseFraction, this.closingHeight)
+    const holdingOpening = (this.tiltPlan ? TILT_GRIP_OPENING : PRIZE_GRIP_OPENING)
+      + (this.carried ? Math.max(0, 0.4 - this.gripStrength) * 0.25 : 0)
     const prongOpen = clawOpeningForPhase(
       phase,
       phase === 'lowering' ? phaseFraction : progress,
-      this.carried,
-      this.tiltPlan ? TILT_GRIP_OPENING : PRIZE_GRIP_OPENING,
+      this.carried || this.slipped,
+      this.slipped ? 0.72 : holdingOpening,
     )
 
     if (phase === 'returning') {
@@ -350,23 +553,62 @@ export class ClawMachineGame {
   }
 
   private tryPickup(): void {
-    if (!this.activePrize) return
+    if (!this.activePrize || this.activePrize.claimed) return
     const position = this.activePrize.body.translation()
     const grabPosition = this.articulatedClaw.getGrabPose()
-    const caught = this.tiltPlan
-      ? canTiltPickup(position, this.articulatedClaw.getFingerTipPositions())
-      : canPickupPrize(position, grabPosition)
-    if (!caught) return
+    const quality = evaluateGrip(
+      { position, rotation: this.activePrize.body.rotation() },
+      grabPosition, this.articulatedClaw.getFingerTipPositions(), this.tiltPlan ? 'tilt' : 'normal',
+    )
+    if (quality < CAPTURE_QUALITY) return
+    const profile = PRIZE_GRIP_PROFILES[this.prizes.indexOf(this.activePrize)] ?? PRIZE_GRIP_PROFILES[0]
+    this.gripQuality = quality
+    this.gripStrength = quality * profile.retention
+    this.gripMass = profile.mass
 
     this.carried = true
     this.lastGrabSucceeded = true
+    this.articulatedClaw.holdCurrentGrip()
     this.activePrize.carry.capture(grabPosition)
+  }
+
+  private advanceGrip(delta: number): void {
+    if (!this.carried || !this.activePrize
+      || (this.round.phase !== 'lifting' && this.round.phase !== 'returning')) return
+    const progress = phaseProgress(this.round)
+    const head = this.articulatedClaw.getHeadPosition()
+    const returning = this.round.phase === 'returning'
+    const travel = returning ? Math.hypot(CHUTE.x - this.cycleStart.x, CHUTE.z - this.cycleStart.z) / 2.4 : 0.9
+    this.gripStrength = nextGripStrength(this.gripStrength, delta, transportStress({
+      quality: this.gripQuality,
+      mass: this.gripMass,
+      acceleration: Math.abs(1 - 2 * progress) * travel,
+      swing: Math.hypot(head.x - this.clawPosition.x, head.z - this.clawPosition.z) / 0.34,
+    }))
+    this.activePrize.carry.loosen(delta * Math.max(0, 0.4 - this.gripStrength) * 0.45)
+    if (this.gripStrength > DROP_STRENGTH) return
+
+    this.carried = false
+    this.slipped = true
+    this.articulatedClaw.releaseGrip()
+    this.activePrize.carry.release()
+    // Carry the travel momentum into the fall, so a late slip can still reach the chute.
+    const speed = returning ? 6 * progress * (1 - progress) / phaseDurations.returning! : 0
+    this.activePrize.body.setLinvel({
+      x: (CHUTE.x - this.cycleStart.x) * speed,
+      y: -0.15,
+      z: (CHUTE.z - this.cycleStart.z) * speed,
+    }, true)
+    this.activePrize.body.setAngvel({ x: 0.25, y: 0.35, z: -0.2 }, true)
+    this.publishSnapshot()
   }
 
   private releasePrize(): void {
     if (!this.carried || !this.activePrize) return
     this.carried = false
+    this.articulatedClaw.releaseGrip()
     this.activePrize.carry.release()
+    this.enteredChute = false
     this.activePrize.body.setLinvel({ x: 0, y: -0.25, z: 0 }, true)
     this.activePrize.body.setAngvel(prizeReleaseAngularVelocity(), true)
   }
@@ -388,6 +630,12 @@ export class ClawMachineGame {
         )
       }
       this.world.step()
+      if (!this.carried && this.lastGrabSucceeded && this.activePrize && !this.enteredChute
+        && (this.round.phase === 'releasing' || this.round.phase === 'resetting' || this.slipped)
+        && isPrizeEnteringChute(this.activePrize.body.translation(), CHUTE)) {
+        this.setPrizeSensor(this.activePrize, true)
+        this.enteredChute = true
+      }
       this.articulatedClaw.stabilizeSwing()
       if (this.carried && this.activePrize) {
         if (centerStrength > 0) {
@@ -412,12 +660,29 @@ export class ClawMachineGame {
 
   private checkForWin(): void {
     if (this.carried || this.round.phase === 'won' || this.round.phase === 'lost') return
-    if (this.round.phase !== 'releasing' && this.round.phase !== 'resetting') return
+    if (this.round.phase !== 'releasing' && this.round.phase !== 'resetting' && !this.slipped) return
 
     if (this.activePrize && isPrizeCaptured(this.activePrize.body.translation(), CHUTE)) {
+      this.activePrize.claimed = true
+      // Leave the prize non-colliding while it visibly falls into the chute.
+      this.setPrizeSensor(this.activePrize, true)
+      this.pendingPrizeExit = { prize: this.activePrize, elapsed: 0 }
       this.round = stepRound(this.round, { type: 'PRIZE_DROPPED' })
       this.publishSnapshot()
     }
+  }
+
+  private advancePrizeExit(delta: number): void {
+    const pending = this.pendingPrizeExit
+    if (!pending) return
+    pending.elapsed += delta
+    if (pending.elapsed < PRIZE_EXIT_MIN_SECONDS) return
+    if (pending.prize.body.translation().y > PRIZE_EXIT_Y
+      && pending.elapsed < PRIZE_EXIT_MAX_SECONDS) return
+
+    pending.prize.mesh.visible = false
+    pending.prize.body.setEnabled(false)
+    this.pendingPrizeExit = undefined
   }
 
   private addLights(): void {
@@ -471,7 +736,7 @@ export class ClawMachineGame {
     const glassMaterial = new THREE.MeshPhysicalMaterial({
       color: 0xf1ffff,
       transparent: true,
-      opacity: 0.035,
+      opacity: 0.075,
       roughness: 0.06,
       metalness: 0,
       transmission: 0,
@@ -622,6 +887,36 @@ export class ClawMachineGame {
     right.position.x = 1.86
     this.scene.add(right)
 
+    const front = new THREE.Mesh(new THREE.PlaneGeometry(3.72, MACHINE_DIMENSIONS.glassHeight), glassMaterial)
+    front.position.set(0, 2.05, 1.72)
+    this.scene.add(front)
+
+    const paneEdgeMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8bb6c7,
+      transparent: true,
+      opacity: 0.5,
+      roughness: 0.18,
+      metalness: 0.55,
+    })
+    for (const edge of [
+      { size: [3.72, 0.018, 0.018] as const, position: [0, 0.19, -1.585] as const },
+      { size: [3.72, 0.018, 0.018] as const, position: [0, 0.19, 1.725] as const },
+      { size: [0.018, 0.018, 3.25] as const, position: [-1.865, 0.19, 0] as const },
+      { size: [0.018, 0.018, 3.25] as const, position: [1.865, 0.19, 0] as const },
+    ]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(edge.size[0], edge.size[1], edge.size[2]), paneEdgeMaterial)
+      rail.position.set(edge.position[0], edge.position[1], edge.position[2])
+      this.scene.add(rail)
+    }
+
+    // The panes are nearly invisible, but the physical chamber must still keep loose prizes inside.
+    for (const wall of [
+      { half: { x: 0.035, y: 1.98, z: 1.72 }, center: { x: -1.875, y: 1.98, z: 0 } },
+      { half: { x: 0.035, y: 1.98, z: 1.72 }, center: { x: 1.875, y: 1.98, z: 0 } },
+      { half: { x: 1.875, y: 1.98, z: 0.035 }, center: { x: 0, y: 1.98, z: -1.615 } },
+      { half: { x: 1.875, y: 1.98, z: 0.035 }, center: { x: 0, y: 1.98, z: 1.715 } },
+    ]) this.addStaticCollider(wall.half, wall.center)
+
     const chute = new THREE.Mesh(
       new THREE.BoxGeometry(
         CHUTE_OPENING_HALF_X * 2,
@@ -637,11 +932,34 @@ export class ClawMachineGame {
     )
     this.scene.add(chute)
 
+    const chuteInterior = new THREE.Group()
+    chuteInterior.name = 'chute-interior'
     const chuteWallMaterial = new THREE.MeshStandardMaterial({
-      color: 0x0a1724,
-      roughness: 0.42,
-      metalness: 0.36,
+      color: 0x142c3c,
+      roughness: 0.9,
+      metalness: 0.05,
+      side: THREE.DoubleSide,
     })
+    // Thin inset faces show the well's depth without sharing a plane with the cabinet shell.
+    for (const face of [
+      { width: openingWidth, x: CHUTE.x, z: openingMinZ + 0.012, yaw: 0 },
+      { width: openingWidth, x: CHUTE.x, z: openingMaxZ - 0.012, yaw: Math.PI },
+      { width: CHUTE_OPENING_HALF_Z * 2, x: openingMinX + 0.012, z: CHUTE.z, yaw: Math.PI / 2 },
+      { width: CHUTE_OPENING_HALF_Z * 2, x: openingMaxX - 0.012, z: CHUTE.z, yaw: -Math.PI / 2 },
+    ]) {
+      const wallFace = new THREE.Mesh(
+        new THREE.PlaneGeometry(face.width, MACHINE_DIMENSIONS.chuteWellDepth),
+        chuteWallMaterial,
+      )
+      wallFace.position.set(face.x, -MACHINE_DIMENSIONS.chuteWellDepth / 2, face.z)
+      wallFace.rotation.y = face.yaw
+      chuteInterior.add(wallFace)
+    }
+    const wellLight = new THREE.PointLight(COLORS.aqua, 1.1, 2.1)
+    wellLight.position.set(CHUTE.x, -0.9, CHUTE.z)
+    chuteInterior.add(wellLight)
+    this.scene.add(chuteInterior)
+
     const chuteWell: Array<{
       size: [number, number, number]
       position: [number, number, number]
@@ -664,12 +982,6 @@ export class ClawMachineGame {
       },
     ]
     for (const wall of chuteWell) {
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(wall.size[0], wall.size[1], wall.size[2]),
-        chuteWallMaterial,
-      )
-      mesh.position.set(wall.position[0], wall.position[1], wall.position[2])
-      this.scene.add(mesh)
       this.addStaticCollider(
         { x: wall.size[0] / 2, y: wall.size[1] / 2, z: wall.size[2] / 2 },
         { x: wall.position[0], y: wall.position[1], z: wall.position[2] },
@@ -695,14 +1007,53 @@ export class ClawMachineGame {
     chuteFrame.position.set(CHUTE.x, 0.05, CHUTE.z)
     this.scene.add(chuteFrame)
 
+    // Clear acrylic panels are tall enough to make nudging a prize over the edge meaningful.
+    const chuteLip = new THREE.Group()
+    chuteLip.name = 'chute-lip'
+    const acrylic = new THREE.MeshPhysicalMaterial({
+      color: 0x9dd9ea,
+      transparent: true,
+      opacity: 0.32,
+      roughness: 0.08,
+      metalness: 0,
+      clearcoat: 1,
+      clearcoatRoughness: 0.05,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    })
+    for (const lip of [
+      { size: [openingWidth + 0.06, CHUTE_GUARD_HEIGHT, 0.055] as const, position: [CHUTE.x, CHUTE_GUARD_HEIGHT / 2, openingMinZ - 0.025] as const },
+      { size: [0.055, CHUTE_GUARD_HEIGHT, CHUTE_OPENING_HALF_Z * 2 + 0.06] as const, position: [openingMaxX + 0.025, CHUTE_GUARD_HEIGHT / 2, CHUTE.z] as const },
+    ]) {
+      const guard = new THREE.Mesh(new RoundedBoxGeometry(...lip.size, 3, 0.018), acrylic)
+      guard.position.set(...lip.position)
+      chuteLip.add(guard)
+      this.addStaticCollider(
+        { x: lip.size[0] / 2, y: lip.size[1] / 2, z: lip.size[2] / 2 },
+        { x: lip.position[0], y: lip.position[1], z: lip.position[2] },
+      )
+    }
+    this.scene.add(chuteLip)
+
     const lowerCabinetCenterY = -0.08 - MACHINE_DIMENSIONS.lowerCabinetHeight / 2
-    const plinth = new THREE.Mesh(
-      new RoundedBoxGeometry(4.04, MACHINE_DIMENSIONS.lowerCabinetHeight, 3.65, 4, 0.12),
-      frameMaterial,
-    )
-    plinth.position.y = lowerCabinetCenterY
-    plinth.castShadow = true
-    this.scene.add(plinth)
+    const shell = new THREE.Group()
+    shell.name = 'cabinet-shell'
+    const shellPanels = [
+      { minX: -2.02, maxX: openingMinX, minZ: -1.825, maxZ: 1.825 },
+      { minX: openingMaxX, maxX: 2.02, minZ: -1.825, maxZ: 1.825 },
+      { minX: openingMinX, maxX: openingMaxX, minZ: -1.825, maxZ: openingMinZ },
+      { minX: openingMinX, maxX: openingMaxX, minZ: openingMaxZ, maxZ: 1.825 },
+    ]
+    for (const panel of shellPanels) {
+      const block = new THREE.Mesh(
+        new THREE.BoxGeometry(panel.maxX - panel.minX, MACHINE_DIMENSIONS.lowerCabinetHeight, panel.maxZ - panel.minZ),
+        frameMaterial,
+      )
+      block.position.set((panel.minX + panel.maxX) / 2, lowerCabinetCenterY, (panel.minZ + panel.maxZ) / 2)
+      block.castShadow = true
+      shell.add(block)
+    }
+    this.scene.add(shell)
 
     const frontPanel = new THREE.Mesh(
       new RoundedBoxGeometry(3.62, MACHINE_DIMENSIONS.lowerCabinetHeight - 0.28, 0.1, 4, 0.07),
@@ -782,6 +1133,7 @@ export class ClawMachineGame {
     mesh: THREE.Group,
     glowColor: number,
     glowIntensity = 2.8,
+    kind?: 'slowpoke',
   ): Prize {
     const start: PrizePlacement = {
       position: { ...placement.position },
@@ -800,28 +1152,38 @@ export class ClawMachineGame {
         .setAngularDamping(3.2),
     )
     const collider = this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(PRIZE_HALF_WIDTH, PRIZE_HALF_HEIGHT, PRIZE_HALF_DEPTH)
+      RAPIER.ColliderDesc.capsule(PLUSH_HALF_SEGMENT, PLUSH_RADIUS)
         .setRestitution(0.15)
         .setFriction(0.8),
       body,
     )
+    const colliders = [collider]
+    if (kind === 'slowpoke') {
+      for (const part of [
+        { radius: 0.17, x: 0.29, y: 0.36, z: -0.56 },
+        { radius: 0.11, x: 0.36, y: 0.62, z: -0.5 },
+        { radius: 0.31, x: 0, y: 0.12, z: 0.39 },
+      ]) {
+        colliders.push(this.world.createCollider(
+          RAPIER.ColliderDesc.ball(part.radius)
+            .setTranslation(part.x, part.y, part.z)
+            .setRestitution(0.15)
+            .setFriction(0.8),
+          body,
+        ))
+      }
+    }
 
     const prizeGlow = new THREE.PointLight(glowColor, glowIntensity, 2.2)
     prizeGlow.position.y = PRIZE_HALF_HEIGHT + 0.07
     mesh.add(prizeGlow)
     this.scene.add(mesh)
 
-    return { body, collider, mesh, carry: new PrizeCarryController(body, collider), start }
+    return { body, collider, colliders, mesh, carry: new PrizeCarryController(body, colliders), start, claimed: false }
   }
 
-  private addAmbientStars(): void {
-    const stars = new THREE.BufferGeometry()
-    const points: number[] = []
-    for (let index = 0; index < 120; index += 1) {
-      points.push((Math.random() - 0.5) * 14, Math.random() * 6, (Math.random() - 0.5) * 11 - 2)
-    }
-    stars.setAttribute('position', new THREE.Float32BufferAttribute(points, 3))
-    this.scene.add(new THREE.Points(stars, new THREE.PointsMaterial({ color: 0x8fdcff, size: 0.035 })))
+  private setPrizeSensor(prize: Prize, enabled: boolean): void {
+    for (const collider of prize.colliders ?? [prize.collider]) collider.setSensor(enabled)
   }
 
   private addStaticCollider(halfExtents: RAPIER.Vector3, position: RAPIER.Vector3): void {
@@ -835,11 +1197,13 @@ export class ClawMachineGame {
   }
 
   private publishSnapshot(): void {
+    const showingSlip = this.slipped && (this.round.phase === 'lifting' || this.round.phase === 'returning'
+      || this.round.phase === 'releasing' || this.round.phase === 'resetting')
     this.onSnapshot({
       attempts: this.round.attempts,
       banter: banterFor({
         attempts: this.round.attempts,
-        carried: this.carried || this.lastGrabSucceeded,
+        carried: this.carried || (this.lastGrabSucceeded && !this.slipped),
         phase: this.round.phase,
         timeLeft: this.round.timeLeft,
       }),
@@ -847,7 +1211,8 @@ export class ClawMachineGame {
       grabLabel: this.round.phase === 'lowering' ? '二收' : '出爪',
       isReady: this.round.phase === 'ready',
       result: this.round.phase === 'won' || this.round.phase === 'lost' ? this.round.phase : undefined,
-      status: this.round.phase === 'aiming' && this.prizes.some((prize) =>
+      status: showingSlip ? '滑了滑了！娃娃說它還沒下班。'
+        : this.round.phase === 'aiming' && this.prizes.some((prize) =>
         tiltPlanForAim(this.clawPosition, prize.body.translation()))
         ? '偏側下爪：可試試倒爪！'
         : this.round.phase === 'lowering' && this.tiltPlan

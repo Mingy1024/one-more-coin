@@ -3,9 +3,10 @@ import * as THREE from 'three'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import { ArticulatedClaw } from './ArticulatedClaw'
+import { evaluateGrip, PLUSH_HALF_SEGMENT, PLUSH_RADIUS } from './gripMechanics'
 import { clawDescentProgress, clawOpeningForPhase } from './clawPose'
 import { MACHINE_DIMENSIONS } from './machineDimensions'
-import { PRIZE_GRIP_OPENING, PRIZE_HALF_DEPTH, PRIZE_HALF_HEIGHT, PRIZE_HALF_WIDTH } from './prizeInteraction'
+import { PRIZE_GRIP_OPENING, PRIZE_HALF_HEIGHT } from './prizeInteraction'
 import { phaseDurations } from './round'
 import { canTiltPickup, TILT_GRIP_OPENING, tiltAmountForPhase, tiltPlanForAim } from './tiltGrab'
 
@@ -18,7 +19,7 @@ describe('tilt-grab physics', () => {
     const floor = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.08, 0))
     world.createCollider(RAPIER.ColliderDesc.cuboid(1.5, 0.08, 1.5), floor)
     const prize = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(0, PRIZE_HALF_HEIGHT + 0.02, 0))
-    world.createCollider(RAPIER.ColliderDesc.cuboid(PRIZE_HALF_WIDTH, PRIZE_HALF_HEIGHT, PRIZE_HALF_DEPTH), prize)
+    world.createCollider(RAPIER.ColliderDesc.capsule(PLUSH_HALF_SEGMENT, PLUSH_RADIUS), prize)
     const claw = new ArticulatedClaw(world, new THREE.Scene(), {
       anchorY: MACHINE_DIMENSIONS.ropeAnchorY,
       headY: MACHINE_DIMENSIONS.clawTopY,
@@ -60,5 +61,6 @@ describe('tilt-grab physics', () => {
     const tips = claw.getFingerTipPositions()
     expect(up.z).toBeGreaterThan(0.35)
     expect(canTiltPickup(position, tips), JSON.stringify({ prize: position, tips })).toBe(true)
+    expect(evaluateGrip({ position, rotation: prize.rotation() }, claw.getGrabPose(), tips, 'tilt')).toBeGreaterThan(0.55)
   })
 })

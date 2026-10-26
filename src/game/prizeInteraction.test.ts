@@ -5,6 +5,8 @@ import {
   CHUTE_OPENING_HALF_X,
   CHUTE_OPENING_HALF_Z,
   isPrizeCaptured,
+  isPrizeEnteringChute,
+  isPrizeStuckAtChute,
   prizeReleaseAngularVelocity,
   PRIZE_HALF_DIAGONAL,
   PRIZE_HALF_DEPTH,
@@ -34,6 +36,20 @@ describe('prize drop', () => {
 
   it('does not report a win when the prize falls outside the chute', () => {
     expect(isPrizeCaptured({ x: -0.4, y: -0.55, z: 0.96 }, chute)).toBe(false)
+  })
+
+  it('recognizes a carried doll entering the mouth before its rotated box catches the rim', () => {
+    expect(isPrizeEnteringChute({ x: -1.2, y: 0.9, z: 0.96 }, chute)).toBe(true)
+    expect(isPrizeEnteringChute({ x: -1.2, y: 1.1, z: 0.96 }, chute)).toBe(false)
+    expect(isPrizeEnteringChute({ x: -0.45, y: 0.1, z: 0.96 }, chute)).toBe(false)
+  })
+
+  it('only treats a released, slow doll at the chute lip as stuck', () => {
+    expect(isPrizeStuckAtChute({ x: -1.2, y: 0.35, z: 0.96 }, { x: 0.02, y: 0, z: 0 }, chute)).toBe(true)
+    expect(isPrizeStuckAtChute({ x: -1.2, y: 0.78, z: 0.96 }, { x: 0, y: 0, z: 0 }, chute)).toBe(true)
+    expect(isPrizeStuckAtChute({ x: -1.2, y: -0.8, z: 0.96 }, { x: 0, y: 0, z: 0 }, chute)).toBe(false)
+    expect(isPrizeStuckAtChute({ x: -0.2, y: 0.35, z: 0.96 }, { x: 0, y: 0, z: 0 }, chute)).toBe(false)
+    expect(isPrizeStuckAtChute({ x: -1.2, y: 0.35, z: 0.96 }, { x: 0, y: -2, z: 0 }, chute)).toBe(false)
   })
 
   it('leaves clearance for the gift box even when it is rotated', () => {
