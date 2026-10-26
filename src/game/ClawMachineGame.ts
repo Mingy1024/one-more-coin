@@ -59,6 +59,12 @@ interface Prize {
   collider: RAPIER.Collider
   mesh: THREE.Group
   carry: PrizeCarryController
+  start: PrizePlacement
+}
+
+interface PrizePlacement {
+  position: { x: number; y: number; z: number }
+  rotation: { x: number; y: number; z: number; w: number }
 }
 
 const COLORS = {
@@ -72,12 +78,22 @@ const COLORS = {
 const CLAW_TOP_Y = MACHINE_DIMENSIONS.clawTopY
 const CLAW_LOW_Y = MACHINE_DIMENSIONS.clawLowY
 const CHUTE = { x: -1.2, z: 0.96 }
-const PRIZE_START = { x: 0.48, y: 0.62, z: -0.18 }
-const ARCANINE_START = { x: -0.2, y: 0.62, z: -1.14 }
-const SNOOPY_START = { x: 1.18, y: 0.62, z: -0.35 }
-const SLOWPOKE_START = { x: -0.08, y: 0.62, z: 0.53 }
-const BULBASAUR_START = { x: 0.88, y: 0.62, z: 0.62 }
-const ALIEN_START = { x: -1.25, y: 0.62, z: -0.35 }
+function prizePlacement(
+  x: number, y: number, z: number,
+  tiltX = 0, yaw = 0, tiltZ = 0,
+): PrizePlacement {
+  const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(tiltX, yaw, tiltZ))
+  return { position: { x, y, z }, rotation }
+}
+
+export const INITIAL_PRIZE_PLACEMENTS = [
+  prizePlacement(0.48, 0.62, -0.18),
+  prizePlacement(-0.2, 0.62, -1.14, 0, 0.3),
+  prizePlacement(1.18, 0.43, -1.12, 0, 0, Math.PI / 2),
+  prizePlacement(-0.08, 0.68, 0.53, 0.2, -0.2),
+  prizePlacement(0.88, 0.62, 0.62, 0, 0.22),
+  prizePlacement(-1.25, 0.62, -0.35, 0, -0.32),
+] as const
 const ROPE_ANCHOR_Y = MACHINE_DIMENSIONS.ropeAnchorY
 
 export class ClawMachineGame {
@@ -136,12 +152,12 @@ export class ClawMachineGame {
       z: CHUTE.z,
     })
     this.prizes = [
-      this.createPrize(PRIZE_START, createPrizeModel(), COLORS.pink),
-      this.createPrize(ARCANINE_START, createArcanineModel(), COLORS.warm, 0.35),
-      this.createPrize(SNOOPY_START, createSnoopyModel(), COLORS.aqua, 0.35),
-      this.createPrize(SLOWPOKE_START, createSlowpokeModel(), COLORS.warm, 0.25),
-      this.createPrize(BULBASAUR_START, createBulbasaurModel(), COLORS.aqua, 0.3),
-      this.createPrize(ALIEN_START, createAlienModel(), COLORS.warm, 0.25),
+      this.createPrize(INITIAL_PRIZE_PLACEMENTS[0], createPrizeModel(), COLORS.pink),
+      this.createPrize(INITIAL_PRIZE_PLACEMENTS[1], createArcanineModel(), COLORS.warm, 0.35),
+      this.createPrize(INITIAL_PRIZE_PLACEMENTS[2], createSnoopyModel(), COLORS.aqua, 0.35),
+      this.createPrize(INITIAL_PRIZE_PLACEMENTS[3], createSlowpokeModel(), COLORS.warm, 0.25),
+      this.createPrize(INITIAL_PRIZE_PLACEMENTS[4], createBulbasaurModel(), COLORS.aqua, 0.3),
+      this.createPrize(INITIAL_PRIZE_PLACEMENTS[5], createAlienModel(), COLORS.warm, 0.25),
     ]
     this.addAmbientStars()
 
@@ -223,6 +239,24 @@ export class ClawMachineGame {
     this.articulatedClaw.reset(CHUTE.x, CHUTE.z, ROPE_ANCHOR_Y - CLAW_TOP_Y)
     for (const prize of this.prizes) {
       prize.carry.release()
+    }
+    this.publishSnapshot()
+  }
+
+  resetPrizes(): void {
+    if (this.round.phase !== 'ready') return
+    for (const prize of this.prizes) {
+      prize.carry.release()
+      prize.body.setTranslation(prize.start.position, true)
+      prize.body.setRotation(prize.start.rotation, true)
+      prize.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+      prize.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
+      prize.mesh.position.set(
+        prize.start.position.x, prize.start.position.y, prize.start.position.z,
+      )
+      prize.mesh.quaternion.set(
+        prize.start.rotation.x, prize.start.rotation.y, prize.start.rotation.z, prize.start.rotation.w,
+      )
     }
     this.publishSnapshot()
   }
@@ -735,14 +769,24 @@ export class ClawMachineGame {
   }
 
   private createPrize(
-    start: { x: number; y: number; z: number },
+    placement: PrizePlacement,
     mesh: THREE.Group,
     glowColor: number,
     glowIntensity = 2.8,
   ): Prize {
+    const start: PrizePlacement = {
+      position: { ...placement.position },
+      rotation: {
+        x: placement.rotation.x,
+        y: placement.rotation.y,
+        z: placement.rotation.z,
+        w: placement.rotation.w,
+      },
+    }
     const body = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(start.x, start.y, start.z)
+        .setTranslation(start.position.x, start.position.y, start.position.z)
+        .setRotation(start.rotation)
         .setLinearDamping(0.35)
         .setAngularDamping(3.2),
     )
@@ -758,7 +802,7 @@ export class ClawMachineGame {
     mesh.add(prizeGlow)
     this.scene.add(mesh)
 
-    return { body, collider, mesh, carry: new PrizeCarryController(body, collider) }
+    return { body, collider, mesh, carry: new PrizeCarryController(body, collider), start }
   }
 
   private addAmbientStars(): void {

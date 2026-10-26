@@ -13,6 +13,7 @@ const statusText = requireElement<HTMLElement>('status-text')
 const grabButton = requireElement<HTMLButtonElement>('grab-button')
 const grabLabel = requireElement<HTMLElement>('grab-label')
 const startButton = requireElement<HTMLButtonElement>('start-button')
+const resetButton = requireElement<HTMLButtonElement>('reset-button')
 const startPanel = requireElement<HTMLElement>('start-panel')
 const gameControls = requireElement<HTMLElement>('game-controls')
 const banterCard = requireElement<HTMLElement>('banter-card')
@@ -61,6 +62,10 @@ window.addEventListener('blur', () => {
 })
 
 grabButton.addEventListener('click', () => game.grab())
+resetButton.addEventListener('click', () => {
+  game.resetPrizes()
+  statusText.textContent = '娃娃已補回並重新擺放'
+})
 startButton.addEventListener('click', () => {
   const spend = coinLedger.insertCoin()
   renderSpend(spend)
@@ -139,6 +144,7 @@ function updateHud(snapshot: GameSnapshot): void {
   attemptValue.textContent = String(snapshot.attempts)
   statusText.textContent = snapshot.status
   grabButton.disabled = !snapshot.canGrab
+  resetButton.disabled = !snapshot.isReady
   grabLabel.textContent = snapshot.grabLabel
   startPanel.hidden = !snapshot.isReady
   gameControls.classList.toggle('is-locked', snapshot.isReady)
