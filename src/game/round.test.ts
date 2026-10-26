@@ -60,6 +60,24 @@ describe('claw machine round', () => {
     expect(round.attempts).toBe(1)
   })
 
+  it('closes early on a second press during descent without spending another attempt', () => {
+    let round = stepRound(createRound(), { type: 'START' })
+    round = stepRound(round, { type: 'GRAB' })
+    round = stepRound(round, { type: 'TICK', deltaSeconds: 0.9 })
+
+    round = stepRound(round, { type: 'SECOND_GRAB' })
+
+    expect(round.phase).toBe('closing')
+    expect(round.phaseElapsed).toBe(0)
+    expect(round.attempts).toBe(1)
+    expect(stepRound(round, { type: 'SECOND_GRAB' })).toBe(round)
+  })
+
+  it('ignores the second-stage command before the first press', () => {
+    const round = stepRound(createRound(), { type: 'START' })
+    expect(stepRound(round, { type: 'SECOND_GRAB' })).toBe(round)
+  })
+
   it('finishes immediately after a successful drop', () => {
     const started = stepRound(createRound(), { type: 'START' })
     const round = stepRound(started, { type: 'PRIZE_DROPPED' })

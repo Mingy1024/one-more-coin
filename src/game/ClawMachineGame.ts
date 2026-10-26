@@ -12,7 +12,7 @@ import {
 import { dragOrbit, orbitPosition, type OrbitState } from './orbit'
 import { banterFor, type BanterLine } from './banter'
 import { approachVelocity, type PlanarMotion } from './clawMotion'
-import { clawDescentProgress, clawOpeningForPhase } from './clawPose'
+import { clawHeadHeight, clawOpeningForPhase } from './clawPose'
 import { ArticulatedClaw } from './ArticulatedClaw'
 import { MACHINE_DIMENSIONS } from './machineDimensions'
 import { PrizeCarryController } from './PrizeCarryController'
@@ -47,6 +47,7 @@ export interface GameSnapshot {
   attempts: number
   banter: BanterLine
   canGrab: boolean
+  grabLabel: '出爪' | '二收'
   isReady: boolean
   result?: 'won' | 'lost'
   status: string
@@ -96,6 +97,7 @@ export class ClawMachineGame {
   private movement = { x: 0, z: 0 }
   private clawPosition = { ...CHUTE }
   private cycleStart = { ...CHUTE }
+  private closingHeight: number = CLAW_LOW_Y
   private driveVelocity: PlanarMotion = { x: 0, z: 0 }
   private carried = false
   private lastGrabSucceeded = false
@@ -172,7 +174,14 @@ export class ClawMachineGame {
   }
 
   grab(): void {
+    if (this.round.phase === 'lowering') {
+      this.closingHeight = clawHeadHeight('lowering', phaseProgress(this.round), CLAW_LOW_Y)
+      this.round = stepRound(this.round, { type: 'SECOND_GRAB' })
+      this.publishSnapshot()
+      return
+    }
     if (this.round.phase !== 'aiming') return
+    this.closingHeight = CLAW_LOW_Y
     this.lastGrabSucceeded = false
     this.cycleStart = { ...this.clawPosition }
     const prizeIndex = selectPrizeForAim(
@@ -209,6 +218,7 @@ export class ClawMachineGame {
     this.activePrize = undefined
     this.clawPosition = { ...CHUTE }
     this.cycleStart = { ...CHUTE }
+    this.closingHeight = CLAW_LOW_Y
     this.driveVelocity = { x: 0, z: 0 }
     this.articulatedClaw.reset(CHUTE.x, CHUTE.z, ROPE_ANCHOR_Y - CLAW_TOP_Y)
     for (const prize of this.prizes) {
@@ -269,7 +279,7 @@ export class ClawMachineGame {
     const phaseFraction = phaseProgress(this.round)
     const progress = smoothStep(phaseFraction)
     const phase = this.round.phase
-    let headY: number = CLAW_TOP_Y
+    const headY = clawHeadHeight(phase, phaseFraction, this.closingHeight)
     const prongOpen = clawOpeningForPhase(
       phase,
       phase === 'lowering' ? phaseFraction : progress,
@@ -277,13 +287,7 @@ export class ClawMachineGame {
       this.tiltPlan ? TILT_GRIP_OPENING : PRIZE_GRIP_OPENING,
     )
 
-    if (phase === 'lowering') {
-      headY = THREE.MathUtils.lerp(CLAW_TOP_Y, CLAW_LOW_Y, clawDescentProgress(phaseFraction))
-    } else if (phase === 'closing') {
-      headY = CLAW_LOW_Y
-    } else if (phase === 'lifting') {
-      headY = THREE.MathUtils.lerp(CLAW_LOW_Y, CLAW_TOP_Y, progress)
-    } else if (phase === 'returning') {
+    if (phase === 'returning') {
       this.clawPosition.x = THREE.MathUtils.lerp(this.cycleStart.x, CHUTE.x, progress)
       this.clawPosition.z = THREE.MathUtils.lerp(this.cycleStart.z, CHUTE.z, progress)
     }
@@ -786,14 +790,15 @@ export class ClawMachineGame {
         phase: this.round.phase,
         timeLeft: this.round.timeLeft,
       }),
-      canGrab: this.round.phase === 'aiming',
+      canGrab: this.round.phase === 'aiming' || this.round.phase === 'lowering',
+      grabLabel: this.round.phase === 'lowering' ? '二收' : '出爪',
       isReady: this.round.phase === 'ready',
       result: this.round.phase === 'won' || this.round.phase === 'lost' ? this.round.phase : undefined,
       status: this.round.phase === 'aiming' && this.prizes.some((prize) =>
         tiltPlanForAim(this.clawPosition, prize.body.translation()))
         ? '偏側下爪：可試試倒爪！'
         : this.round.phase === 'lowering' && this.tiltPlan
-          ? '倒爪中：一爪在上、兩爪往側下方…'
+          ? '倒爪中：再按二收可提早夾住！'
           : statusForPhase(this.round.phase),
       timeLeft: this.round.timeLeft,
     })
@@ -861,7 +866,7 @@ function statusForPhase(phase: RoundPhase): string {
   const messages: Record<RoundPhase, string> = {
     ready: '先拖曳畫面確認目標，準備好再開始',
     aiming: '移動搖桿，讓夾爪對準娃娃',
-    lowering: '夾爪下降中…',
+    lowering: '夾爪下降中，再按二收可提早收爪',
     closing: '正在夾取！',
     lifting: '穩住，慢慢升起…',
     returning: '送往發光的取物口',

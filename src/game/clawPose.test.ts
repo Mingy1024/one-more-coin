@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { clawDescentProgress, clawOpeningForPhase } from './clawPose'
+import { clawDescentProgress, clawHeadHeight, clawOpeningForPhase } from './clawPose'
+import { MACHINE_DIMENSIONS } from './machineDimensions'
 
 const gripOpening = 0.55
 
@@ -23,5 +24,14 @@ describe('claw pose by round phase', () => {
   it('closes from fully open to the carrying grip at the bottom', () => {
     expect(clawOpeningForPhase('closing', 0, false, gripOpening)).toBe(1)
     expect(clawOpeningForPhase('closing', 1, false, gripOpening)).toBe(gripOpening)
+  })
+
+  it('holds the current height for an early second grab and lifts from there', () => {
+    const midairHeight = clawHeadHeight('lowering', 0.7, MACHINE_DIMENSIONS.clawLowY)
+    expect(midairHeight).toBeGreaterThan(MACHINE_DIMENSIONS.clawLowY)
+    expect(midairHeight).toBeLessThan(MACHINE_DIMENSIONS.clawTopY)
+    expect(clawHeadHeight('closing', 0.5, midairHeight)).toBe(midairHeight)
+    expect(clawHeadHeight('lifting', 0, midairHeight)).toBe(midairHeight)
+    expect(clawHeadHeight('lifting', 1, midairHeight)).toBe(MACHINE_DIMENSIONS.clawTopY)
   })
 })

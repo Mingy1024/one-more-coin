@@ -11,6 +11,7 @@ const spendValue = requireElement<HTMLElement>('spend-value')
 const spendTitle = requireElement<HTMLElement>('spend-title')
 const statusText = requireElement<HTMLElement>('status-text')
 const grabButton = requireElement<HTMLButtonElement>('grab-button')
+const grabLabel = requireElement<HTMLElement>('grab-label')
 const startButton = requireElement<HTMLButtonElement>('start-button')
 const startPanel = requireElement<HTMLElement>('start-panel')
 const gameControls = requireElement<HTMLElement>('game-controls')
@@ -138,6 +139,7 @@ function updateHud(snapshot: GameSnapshot): void {
   attemptValue.textContent = String(snapshot.attempts)
   statusText.textContent = snapshot.status
   grabButton.disabled = !snapshot.canGrab
+  grabLabel.textContent = snapshot.grabLabel
   startPanel.hidden = !snapshot.isReady
   gameControls.classList.toggle('is-locked', snapshot.isReady)
   gameControls.setAttribute('aria-disabled', String(snapshot.isReady))

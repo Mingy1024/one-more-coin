@@ -1,8 +1,20 @@
 import type { RoundPhase } from './round'
+import { MACHINE_DIMENSIONS } from './machineDimensions'
 
 export function clawDescentProgress(progress: number): number {
   const travel = Math.min(1, Math.max(0, (progress - 0.25) / 0.75))
   return travel * travel * (3 - 2 * travel)
+}
+
+export function clawHeadHeight(phase: RoundPhase, progress: number, closingHeight: number): number {
+  const { clawTopY, clawLowY } = MACHINE_DIMENSIONS
+  if (phase === 'lowering') return clawTopY + (clawLowY - clawTopY) * clawDescentProgress(progress)
+  if (phase === 'closing') return closingHeight
+  if (phase === 'lifting') {
+    const lift = progress * progress * (3 - 2 * progress)
+    return closingHeight + (clawTopY - closingHeight) * lift
+  }
+  return clawTopY
 }
 
 export function clawOpeningForPhase(

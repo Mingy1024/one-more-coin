@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { ClawMachineGame } from './ClawMachineGame'
-import { createRound } from './round'
+import { clawHeadHeight } from './clawPose'
+import { MACHINE_DIMENSIONS } from './machineDimensions'
+import { createRound, phaseProgress, stepRound, type RoundState } from './round'
 
 describe('claw machine session', () => {
   it('keeps every prize position, rotation and momentum when a new paid round begins', () => {
@@ -21,7 +23,6 @@ describe('claw machine session', () => {
       prizes: [{
         body,
         carry: { release: vi.fn() },
-        start: { x: -1, y: 0.62, z: -1 },
       }],
       publishSnapshot: vi.fn(),
     }) as ClawMachineGame
@@ -34,5 +35,25 @@ describe('claw machine session', () => {
     expect(body.setRotation).not.toHaveBeenCalled()
     expect(body.setLinvel).not.toHaveBeenCalled()
     expect(body.setAngvel).not.toHaveBeenCalled()
+  })
+
+  it('uses the current descent height for the second-stage close', () => {
+    let round = stepRound(createRound(), { type: 'START' })
+    round = stepRound(round, { type: 'GRAB' })
+    round = stepRound(round, { type: 'TICK', deltaSeconds: 1.1 })
+    const expectedHeight = clawHeadHeight('lowering', phaseProgress(round), MACHINE_DIMENSIONS.clawLowY)
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round,
+      closingHeight: MACHINE_DIMENSIONS.clawLowY,
+      publishSnapshot: vi.fn(),
+    }) as ClawMachineGame
+
+    game.grab()
+
+    const state = game as unknown as { round: RoundState; closingHeight: number }
+    expect(state.round.phase).toBe('closing')
+    expect(state.round.attempts).toBe(1)
+    expect(state.closingHeight).toBeCloseTo(expectedHeight)
+    expect(state.closingHeight).toBeGreaterThan(MACHINE_DIMENSIONS.clawLowY)
   })
 })

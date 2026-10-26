@@ -20,6 +20,7 @@ export interface RoundState {
 export type RoundAction =
   | { type: 'START' }
   | { type: 'GRAB' }
+  | { type: 'SECOND_GRAB' }
   | { type: 'TICK'; deltaSeconds: number }
   | { type: 'PRIZE_DROPPED' }
 
@@ -78,6 +79,11 @@ export function stepRound(state: RoundState, action: RoundAction): RoundState {
       phaseElapsed: 0,
       attempts: state.attempts + 1,
     }
+  }
+
+  if (action.type === 'SECOND_GRAB') {
+    if (state.phase !== 'lowering') return state
+    return { ...state, phase: 'closing', phaseElapsed: 0 }
   }
 
   const timeLeft = Math.max(0, state.timeLeft - action.deltaSeconds)
