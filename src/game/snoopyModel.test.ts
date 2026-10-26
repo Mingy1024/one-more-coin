@@ -41,6 +41,8 @@ describe('Snoopy plush prize', () => {
       const pixels = (material.map as THREE.DataTexture).image.data!
       expect(pixels[2]).toBeGreaterThan(pixels[0]!)
       expect(pixels[0]).toBeGreaterThan(pixels[1]!)
+      expect(pixels[0]).toBeLessThan(110)
+      expect(pixels[2]).toBeLessThan(150)
     }
   })
 })
