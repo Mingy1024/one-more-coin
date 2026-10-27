@@ -16,6 +16,7 @@ export const jp = {
     introStepClaw: 'アームを動かし、ここぞという時に下ろす',
     introStepSurprise: '景品か、予想外の出来事を持ち帰ろう',
     introEnter: 'ゲームに入る', introNote: '入場は無料。タイマーは投入後にスタート。',
+    introCopyright: '© 2026 ONE MORE COIN',
     introHelp: '遊び方', actionMenu: 'メニュー', actionMenuAria: 'ゲーム機のメニュー',
     resetAria: '景品の位置を戻して補充', reset: 'リセット', titles: '称号',
     callClerk: '店員を呼ぶ', timeLeft: '残り時間', attempts: '挑戦回数',

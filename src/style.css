@@ -85,6 +85,10 @@ body[data-intro] .game-shell { visibility: hidden; }
 .intro-enter-arrow svg { display: block; }
 .intro-enter:hover .intro-enter-arrow, .intro-enter:focus-visible .intro-enter-arrow { right: 5px; background: #2e6479; }
 .intro-note { margin: 12px 0 0; color: #b7d1dc; font-size: 12px; text-align: center; }
+.intro-footer { display: flex; justify-content: center; padding: 12px 16px; border-top: 1px solid #54758b; }
+.intro-footer a { min-height: 24px; display: inline-flex; align-items: center; color: #b7d1dc; font-size: 11px; font-weight: 700; text-align: center; text-decoration-color: #66899a; text-underline-offset: 3px; }
+.intro-footer a:hover { color: #fff1b8; text-decoration-color: currentColor; }
+.intro-footer a:focus-visible { outline: 2px solid var(--coin); outline-offset: 4px; border-radius: 2px; }
 @keyframes intro-float { 50% { transform: translateY(-6px); } }
 @keyframes intro-twinkle { to { opacity: .42; } }
 @media (max-width: 680px) {

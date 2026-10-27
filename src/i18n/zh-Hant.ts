@@ -14,6 +14,7 @@ export const zhHant = {
     introStepClaw: '移動夾爪，抓準時機出爪',
     introStepSurprise: '夾到娃娃，或帶走意想不到的驚喜',
     introEnter: '進入遊戲', introNote: '進場免費，投幣後才開始計時。',
+    introCopyright: '© 2026 ONE MORE COIN',
     introHelp: '遊戲說明', actionMenu: '選單', actionMenuAria: '機台功能',
     resetAria: '重置娃娃位置並補回獎品', reset: '重置', titles: '稱號一覽',
     callClerk: '呼叫店員', timeLeft: '剩餘秒數', attempts: '出爪',
