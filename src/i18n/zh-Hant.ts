@@ -35,6 +35,8 @@ export const zhHant = {
     clerkCallCopy: '這位客人，請問需要什麼協助？',
     clerkRescue: '🧸 娃娃卡在洞口，幫我拿取', clerkPlacement: '↔ 請幫忙擺娃娃位置',
     close: '關閉', languageAria: '切換語言',
+    musicOn: '背景音樂：開', musicOff: '背景音樂：關', musicMute: '關閉背景音樂', musicEnable: '開啟背景音樂',
+    effectsOn: '音效：開', effectsOff: '音效：關', effectsMute: '關閉音效', effectsEnable: '開啟音效',
   },
   game: {
     grab: '出爪', earlyClose: '二收',

@@ -37,6 +37,8 @@ export const jp = {
     clerkCallCopy: 'お客様、どうされました？',
     clerkRescue: '🧸 景品が出口で詰まった', clerkPlacement: '↔ 景品の位置を直して',
     close: '閉じる', languageAria: '表示言語を選択',
+    musicOn: 'BGM：オン', musicOff: 'BGM：オフ', musicMute: 'BGMをオフにする', musicEnable: 'BGMをオンにする',
+    effectsOn: '効果音：オン', effectsOff: '効果音：オフ', effectsMute: '効果音を消す', effectsEnable: '効果音をオンにする',
   },
   game: {
     grab: '下ろす', earlyClose: '早閉じ',

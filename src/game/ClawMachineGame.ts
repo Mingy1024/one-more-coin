@@ -58,6 +58,7 @@ export interface GameSnapshot {
   canGrab: boolean
   grabLabel: string
   isReady: boolean
+  phase: RoundPhase
   result?: 'won' | 'lost'
   wonPrizeIndex?: number
   status: string
@@ -1368,6 +1369,7 @@ export class ClawMachineGame {
       canGrab: this.round.phase === 'aiming' || this.round.phase === 'lowering',
       grabLabel: this.round.phase === 'lowering' ? messages.earlyClose : messages.grab,
       isReady: this.round.phase === 'ready',
+      phase: this.round.phase,
       result: this.round.phase === 'won' || this.round.phase === 'lost' ? this.round.phase : undefined,
       wonPrizeIndex: this.round.phase === 'won' && this.activePrize?.claimed
         ? this.prizes.indexOf(this.activePrize) : undefined,

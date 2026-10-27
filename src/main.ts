@@ -5,6 +5,7 @@ import { BanterPresenter, type BanterRender } from './game/banterPresenter'
 import { CoinLedger, spendTitles, type SpendSnapshot, type SpendTitle } from './game/coinLedger'
 import { ClerkAssistTrigger } from './game/clerkAssist'
 import { HiddenEventSequence, type HiddenResultEvent } from './game/hiddenEvents'
+import { GameAudio } from './game/audio'
 import { applyStaticTranslations, format, getLocale, getMessages, loadLocale, setLocale, type Locale } from './i18n'
 
 setLocale(loadLocale())
@@ -22,7 +23,7 @@ const introHelpButton = requireElement<HTMLButtonElement>('intro-help-button')
 const topbar = requireElement<HTMLElement>('topbar')
 const topbarMenuButton = requireElement<HTMLButtonElement>('topbar-menu-button')
 const topbarActions = requireElement<HTMLElement>('topbar-actions')
-const compactTopbar = window.matchMedia('(max-width: 680px)')
+const compactTopbar = window.matchMedia('(max-width: 860px)')
 const introLocaleOptions = [...introScreen.querySelectorAll<HTMLButtonElement>('button[data-intro-locale]')]
 const canvas = requireElement<HTMLCanvasElement>('game-canvas')
 const timeValue = requireElement<HTMLElement>('time-value')
@@ -49,6 +50,10 @@ const clerkJudgmentCopy = requireElement<HTMLElement>('clerk-judgment-copy')
 const clerkChoices = requireElement<HTMLElement>('clerk-choices')
 const clerkDecline = requireElement<HTMLButtonElement>('clerk-decline')
 const clerkCallButton = requireElement<HTMLButtonElement>('clerk-call-button')
+const musicToggleButton = requireElement<HTMLButtonElement>('music-toggle-button')
+const musicToggleLabel = requireElement<HTMLElement>('music-toggle-label')
+const effectsToggleButton = requireElement<HTMLButtonElement>('effects-toggle-button')
+const effectsToggleLabel = requireElement<HTMLElement>('effects-toggle-label')
 const resultClerkButton = requireElement<HTMLButtonElement>('result-clerk-button')
 const clerkCallDialog = requireElement<HTMLDialogElement>('clerk-call-dialog')
 const clerkCallClose = requireElement<HTMLButtonElement>('clerk-call-close')
@@ -87,8 +92,10 @@ const banterPresenter = new BanterPresenter(renderBanter, undefined, hideBanter)
 const coinLedger = new CoinLedger()
 const clerkAssist = new ClerkAssistTrigger()
 const hiddenEvents = new HiddenEventSequence()
+const gameAudio = new GameAudio()
 const INTRO_COMPLETED_KEY = 'one-more-coin:intro-completed'
 let currentSnapshot: GameSnapshot | undefined
+let lastAudioPhase: GameSnapshot['phase'] | undefined
 let contextLost = false
 let lastResultSpend: SpendSnapshot | undefined
 let activeAchievement: { threshold: number; amount: number } | undefined
@@ -125,7 +132,7 @@ function closeActionMenu(): void {
   topbarActions.classList.remove('is-open')
   topbar.classList.remove('menu-open')
   topbarMenuButton.setAttribute('aria-expanded', 'false')
-  game.setPaused(false)
+  setGamePaused(false)
 }
 
 function focusTopbarAction(button: HTMLButtonElement): void {
@@ -134,6 +141,16 @@ function focusTopbarAction(button: HTMLButtonElement): void {
 
 syncLocaleControl()
 renderSpend(coinLedger.snapshot())
+renderAudioControls()
+musicToggleButton.addEventListener('click', () => {
+  gameAudio.setMusicEnabled(!gameAudio.isMusicEnabled())
+  renderAudioControls()
+})
+effectsToggleButton.addEventListener('click', () => {
+  gameAudio.setEffectsEnabled(!gameAudio.isEffectsEnabled())
+  renderAudioControls()
+  updateMovement()
+})
 
 function showLoading(message: string): void {
   loadingCopy.textContent = message
@@ -178,6 +195,7 @@ canvas.addEventListener('webglcontextrestored', () => {
 function changeLocale(locale: Locale): void {
   setLocale(locale)
   syncLocaleControl()
+  renderAudioControls()
   closeLocaleMenu()
   applyStaticTranslations()
   renderSpend(lastResultSpend ?? coinLedger.snapshot())
@@ -196,10 +214,10 @@ topbarMenuButton.addEventListener('click', () => {
   topbarActions.classList.add('is-open')
   topbar.classList.add('menu-open')
   topbarMenuButton.setAttribute('aria-expanded', 'true')
-  game.setPaused(true)
+  setGamePaused(true)
 })
 topbarActions.addEventListener('click', (event) => {
-  if ((event.target as HTMLElement).closest('.locale-switch')) return
+  if ((event.target as HTMLElement).closest('.locale-switch, .audio-toggle-button')) return
   if (!(event.target as HTMLElement).closest('button')) return
   closeActionMenu()
   if (compactTopbar.matches) topbarMenuButton.focus({ preventScroll: true })
@@ -240,7 +258,7 @@ introScreen.addEventListener('click', (event) => {
 introHelpButton.addEventListener('click', () => {
   closeLocaleMenu()
   introReturnFocus = introHelpButton
-  game.setPaused(true)
+  setGamePaused(true)
   introScreen.hidden = false
   document.body.dataset.intro = ''
   introEnter.focus({ preventScroll: true })
@@ -254,7 +272,7 @@ introEnter.addEventListener('click', () => {
   }
   introScreen.hidden = true
   document.body.removeAttribute('data-intro')
-  game.setPaused(false)
+  setGamePaused(false)
   const returnToHelp = introReturnFocus === introHelpButton
   introReturnFocus = undefined
   if (returnToHelp) focusTopbarAction(introHelpButton)
@@ -314,13 +332,13 @@ resetButton.addEventListener('click', () => {
 })
 titlesButton.addEventListener('click', () => {
   renderTitleGallery()
-  game.setPaused(true)
+  setGamePaused(true)
   titlesDialog.showModal()
   titlesClose.focus({ preventScroll: true })
 })
 titlesClose.addEventListener('click', () => titlesDialog.close())
 titlesDialog.addEventListener('close', () => {
-  game.setPaused(false)
+  setGamePaused(false)
   focusTopbarAction(titlesButton)
 })
 titlesDialog.addEventListener('click', (event) => {
@@ -331,8 +349,9 @@ const openClerkCall = (): void => {
   if (clerkCallDialog.open || clerkDialog.open) return
   clerkCallFeedback.hidden = true
   clerkCallFeedback.textContent = ''
-  game.setPaused(true)
+  setGamePaused(true)
   clerkCallDialog.showModal()
+  gameAudio.playEffect('clerkCall')
   clerkRescueButton.focus({ preventScroll: true })
 }
 clerkCallButton.addEventListener('click', openClerkCall)
@@ -340,7 +359,7 @@ resultClerkButton.addEventListener('click', openClerkCall)
 clerkCallClose.addEventListener('click', () => clerkCallDialog.close())
 clerkCallDialog.addEventListener('close', () => {
   if (!clerkDialog.open) {
-    game.setPaused(false)
+    setGamePaused(false)
     if (!resultModal.hidden) resultClerkButton.focus({ preventScroll: true })
     else focusTopbarAction(clerkCallButton)
   }
@@ -373,13 +392,15 @@ clerkPlacementButton.addEventListener('click', () => {
 clerkDialog.addEventListener('close', () => {
   clerkDialog.removeAttribute('data-phase')
   clerkJudgment.hidden = true
-  game.setPaused(false)
+  setGamePaused(false)
   game.restart()
   lastResult = undefined
   lastResultSpend = undefined
   startButton.focus({ preventScroll: true })
 })
 startButton.addEventListener('click', () => {
+  gameAudio.startGameAudio()
+  gameAudio.playEffect('coinInsert')
   const spend = coinLedger.insertCoin()
   renderSpend(spend)
   if (spend.achievement) showAchievement(spend.achievement, spend.amount)
@@ -464,14 +485,21 @@ function updateMovement(): void {
   const keyboardZ = Number(keyboard.has('ArrowDown') || keyboard.has('KeyS'))
     - Number(keyboard.has('ArrowUp') || keyboard.has('KeyW'))
 
-  game.setMovement(
-    Math.max(-1, Math.min(1, joystickAxis.x + keyboardX)),
-    Math.max(-1, Math.min(1, joystickAxis.z + keyboardZ)),
-  )
+  const x = Math.max(-1, Math.min(1, joystickAxis.x + keyboardX))
+  const z = Math.max(-1, Math.min(1, joystickAxis.z + keyboardZ))
+  game.setMovement(x, z)
+  gameAudio.setMovement(currentSnapshot?.phase === 'aiming' ? Math.min(1, Math.hypot(x, z)) : 0)
 }
 
 function updateHud(snapshot: GameSnapshot): void {
   currentSnapshot = snapshot
+  if (snapshot.phase !== lastAudioPhase) {
+    if (snapshot.phase === 'lowering') gameAudio.playEffect('clawDrop')
+    else if (snapshot.phase === 'closing') gameAudio.playEffect('clawClose')
+    else if (snapshot.phase === 'won') gameAudio.playEffect('prizeRattle')
+    lastAudioPhase = snapshot.phase
+    if (snapshot.phase !== 'aiming') gameAudio.setMovement(0)
+  }
   timeValue.textContent = String(Math.ceil(snapshot.timeLeft))
   attemptValue.textContent = String(snapshot.attempts)
   statusText.textContent = snapshot.status
@@ -508,6 +536,7 @@ function updateHud(snapshot: GameSnapshot): void {
         showClerkAssist()
         return
       }
+      if (activeHiddenResultEvent) gameAudio.playEffect(activeHiddenResultEvent)
       lastResultSpend = spend
       lastResult = snapshot.result
       if (!clerkCallDialog.open) requestAnimationFrame(() => restartButton.focus({ preventScroll: true }))
@@ -535,6 +564,7 @@ function updateHud(snapshot: GameSnapshot): void {
 }
 
 function showClerkAssist(): void {
+  gameAudio.playEffect('clerkArrival')
   const copy = getMessages().dynamic
   clerkDialog.removeAttribute('data-phase')
   clerkJudgment.hidden = true
@@ -567,13 +597,14 @@ function showClerkAssist(): void {
       clerkJudgmentTitle.textContent = copy.judgmentTitle
       clerkJudgmentCopy.textContent = copy.judgmentCopy
       clerkJudgment.hidden = false
+      gameAudio.playEffect('clerkJudgment')
       for (const choice of clerkChoices.querySelectorAll('button')) choice.disabled = true
       clerkDecline.textContent = copy.placementDone
       clerkDecline.focus({ preventScroll: true })
     })
     return button
   }))
-  game.setPaused(true)
+  setGamePaused(true)
   clerkDialog.showModal()
   clerkChoices.querySelector('button')?.focus({ preventScroll: true })
 }
@@ -638,6 +669,7 @@ function renderTitleGallery(): void {
 
 function showAchievement(title: SpendTitle, amount: number): void {
   if (achievementTimeout !== undefined) clearTimeout(achievementTimeout)
+  window.setTimeout(() => gameAudio.playEffect('titleUnlock'), 280)
   banterPresenter.clear()
   activeAchievement = { threshold: title.threshold, amount }
   renderAchievement(title.threshold, amount)
@@ -690,4 +722,24 @@ function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id)
   if (!element) throw new Error(`Missing element #${id}`)
   return element as T
+}
+
+function renderAudioControls(): void {
+  const ui = getMessages().ui
+  const musicEnabled = gameAudio.isMusicEnabled()
+  const effectsEnabled = gameAudio.isEffectsEnabled()
+  musicToggleButton.setAttribute('aria-pressed', String(musicEnabled))
+  musicToggleButton.setAttribute('aria-label', musicEnabled ? ui.musicMute : ui.musicEnable)
+  musicToggleButton.title = musicEnabled ? ui.musicMute : ui.musicEnable
+  musicToggleLabel.textContent = musicEnabled ? ui.musicOn : ui.musicOff
+  effectsToggleButton.setAttribute('aria-pressed', String(effectsEnabled))
+  effectsToggleButton.setAttribute('aria-label', effectsEnabled ? ui.effectsMute : ui.effectsEnable)
+  effectsToggleButton.title = effectsEnabled ? ui.effectsMute : ui.effectsEnable
+  effectsToggleLabel.textContent = effectsEnabled ? ui.effectsOn : ui.effectsOff
+}
+
+function setGamePaused(paused: boolean): void {
+  game.setPaused(paused)
+  gameAudio.setPaused(paused)
+  if (!paused) updateMovement()
 }
