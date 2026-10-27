@@ -22,7 +22,7 @@ export const zhHant = {
     insertCoin: '投入 10 元・開始挑戰', achievementEyebrow: '機台認證・新稱號',
     viewHint: '↔ 拖曳旋轉視角',
     desktopHint: '拖曳畫面旋轉・WASD / 方向鍵移動・空白鍵出爪／二收',
-    resultEyebrow: '景品研究結果', resultPrizeLabel: '本次夾中', playAgain: '再玩一次',
+    resultEyebrow: '本次夾取結果', resultPrizeLabel: '本次夾中', playAgain: '再玩一次',
     hiddenEventKicker: '機台祕密頒獎典禮',
     closeTitlesAria: '關閉稱號一覽', titlesKicker: '稱號收藏',
     titlesCopy: '每一枚十元，都是你和機台的共同回憶。',
