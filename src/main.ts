@@ -4,6 +4,7 @@ import { ClawMachineGame, type GameSnapshot } from './game/ClawMachineGame'
 import { BanterPresenter, type BanterRender } from './game/banterPresenter'
 import { CoinLedger, spendTitles, type SpendSnapshot, type SpendTitle } from './game/coinLedger'
 import { ClerkAssistTrigger } from './game/clerkAssist'
+import { HiddenEventSequence, type HiddenResultEvent } from './game/hiddenEvents'
 import { applyStaticTranslations, format, getLocale, getMessages, loadLocale, setLocale, type Locale } from './i18n'
 
 setLocale(loadLocale())
@@ -11,6 +12,14 @@ applyStaticTranslations()
 
 const loadingScreen = requireElement<HTMLElement>('loading-screen')
 const loadingCopy = requireElement<HTMLElement>('loading-copy')
+const introScreen = requireElement<HTMLElement>('intro-screen')
+const introEnter = requireElement<HTMLButtonElement>('intro-enter')
+const introHelpButton = requireElement<HTMLButtonElement>('intro-help-button')
+const topbar = requireElement<HTMLElement>('topbar')
+const topbarMenuButton = requireElement<HTMLButtonElement>('topbar-menu-button')
+const topbarActions = requireElement<HTMLElement>('topbar-actions')
+const compactTopbar = window.matchMedia('(max-width: 680px)')
+const introLocaleOptions = [...introScreen.querySelectorAll<HTMLButtonElement>('button[data-intro-locale]')]
 const canvas = requireElement<HTMLCanvasElement>('game-canvas')
 const timeValue = requireElement<HTMLElement>('time-value')
 const attemptValue = requireElement<HTMLElement>('attempt-value')
@@ -30,6 +39,9 @@ const titlesEmpty = requireElement<HTMLElement>('titles-empty')
 const clerkDialog = requireElement<HTMLDialogElement>('clerk-dialog')
 const clerkCopy = requireElement<HTMLElement>('clerk-dialog-copy')
 const clerkSound = requireElement<HTMLElement>('clerk-sound')
+const clerkJudgment = requireElement<HTMLElement>('clerk-judgment')
+const clerkJudgmentTitle = requireElement<HTMLElement>('clerk-judgment-title')
+const clerkJudgmentCopy = requireElement<HTMLElement>('clerk-judgment-copy')
 const clerkChoices = requireElement<HTMLElement>('clerk-choices')
 const clerkDecline = requireElement<HTMLButtonElement>('clerk-decline')
 const clerkCallButton = requireElement<HTMLButtonElement>('clerk-call-button')
@@ -59,17 +71,32 @@ const resultPrizePortrait = requireElement<HTMLImageElement>('result-prize-portr
 const resultPrizeName = requireElement<HTMLElement>('result-prize-name')
 const resultCopy = requireElement<HTMLElement>('result-copy')
 const resultSpend = requireElement<HTMLElement>('result-spend')
+const hiddenResultEvent = requireElement<HTMLElement>('hidden-result-event')
+const hiddenEventIcon = requireElement<HTMLImageElement>('hidden-event-icon')
+const hiddenEventTitle = requireElement<HTMLElement>('hidden-event-title')
+const hiddenEventCopy = requireElement<HTMLElement>('hidden-event-copy')
 const achievementToast = requireElement<HTMLElement>('achievement-toast')
-const achievementIcon = requireElement<HTMLElement>('achievement-icon')
+const achievementIcon = requireElement<HTMLImageElement>('achievement-icon')
 const achievementTitle = requireElement<HTMLElement>('achievement-title')
 const achievementCopy = requireElement<HTMLElement>('achievement-copy')
 const banterPresenter = new BanterPresenter(renderBanter, undefined, hideBanter)
 const coinLedger = new CoinLedger()
 const clerkAssist = new ClerkAssistTrigger()
+const hiddenEvents = new HiddenEventSequence()
+const INTRO_COMPLETED_KEY = 'one-more-coin:intro-completed'
 let currentSnapshot: GameSnapshot | undefined
 let contextLost = false
 let lastResultSpend: SpendSnapshot | undefined
 let activeAchievement: { threshold: number; amount: number } | undefined
+let activeHiddenResultEvent: HiddenResultEvent | undefined
+let hasEnteredGame = (() => {
+  try {
+    return window.localStorage.getItem(INTRO_COMPLETED_KEY) === 'true'
+  } catch {
+    return false
+  }
+})()
+let introReturnFocus: HTMLElement | undefined
 
 function syncLocaleControl(): void {
   const locale = getLocale()
@@ -78,11 +105,27 @@ function syncLocaleControl(): void {
     option.setAttribute('aria-pressed', String(selected))
     if (selected) localeButtonLabel.textContent = option.textContent
   }
+  for (const option of introLocaleOptions) {
+    option.setAttribute('aria-pressed', String(option.dataset.introLocale === locale))
+  }
 }
 
 function closeLocaleMenu(): void {
   localeMenu.hidden = true
   localeButton.setAttribute('aria-expanded', 'false')
+}
+
+function closeActionMenu(): void {
+  if (!topbarActions.classList.contains('is-open')) return
+  closeLocaleMenu()
+  topbarActions.classList.remove('is-open')
+  topbar.classList.remove('menu-open')
+  topbarMenuButton.setAttribute('aria-expanded', 'false')
+  game.setPaused(false)
+}
+
+function focusTopbarAction(button: HTMLButtonElement): void {
+  (compactTopbar.matches ? topbarMenuButton : button).focus({ preventScroll: true })
 }
 
 syncLocaleControl()
@@ -100,6 +143,16 @@ function hideLoading(): void {
   document.body.removeAttribute('data-loading')
 }
 
+function finishLoading(): void {
+  if (contextLost) return
+  if (!hasEnteredGame) {
+    introScreen.hidden = false
+    document.body.dataset.intro = ''
+  }
+  hideLoading()
+  if (!hasEnteredGame) introEnter.focus({ preventScroll: true })
+}
+
 let game: ClawMachineGame
 try {
   game = await ClawMachineGame.create(canvas, updateHud)
@@ -115,7 +168,46 @@ canvas.addEventListener('webglcontextlost', () => {
 canvas.addEventListener('webglcontextrestored', () => {
   contextLost = false
   showLoading(getMessages().dynamic.contextRestored)
-  game.onNextRenderedFrame(hideLoading)
+  game.onNextRenderedFrame(finishLoading)
+})
+
+function changeLocale(locale: Locale): void {
+  setLocale(locale)
+  syncLocaleControl()
+  closeLocaleMenu()
+  applyStaticTranslations()
+  renderSpend(lastResultSpend ?? coinLedger.snapshot())
+  if (activeAchievement) renderAchievement(activeAchievement.threshold, activeAchievement.amount)
+  renderHiddenResultEvent()
+  banterPresenter.clear()
+  game.refreshLocale()
+}
+
+topbarMenuButton.addEventListener('click', () => {
+  if (topbarActions.classList.contains('is-open')) {
+    closeActionMenu()
+    return
+  }
+  closeLocaleMenu()
+  topbarActions.classList.add('is-open')
+  topbar.classList.add('menu-open')
+  topbarMenuButton.setAttribute('aria-expanded', 'true')
+  game.setPaused(true)
+})
+topbarActions.addEventListener('click', (event) => {
+  if ((event.target as HTMLElement).closest('.locale-switch')) return
+  if (!(event.target as HTMLElement).closest('button')) return
+  closeActionMenu()
+  if (compactTopbar.matches) topbarMenuButton.focus({ preventScroll: true })
+}, true)
+window.addEventListener('resize', () => {
+  if (compactTopbar.matches) {
+    if (topbarActions.contains(document.activeElement) && !topbarActions.classList.contains('is-open')) topbarMenuButton.focus({ preventScroll: true })
+    return
+  }
+  const menuWasFocused = document.activeElement === topbarMenuButton
+  closeActionMenu()
+  if (menuWasFocused) introHelpButton.focus({ preventScroll: true })
 })
 
 localeButton.addEventListener('click', () => {
@@ -127,23 +219,57 @@ localeButton.addEventListener('click', () => {
 localeMenu.addEventListener('click', (event) => {
   const option = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-locale]')
   if (!option) return
-  setLocale(option.dataset.locale as Locale)
-  syncLocaleControl()
+  changeLocale(option.dataset.locale as Locale)
+  if (compactTopbar.matches) {
+    closeActionMenu()
+    topbarMenuButton.focus({ preventScroll: true })
+  } else {
+    localeButton.focus({ preventScroll: true })
+  }
+})
+introScreen.addEventListener('click', (event) => {
+  const option = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-intro-locale]')
+  if (!option) return
+  changeLocale(option.dataset.introLocale as Locale)
+  option.focus({ preventScroll: true })
+})
+introHelpButton.addEventListener('click', () => {
   closeLocaleMenu()
-  applyStaticTranslations()
-  renderSpend(lastResultSpend ?? coinLedger.snapshot())
-  if (activeAchievement) renderAchievement(activeAchievement.threshold, activeAchievement.amount)
-  banterPresenter.clear()
-  game.refreshLocale()
-  localeButton.focus({ preventScroll: true })
+  introReturnFocus = introHelpButton
+  game.setPaused(true)
+  introScreen.hidden = false
+  document.body.dataset.intro = ''
+  introEnter.focus({ preventScroll: true })
+})
+introEnter.addEventListener('click', () => {
+  hasEnteredGame = true
+  try {
+    window.localStorage.setItem(INTRO_COMPLETED_KEY, 'true')
+  } catch {
+    // The introduction still works when browser storage is unavailable.
+  }
+  introScreen.hidden = true
+  document.body.removeAttribute('data-intro')
+  game.setPaused(false)
+  const returnToHelp = introReturnFocus === introHelpButton
+  introReturnFocus = undefined
+  if (returnToHelp) focusTopbarAction(introHelpButton)
+  else startButton.focus({ preventScroll: true })
 })
 document.addEventListener('pointerdown', (event) => {
   if (!localeButton.parentElement?.contains(event.target as Node)) closeLocaleMenu()
+  if (!topbarMenuButton.contains(event.target as Node) && !topbarActions.contains(event.target as Node)) closeActionMenu()
 })
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !localeMenu.hidden) {
     closeLocaleMenu()
     localeButton.focus({ preventScroll: true })
+    return
+  }
+  if (event.key === 'Escape' && topbarActions.classList.contains('is-open')) {
+    closeActionMenu()
+    topbarMenuButton.focus({ preventScroll: true })
+    return
   }
 })
 
@@ -153,6 +279,9 @@ let lastResult: GameSnapshot['result']
 let achievementTimeout: ReturnType<typeof setTimeout> | undefined
 
 window.addEventListener('keydown', (event) => {
+  if (!hasEnteredGame) return
+  if (!introScreen.hidden || topbarActions.classList.contains('is-open')) return
+  if (event.code === 'Space' && event.target instanceof HTMLElement && (event.target === topbarMenuButton || topbarActions.contains(event.target))) return
   if (titlesDialog.open || clerkDialog.open || clerkCallDialog.open || !resultModal.hidden) return
   keyboard.add(event.code)
   if (event.code === 'Space') {
@@ -188,7 +317,7 @@ titlesButton.addEventListener('click', () => {
 titlesClose.addEventListener('click', () => titlesDialog.close())
 titlesDialog.addEventListener('close', () => {
   game.setPaused(false)
-  titlesButton.focus({ preventScroll: true })
+  focusTopbarAction(titlesButton)
 })
 titlesDialog.addEventListener('click', (event) => {
   if (event.target === titlesDialog) titlesDialog.close()
@@ -209,7 +338,7 @@ clerkCallDialog.addEventListener('close', () => {
   if (!clerkDialog.open) {
     game.setPaused(false)
     if (!resultModal.hidden) resultClerkButton.focus({ preventScroll: true })
-    else clerkCallButton.focus({ preventScroll: true })
+    else focusTopbarAction(clerkCallButton)
   }
 })
 clerkRescueButton.addEventListener('click', () => {
@@ -239,6 +368,7 @@ clerkPlacementButton.addEventListener('click', () => {
 })
 clerkDialog.addEventListener('close', () => {
   clerkDialog.removeAttribute('data-phase')
+  clerkJudgment.hidden = true
   game.setPaused(false)
   game.restart()
   lastResult = undefined
@@ -254,6 +384,8 @@ startButton.addEventListener('click', () => {
 })
 restartButton.addEventListener('click', () => {
   resultModal.hidden = true
+  activeHiddenResultEvent = undefined
+  renderHiddenResultEvent()
   if (lastResult === 'won') renderSpend(coinLedger.snapshot())
   lastResult = undefined
   lastResultSpend = undefined
@@ -262,7 +394,8 @@ restartButton.addEventListener('click', () => {
 })
 
 setupJoystick()
-game.onNextRenderedFrame(hideLoading)
+game.setPaused(!hasEnteredGame)
+game.onNextRenderedFrame(finishLoading)
 game.start()
 
 function setupJoystick(): void {
@@ -358,7 +491,11 @@ function updateHud(snapshot: GameSnapshot): void {
     const won = snapshot.result === 'won'
     if (snapshot.result !== lastResult) {
       const spend = won ? coinLedger.settleWin() : coinLedger.snapshot()
-      const shouldOfferHelp = snapshot.result === 'lost' && game.hasStuckPrizeAtChute()
+      const stuckAtChute = !won && game.hasStuckPrizeAtChute()
+      if (won) hiddenEvents.onWin()
+      activeHiddenResultEvent = won || stuckAtChute ? undefined : hiddenEvents.onLoss()
+      renderHiddenResultEvent()
+      const shouldOfferHelp = stuckAtChute
         ? false
         : clerkAssist.onResult(snapshot.result, spend.amount)
       if (shouldOfferHelp && game.availablePrizesForClerk().length > 0) {
@@ -396,6 +533,7 @@ function updateHud(snapshot: GameSnapshot): void {
 function showClerkAssist(): void {
   const copy = getMessages().dynamic
   clerkDialog.removeAttribute('data-phase')
+  clerkJudgment.hidden = true
   clerkSound.textContent = copy.clerkSound
   clerkCopy.textContent = copy.clerkIntro
   clerkDecline.textContent = copy.clerkDecline
@@ -422,6 +560,9 @@ function showClerkAssist(): void {
       clerkCopy.textContent = placement.type === 'swapped'
         ? format(copy.swapped, { name, displaced: placement.displaced })
         : format(copy.placed, { name })
+      clerkJudgmentTitle.textContent = copy.judgmentTitle
+      clerkJudgmentCopy.textContent = copy.judgmentCopy
+      clerkJudgment.hidden = false
       for (const choice of clerkChoices.querySelectorAll('button')) choice.disabled = true
       clerkDecline.textContent = copy.placementDone
       clerkDecline.focus({ preventScroll: true })
@@ -431,6 +572,20 @@ function showClerkAssist(): void {
   game.setPaused(true)
   clerkDialog.showModal()
   clerkChoices.querySelector('button')?.focus({ preventScroll: true })
+}
+
+function renderHiddenResultEvent(): void {
+  hiddenResultEvent.hidden = !activeHiddenResultEvent
+  if (!activeHiddenResultEvent) {
+    resultModal.removeAttribute('data-hidden-event')
+    return
+  }
+  resultModal.dataset.hiddenEvent = activeHiddenResultEvent
+  const copy = getMessages().dynamic
+  const isParticipation = activeHiddenResultEvent === 'participation'
+  hiddenEventIcon.src = `/images/events/${activeHiddenResultEvent}.webp`
+  hiddenEventTitle.textContent = isParticipation ? copy.participationTitle : copy.memorialTitle
+  hiddenEventCopy.textContent = isParticipation ? copy.participationCopy : copy.memorialCopy
 }
 
 function renderSpend(spend: SpendSnapshot): void {
@@ -455,10 +610,13 @@ function renderTitleGallery(): void {
     const item = document.createElement('li')
     item.className = 'title-entry'
 
-    const icon = document.createElement('span')
+    const icon = document.createElement('img')
     icon.className = 'title-entry-icon'
-    icon.textContent = title.emoji
-    icon.setAttribute('aria-hidden', 'true')
+    icon.src = `/images/titles/title-${title.threshold}.webp`
+    icon.alt = ''
+    icon.width = 56
+    icon.height = 56
+    icon.decoding = 'async'
 
     const copy = document.createElement('div')
     copy.className = 'title-entry-copy'
@@ -503,7 +661,7 @@ function showAchievement(title: SpendTitle, amount: number): void {
 function renderAchievement(threshold: number, amount: number): void {
   const index = spendTitles.findIndex((title) => title.threshold === threshold)
   if (index < 0) return
-  achievementIcon.textContent = spendTitles[index]!.emoji
+  achievementIcon.src = `/images/titles/title-${threshold}.webp`
   achievementTitle.textContent = getMessages().titles[index]!.name
   achievementCopy.textContent = format(getMessages().dynamic.achievementSpend, { amount })
 }

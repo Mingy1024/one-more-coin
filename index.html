@@ -11,52 +11,114 @@
       body[data-loading] > :not(#loading-screen) { visibility: hidden; }
       #loading-screen {
         position: fixed; inset: 0; z-index: 2147483647; display: grid; place-items: center;
-        padding: 24px; box-sizing: border-box; overflow: hidden;
-        color: #f7f2dc; font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans TC", system-ui, sans-serif;
-        text-align: center; background: radial-gradient(circle at 50% 37%, #26516a, #102538 68%);
+        padding: max(20px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
+        box-sizing: border-box; overflow: auto;
+        color: #f6fbff; font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans TC", system-ui, sans-serif;
+        text-align: center; background: radial-gradient(circle at 50% 35%, #31546a, #102538 70%);
       }
       #loading-screen[hidden], body:not([data-loading]) #loading-screen { display: none; }
-      .loading-card { width: min(300px, 100%); }
-      .loading-kicker { display: block; margin-bottom: 22px; color: #7cdae7; font-size: 11px; font-weight: 800; letter-spacing: .2em; }
-      .loading-coin {
-        display: grid; width: 82px; height: 82px; margin: auto; place-items: center;
-        color: #44320a; font-size: 29px; font-weight: 950;
-        background: radial-gradient(circle at 35% 30%, #fff1b0, #e9b84c 63%, #ad7528);
-        border: 5px solid #f5d987; border-radius: 50%; box-shadow: 0 0 0 5px #213e54, 0 0 30px #e9b84c55;
+      .loading-card {
+        position: relative; width: min(340px, 100%); padding: 22px 20px 24px; box-sizing: border-box;
+        background: #172a42; border: 3px solid #e8eef2; border-radius: 10px;
+        box-shadow: 0 0 0 3px #2e4c61, -5px 5px 0 #ef5f83, 5px -5px 0 #42c9e8, 0 22px 55px #071622aa;
       }
-      .loading-title { display: block; margin: 25px 0 7px; color: #ffe29a; font-size: 23px; font-weight: 900; letter-spacing: .08em; }
-      .loading-copy { display: block; min-height: 22px; color: #d5e5e9; font-size: 13px; }
-      .loading-track { height: 5px; margin: 27px auto 0; overflow: hidden; background: #345169; border-radius: 5px; }
-      .loading-track::before { content: ""; display: block; width: 34%; height: 100%; background: #62d9e9; border-radius: inherit; animation: loading-slide 1.4s ease-in-out infinite alternate; }
-      .loading-retry { display: inline-block; margin-top: 18px; color: #b8d1d9; font-size: 12px; text-underline-offset: 3px; }
-      @keyframes loading-slide { from { transform: translateX(-100%); } to { transform: translateX(295%); } }
-      @media (prefers-reduced-motion: reduce) { .loading-track::before { animation: none; width: 100%; } }
+      .loading-card::before { position: absolute; top: 8px; right: 8px; bottom: 8px; left: 8px; border: 1px solid #7d9dad66; border-radius: 5px; content: ""; pointer-events: none; }
+      .loading-kicker { display: block; color: #7cdae7; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+      .loading-art {
+        position: relative; display: grid; width: 164px; height: 148px; margin: 10px auto 0; place-items: center;
+        background: repeating-conic-gradient(from 7deg, #ffd65a22 0deg 14deg, transparent 14deg 28deg);
+        border-radius: 50%;
+      }
+      .loading-art img { position: relative; display: block; width: 140px; height: 140px; object-fit: contain; filter: drop-shadow(0 5px 4px #08172588); animation: loading-bob 2.2s ease-in-out infinite; }
+      .loading-title { display: block; margin: 2px 0 8px; color: #ffe29a; font-size: 23px; font-weight: 900; letter-spacing: .05em; }
+      .loading-copy { display: block; min-height: 22px; color: #d5e5e9; font-size: 13px; line-height: 1.5; }
+      .loading-track { height: 8px; margin: 22px auto 0; overflow: hidden; background: #102235; border: 1px solid #69879a; border-radius: 5px; }
+      .loading-track::before { content: ""; display: block; width: 38%; height: 100%; background: linear-gradient(90deg, #42c9e8, #ffd65a); border-radius: inherit; animation: loading-slide 1.4s ease-in-out infinite alternate; }
+      .loading-retry { display: inline-block; margin-top: 18px; color: #bce4eb; font-size: 12px; text-underline-offset: 3px; }
+      .loading-retry:focus-visible { outline: 3px solid #ffd65a; outline-offset: 4px; }
+      @keyframes loading-slide { from { transform: translateX(-100%); } to { transform: translateX(270%); } }
+      @keyframes loading-bob { 50% { transform: translateY(-5px); } }
+      @media (prefers-reduced-motion: reduce) { .loading-track::before, .loading-art img { animation: none; } }
     </style>
   </head>
   <body data-loading>
     <section id="loading-screen" role="status" aria-live="polite" aria-label="遊戲載入中" data-i18n-aria="loadingAria">
       <div class="loading-card">
         <span class="loading-kicker" data-i18n="loadingKicker">ONE MORE COIN · 開機中</span>
-        <span class="loading-coin" aria-hidden="true">10</span>
+        <span class="loading-art" aria-hidden="true"><img src="/images/titles/title-150.webp" alt="" width="140" height="140" fetchpriority="high"></span>
         <strong class="loading-title" data-i18n="loadingTitle">機台準備中</strong>
         <span id="loading-copy" class="loading-copy" data-i18n="loadingCopy">正在擺好娃娃，先別急著投幣…</span>
         <div class="loading-track" aria-hidden="true"></div>
         <a class="loading-retry" href="" data-i18n="loadingRetry">載入太久？重新整理</a>
       </div>
     </section>
+    <section id="intro-screen" class="intro-screen" aria-labelledby="intro-title" hidden>
+      <div class="intro-shell">
+        <header class="intro-topline">
+          <span class="intro-brand">ONE MORE COIN <span>✦</span></span>
+          <div class="intro-languages" role="group" aria-label="切換語言" data-i18n-aria="languageAria">
+            <button type="button" data-intro-locale="zh-Hant" aria-pressed="true">中文</button>
+            <button type="button" data-intro-locale="jp" aria-pressed="false">日本語</button>
+          </div>
+        </header>
+        <div class="intro-content">
+          <div class="intro-art" aria-hidden="true">
+            <span class="intro-burst"></span>
+            <img src="/images/intro/dream-machine.webp" alt="" width="512" height="614" decoding="async">
+            <span class="intro-bubble" data-i18n="introBubble">就差一點點！</span>
+          </div>
+          <div class="intro-copy">
+            <span class="intro-kicker" data-i18n="introKicker">歡迎光臨 · 今日營業中</span>
+            <h1 id="intro-title" data-i18n="introTitle">再十塊，
+就夾到？</h1>
+            <p class="intro-lede" data-i18n="introLede">瞄準娃娃、出爪，再接受朋友們毫不留情的場外評論。</p>
+            <ol class="intro-steps">
+              <li><span>01</span><span data-i18n="introStepCoin">投入 10 元，開啟一局挑戰</span></li>
+              <li><span>02</span><span data-i18n="introStepClaw">移動夾爪，抓準時機出爪</span></li>
+              <li><span>03</span><span data-i18n="introStepSurprise">夾到娃娃，或帶走意想不到的驚喜</span></li>
+            </ol>
+            <button id="intro-enter" class="intro-enter" type="button">
+              <span data-i18n="introEnter">進入遊戲</span>
+              <span class="intro-enter-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></span>
+            </button>
+            <p class="intro-note" data-i18n="introNote">進場免費，投幣後才開始計時。</p>
+          </div>
+        </div>
+      </div>
+    </section>
     <main class="game-shell">
       <canvas id="game-canvas" aria-label="3D 夾娃娃機遊戲畫面" data-i18n-aria="canvasAria"></canvas>
 
-      <header class="topbar">
-        <button id="reset-button" class="reset-button" type="button" aria-label="重置娃娃位置並補回獎品" title="重置娃娃位置並補回獎品" data-i18n-aria="resetAria" data-i18n-title="resetAria">
-          <span aria-hidden="true">↻</span><span class="topbar-button-label" data-i18n="reset">重置</span>
+      <header id="topbar" class="topbar">
+        <button id="topbar-menu-button" class="topbar-menu-button" type="button" aria-label="功能選單" aria-expanded="false" aria-controls="topbar-actions" data-i18n-aria="actionMenuAria">
+          <span aria-hidden="true">☰</span><span data-i18n="actionMenu">選單</span>
         </button>
-        <button id="titles-button" class="titles-button" type="button" aria-haspopup="dialog" aria-controls="titles-dialog">
-          <span aria-hidden="true">✦</span><span class="topbar-button-label" data-i18n="titles">稱號一覽</span>
-        </button>
-        <button id="clerk-call-button" class="clerk-call-button" type="button" aria-label="呼叫店員" data-i18n-aria="callClerk" aria-haspopup="dialog" aria-controls="clerk-call-dialog">
-          <span aria-hidden="true">☎</span><span class="topbar-button-label" data-i18n="callClerk">呼叫店員</span>
-        </button>
+        <div id="topbar-actions" class="topbar-actions" role="group" aria-label="機台功能" data-i18n-aria="actionMenuAria">
+          <button id="reset-button" class="reset-button" type="button" aria-label="重置娃娃位置並補回獎品" title="重置娃娃位置並補回獎品" data-i18n-aria="resetAria" data-i18n-title="resetAria">
+            <span aria-hidden="true">↻</span><span class="topbar-button-label" data-i18n="reset">重置</span>
+          </button>
+          <button id="intro-help-button" class="intro-help-button" type="button" aria-label="遊戲說明" title="遊戲說明" data-i18n-aria="introHelp" data-i18n-title="introHelp">
+            <span aria-hidden="true">?</span><span class="topbar-button-label" data-i18n="introHelp">遊戲說明</span>
+          </button>
+          <button id="titles-button" class="titles-button" type="button" aria-haspopup="dialog" aria-controls="titles-dialog">
+            <span aria-hidden="true">✦</span><span class="topbar-button-label" data-i18n="titles">稱號一覽</span>
+          </button>
+          <button id="clerk-call-button" class="clerk-call-button" type="button" aria-label="呼叫店員" data-i18n-aria="callClerk" aria-haspopup="dialog" aria-controls="clerk-call-dialog">
+            <span aria-hidden="true">☎</span><span class="topbar-button-label" data-i18n="callClerk">呼叫店員</span>
+          </button>
+          <div class="locale-switch">
+            <button id="locale-button" class="locale-button" type="button" aria-label="切換語言" data-i18n-aria="languageAria" aria-expanded="false" aria-controls="locale-menu">
+              <span class="locale-glyph" aria-hidden="true">文</span>
+              <span id="locale-button-label">中文</span>
+              <span class="locale-chevron" aria-hidden="true"></span>
+            </button>
+            <div id="locale-menu" class="locale-menu" role="group" aria-label="切換語言" data-i18n-aria="languageAria" hidden>
+              <span class="locale-menu-title" data-i18n="languageAria">切換語言</span>
+              <button type="button" data-locale="zh-Hant" aria-pressed="true">中文</button>
+              <button type="button" data-locale="jp" aria-pressed="false">日本語</button>
+            </div>
+          </div>
+        </div>
         <div class="hud" aria-live="polite">
           <div class="timer-hud"><span class="hud-label" data-i18n="timeLeft">剩餘秒數</span><strong id="time-value">30</strong></div>
           <div><span class="hud-label" data-i18n="attempts">出爪</span><strong id="attempt-value">0</strong></div>
@@ -75,7 +137,7 @@
 
       <section id="start-panel" class="start-panel" aria-label="開始遊戲" data-i18n-aria="startAria">
         <button id="start-button" type="button" aria-label="投入 10 元，開始挑戰" data-i18n-aria="insertCoinAria">
-          <span class="coin-mark" aria-hidden="true"><i>10</i></span>
+          <span class="coin-mark" aria-hidden="true"><img src="/images/ui/coin-token.webp" alt="" width="40" height="40"></span>
           <strong data-i18n="insertCoin">投入 10 元・開始挑戰</strong>
         </button>
       </section>
@@ -83,7 +145,7 @@
       <section id="achievement-toast" class="achievement-toast" role="status" aria-live="assertive" hidden>
         <div class="achievement-rays" aria-hidden="true"></div>
         <div class="achievement-panel">
-          <span id="achievement-icon" class="achievement-icon" aria-hidden="true">🪙</span>
+          <img id="achievement-icon" class="achievement-icon" src="/images/titles/title-10.webp" alt="" width="56" height="56" decoding="async">
           <span class="achievement-eyebrow" data-i18n="achievementEyebrow">機台認證・新稱號</span>
           <strong id="achievement-title">試水溫選手</strong>
           <span id="achievement-copy">累計投入 NT$10</span>
@@ -106,16 +168,6 @@
           <span data-i18n="move">移動</span>
         </div>
 
-        <div class="locale-switch">
-          <button id="locale-button" class="locale-button" type="button" aria-label="切換語言" data-i18n-aria="languageAria" aria-expanded="false" aria-controls="locale-menu">
-            <span id="locale-button-label">中文</span>
-          </button>
-          <div id="locale-menu" class="locale-menu" role="group" aria-label="切換語言" data-i18n-aria="languageAria" hidden>
-            <button type="button" data-locale="zh-Hant" aria-pressed="true">中文</button>
-            <button type="button" data-locale="jp" aria-pressed="false">日本語</button>
-          </div>
-        </div>
-
         <button id="grab-button" class="grab-button" type="button">
           <span class="grab-icon" aria-hidden="true">⌄</span>
           <span id="grab-label">出爪</span>
@@ -130,6 +182,16 @@
           <span id="result-icon" class="result-icon" aria-hidden="true">★</span>
           <p class="eyebrow" data-i18n="resultEyebrow">景品研究結果</p>
           <h1 id="result-title">成功夾到了！</h1>
+          <div id="hidden-result-event" class="hidden-result-event" hidden>
+            <div class="hidden-event-burst" aria-hidden="true"></div>
+            <div class="event-art-stage" aria-hidden="true">
+              <img id="hidden-event-icon" class="hidden-event-art" src="/images/events/participation.webp" alt="" width="768" height="512" decoding="async">
+              <i class="event-spark"></i><i class="event-spark"></i><i class="event-spark"></i><i class="event-spark"></i>
+            </div>
+            <span class="hidden-event-kicker" data-i18n="hiddenEventKicker">隱藏事件</span>
+            <strong id="hidden-event-title"></strong>
+            <span id="hidden-event-copy" class="hidden-event-copy"></span>
+          </div>
           <div id="result-prize" class="result-prize" hidden>
             <img id="result-prize-portrait" class="clerk-choice-portrait" alt="" width="64" height="64">
             <div class="result-prize-details">
@@ -147,7 +209,7 @@
     <dialog id="titles-dialog" class="titles-dialog" aria-labelledby="titles-dialog-title" aria-describedby="titles-dialog-copy">
       <div class="titles-dialog-inner">
         <div class="titles-dialog-header">
-          <span class="titles-dialog-kicker" data-i18n="titlesKicker">投幣紀錄 / 01</span>
+          <span class="titles-dialog-kicker" data-i18n="titlesKicker">稱號收藏</span>
           <button id="titles-close" class="titles-close" type="button" aria-label="關閉稱號一覽" data-i18n-aria="closeTitlesAria">×</button>
           <span class="titles-dialog-emblem" aria-hidden="true">✦</span>
           <h2 id="titles-dialog-title" data-i18n="titles">稱號一覽</h2>
@@ -161,13 +223,21 @@
     <dialog id="clerk-dialog" class="clerk-dialog" aria-labelledby="clerk-dialog-title" aria-describedby="clerk-dialog-copy">
       <div class="clerk-scene" aria-hidden="true">
         <span class="clerk-speedlines"></span>
-        <span class="clerk-character">🧑‍💼</span>
+        <img class="clerk-character" src="/images/events/clerk-avatar.webp" alt="" width="104" height="104" decoding="async">
         <span id="clerk-sound" class="clerk-sound">欸！</span>
       </div>
       <div class="clerk-content">
         <span class="clerk-kicker" data-i18n="clerkKicker">隱藏事件 · 店員介入</span>
         <h2 id="clerk-dialog-title" data-i18n="clerkTitle">店員看不下去了！</h2>
         <p id="clerk-dialog-copy">店員盯著你和機台看了很久，終於嘆了口氣：「好啦，這局我當你場外教練。想喬哪一隻？」</p>
+        <div id="clerk-judgment" class="clerk-judgment" hidden>
+          <div class="event-art-stage" aria-hidden="true">
+            <img class="clerk-judgment-art" src="/images/events/clerk-judgment.webp" alt="" width="768" height="512" decoding="async">
+            <i class="event-spark"></i><i class="event-spark"></i><i class="event-spark"></i><i class="event-spark"></i>
+          </div>
+          <strong id="clerk-judgment-title"></strong>
+          <span id="clerk-judgment-copy"></span>
+        </div>
         <p class="clerk-prompt" data-i18n="clerkPrompt">想請店員幫哪一隻？</p>
         <div id="clerk-choices" class="clerk-choices" role="group" aria-label="選擇要移動的娃娃" data-i18n-aria="clerkChoicesAria"></div>
         <button id="clerk-decline" class="clerk-decline" type="button">不用，我自己來</button>
@@ -176,7 +246,7 @@
     <dialog id="clerk-call-dialog" class="clerk-dialog clerk-call-dialog" aria-labelledby="clerk-call-title" aria-describedby="clerk-call-copy">
       <div class="clerk-scene" aria-hidden="true">
         <span class="clerk-speedlines"></span>
-        <span class="clerk-character">🧑‍💼</span>
+        <img class="clerk-character" src="/images/events/clerk-avatar.webp" alt="" width="104" height="104" decoding="async">
         <span class="clerk-sound" data-i18n="clerkCallSound">嗯？</span>
       </div>
       <div class="clerk-content">
