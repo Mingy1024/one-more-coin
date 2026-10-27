@@ -93,6 +93,7 @@ const CHUTE = { x: -1.2, z: 0.96 }
 const PRIZE_EXIT_Y = -1.05
 const PRIZE_EXIT_MIN_SECONDS = 0.18
 const PRIZE_EXIT_MAX_SECONDS = 0.65
+const PRIZE_MATERIAL_BRIGHTNESS = 0.5
 const CHUTE_GUARD_HEIGHT = PRIZE_HALF_HEIGHT * 2 / 3
 function prizePlacement(
   x: number, y: number, z: number,
@@ -195,12 +196,12 @@ export class ClawMachineGame {
       z: CHUTE.z,
     })
     this.prizes = [
-      this.createPrize(INITIAL_PRIZE_PLACEMENTS[0], createPrizeModel(), COLORS.pink),
-      this.createPrize(INITIAL_PRIZE_PLACEMENTS[1], createArcanineModel(), COLORS.warm, 0.35),
-      this.createPrize(INITIAL_PRIZE_PLACEMENTS[2], createSnoopyModel(), COLORS.aqua, 0.35),
-      this.createPrize(INITIAL_PRIZE_PLACEMENTS[3], createSlowpokeModel(), COLORS.warm, 0.25, 'slowpoke'),
-      this.createPrize(INITIAL_PRIZE_PLACEMENTS[4], createBulbasaurModel(), COLORS.aqua, 0.3),
-      this.createPrize(INITIAL_PRIZE_PLACEMENTS[5], createAlienModel(), COLORS.warm, 0.25),
+      this.createPrize(INITIAL_PRIZE_PLACEMENTS[0], createPrizeModel()),
+      this.createPrize(INITIAL_PRIZE_PLACEMENTS[1], createArcanineModel()),
+      this.createPrize(INITIAL_PRIZE_PLACEMENTS[2], createSnoopyModel()),
+      this.createPrize(INITIAL_PRIZE_PLACEMENTS[3], createSlowpokeModel(), 'slowpoke'),
+      this.createPrize(INITIAL_PRIZE_PLACEMENTS[4], createBulbasaurModel()),
+      this.createPrize(INITIAL_PRIZE_PLACEMENTS[5], createAlienModel()),
     ]
     this.settleInitialPrizes()
 
@@ -1252,10 +1253,24 @@ export class ClawMachineGame {
   private createPrize(
     placement: PrizePlacement,
     mesh: THREE.Group,
-    glowColor: number,
-    glowIntensity = 2.8,
     kind?: 'slowpoke',
   ): Prize {
+    const tonedMaterials = new Set<THREE.Material>()
+    mesh.traverse((part) => {
+      if (!(part instanceof THREE.Mesh || part instanceof THREE.LineSegments)) return
+      const materials = Array.isArray(part.material) ? part.material : [part.material]
+      for (const material of materials) {
+        if (tonedMaterials.has(material)) continue
+        tonedMaterials.add(material)
+        if (material instanceof THREE.MeshStandardMaterial) {
+          material.color.multiplyScalar(PRIZE_MATERIAL_BRIGHTNESS)
+          if (material instanceof THREE.MeshPhysicalMaterial) material.sheenColor.multiplyScalar(PRIZE_MATERIAL_BRIGHTNESS)
+        } else if (material instanceof THREE.LineBasicMaterial) {
+          material.color.multiplyScalar(PRIZE_MATERIAL_BRIGHTNESS)
+        }
+      }
+    })
+
     const start: PrizePlacement = {
       position: { ...placement.position },
       rotation: {
@@ -1295,9 +1310,6 @@ export class ClawMachineGame {
       }
     }
 
-    const prizeGlow = new THREE.PointLight(glowColor, glowIntensity, 2.2)
-    prizeGlow.position.y = PRIZE_HALF_HEIGHT + 0.07
-    mesh.add(prizeGlow)
     this.scene.add(mesh)
 
     return { body, collider, colliders, mesh, carry: new PrizeCarryController(body, colliders), start, claimed: false }
