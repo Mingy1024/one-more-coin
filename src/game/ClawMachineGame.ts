@@ -24,6 +24,7 @@ import {
 import {
   CHUTE_OPENING_HALF_X,
   CHUTE_OPENING_HALF_Z,
+  CHUTE_CAPTURE_Y,
   isPrizeCaptured,
   isPrizeEnteringChute,
   isPrizeStuckAtChute,
@@ -680,7 +681,8 @@ export class ClawMachineGame {
       }
       this.world.step()
       if (!this.carried && this.lastGrabSucceeded && this.activePrize && !this.enteredChute
-        && (this.round.phase === 'releasing' || this.round.phase === 'resetting' || this.slipped)
+        && (this.round.phase === 'releasing' || this.round.phase === 'resetting'
+          || this.round.phase === 'lost' || this.slipped)
         && isPrizeEnteringChute(this.activePrize.body.translation(), CHUTE)) {
         this.setPrizeSensor(this.activePrize, true)
         this.enteredChute = true
@@ -708,15 +710,20 @@ export class ClawMachineGame {
   }
 
   private checkForWin(): void {
-    if (this.carried || this.round.phase === 'won' || this.round.phase === 'lost') return
-    if (this.round.phase !== 'releasing' && this.round.phase !== 'resetting' && !this.slipped) return
+    if (this.carried || this.round.phase === 'won') return
+    if (this.round.phase !== 'releasing' && this.round.phase !== 'resetting'
+      && this.round.phase !== 'lost' && !this.slipped) return
 
-    if (this.activePrize && !this.stalePrizes?.has(this.activePrize)
-      && isPrizeCaptured(this.activePrize.body.translation(), CHUTE)) {
-      this.activePrize.claimed = true
+    const prize = this.activePrize
+    const position = prize?.body.translation()
+    // Once the chute makes a prize non-colliding, horizontal momentum can carry it past the lip.
+    if (prize && position && !this.stalePrizes?.has(prize)
+      && (isPrizeCaptured(position, CHUTE)
+        || (this.enteredChute && position.y < CHUTE_CAPTURE_Y))) {
+      prize.claimed = true
       // Leave the prize non-colliding while it visibly falls into the chute.
-      this.setPrizeSensor(this.activePrize, true)
-      this.pendingPrizeExit = { prize: this.activePrize, elapsed: 0 }
+      this.setPrizeSensor(prize, true)
+      this.pendingPrizeExit = { prize, elapsed: 0 }
       this.round = stepRound(this.round, { type: 'PRIZE_DROPPED' })
       this.publishSnapshot()
     }

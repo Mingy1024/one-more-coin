@@ -62,6 +62,9 @@ export function stepRound(state: RoundState, action: RoundAction): RoundState {
   if (action.type === 'CLERK_RESCUE') {
     return state.phase === 'lost' ? { ...state, phase: 'won', phaseElapsed: 0 } : state
   }
+  if (action.type === 'PRIZE_DROPPED' && state.phase === 'lost') {
+    return { ...state, phase: 'won', phaseElapsed: 0 }
+  }
   if (state.phase === 'won' || state.phase === 'lost') return state
 
   if (action.type === 'START') {
