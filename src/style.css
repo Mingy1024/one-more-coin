@@ -31,6 +31,8 @@ body {
   overscroll-behavior: none;
 }
 
+html { touch-action: pan-x pan-y; }
+
 button { font: inherit; }
 button:focus-visible { outline: 3px solid var(--coin); outline-offset: 4px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
@@ -43,7 +45,7 @@ body[data-intro] .game-shell { visibility: hidden; }
   display: grid;
   align-items: center;
   overflow-y: auto;
-  touch-action: manipulation;
+  touch-action: pan-y;
   padding: max(20px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
   background: radial-gradient(circle at 18% 22%, #6b5e91 0, transparent 32%), radial-gradient(circle at 83% 78%, #366f82 0, transparent 35%), #14233d;
 }
@@ -402,6 +404,7 @@ html[lang="ja"] .clerk-call-button .topbar-button-label { letter-spacing: 0; }
   background: transparent;
   border: 0;
   box-shadow: none;
+  touch-action: none;
 }
 
 .controls::before { content: none; }
@@ -584,7 +587,7 @@ html[lang="ja"] .clerk-call-button .topbar-button-label { letter-spacing: 0; }
 .result-modal { position: absolute; z-index: 10; inset: 0; display: grid; place-items: center; padding: max(24px, calc(env(safe-area-inset-top, 0px) + 12px)) max(24px, calc(env(safe-area-inset-right, 0px) + 12px)) max(24px, calc(env(safe-area-inset-bottom, 0px) + 12px)) max(24px, calc(env(safe-area-inset-left, 0px) + 12px)); background: rgba(5, 14, 26, 0.76); }
 .result-modal[data-hidden-event]::before { position: absolute; inset: 0; background: repeating-conic-gradient(from 0deg at 50% 50%, transparent 0deg 15deg, rgba(255, 223, 95, .12) 15deg 18deg, transparent 18deg 30deg); content: ""; pointer-events: none; animation: hidden-event-spotlight 1.4s ease-out both; }
 .result-modal[data-hidden-event="memorial"]::before { background: repeating-conic-gradient(from 0deg at 50% 50%, transparent 0deg 19deg, rgba(154, 188, 211, .12) 19deg 22deg, transparent 22deg 36deg); }
-.result-panel { width: min(100%, 370px); max-height: 100%; overflow-y: auto; padding: 30px 24px 24px; text-align: center; color: #f5fbff; background: linear-gradient(180deg, #1b314a, #102238); border: 4px solid #dfe9ee; border-radius: 10px; box-shadow: 0 0 0 3px #2c455c, -4px 0 0 var(--aqua), 4px 0 0 var(--coral), 0 28px 70px rgba(0, 0, 0, 0.55); }
+.result-panel { width: min(100%, 370px); max-height: 100%; overflow-y: auto; padding: 30px 24px 24px; text-align: center; color: #f5fbff; background: linear-gradient(180deg, #1b314a, #102238); border: 4px solid #dfe9ee; border-radius: 10px; box-shadow: 0 0 0 3px #2c455c, -4px 0 0 var(--aqua), 4px 0 0 var(--coral), 0 28px 70px rgba(0, 0, 0, 0.55); touch-action: pan-y; }
 .result-modal[data-hidden-event] .result-panel { position: relative; animation: hidden-event-panel 650ms cubic-bezier(.2, 1.3, .3, 1) both; }
 .result-icon { display: grid; width: 64px; height: 64px; margin: 0 auto 14px; place-items: center; color: var(--ink); font-size: 34px; background: var(--coin); border: 3px solid white; border-radius: 50%; box-shadow: 0 0 0 3px #b6830d; }
 .eyebrow { margin: 0 0 6px; color: #81dcee; font-size: 12px; font-weight: 800; }
@@ -640,6 +643,7 @@ html[lang="ja"] .clerk-call-button .topbar-button-label { letter-spacing: 0; }
   border: 2px solid #d5e9ec;
   border-radius: 10px;
   box-shadow: 0 0 0 3px #2e4c61, -4px 0 var(--aqua), 4px 0 var(--coin), 0 24px 64px rgba(2, 10, 20, 0.72);
+  touch-action: pan-y;
   transform: translateY(calc((env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 2));
 }
 .titles-dialog:not([open]) { display: none; }

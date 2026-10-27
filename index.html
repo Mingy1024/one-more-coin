@@ -12,7 +12,7 @@
       #loading-screen {
         position: fixed; inset: 0; z-index: 2147483647; display: grid; place-items: center;
         padding: max(20px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
-        box-sizing: border-box; overflow: auto;
+        box-sizing: border-box; overflow: auto; touch-action: pan-y;
         color: #f6fbff; font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans TC", system-ui, sans-serif;
         text-align: center; background: radial-gradient(circle at 50% 35%, #31546a, #102538 70%);
       }

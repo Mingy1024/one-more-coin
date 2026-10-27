@@ -62,6 +62,11 @@ const clerkPlacementButton = requireElement<HTMLButtonElement>('clerk-placement-
 const clerkCallFeedback = requireElement<HTMLElement>('clerk-call-feedback')
 const startPanel = requireElement<HTMLElement>('start-panel')
 const gameControls = requireElement<HTMLElement>('game-controls')
+// Fallback for browsers that still try to zoom during a game gesture. Leave touchstart
+// alone so a second finger can press the grab button while the joystick is held.
+gameControls.addEventListener('touchmove', (event) => {
+  if (event.touches.length > 1 && event.cancelable) event.preventDefault()
+}, { passive: false })
 const joystick = requireElement<HTMLElement>('joystick')
 const localeButton = requireElement<HTMLButtonElement>('locale-button')
 const localeButtonLabel = requireElement<HTMLElement>('locale-button-label')
@@ -418,10 +423,22 @@ restartButton.addEventListener('click', () => {
   startButton.focus({ preventScroll: true })
 })
 
+preventRapidTouchZoom(canvas)
 setupJoystick()
 game.setPaused(!hasEnteredGame)
 game.onNextRenderedFrame(finishLoading)
 game.start()
+
+function preventRapidTouchZoom(element: HTMLElement): void {
+  let lastTouchEnd = 0
+  // WebKit can still smart-zoom some game surfaces despite touch-action: none.
+  element.addEventListener('touchend', (event) => {
+    if (event.touches.length !== 0 || event.changedTouches.length !== 1) return
+    const now = performance.now()
+    if (lastTouchEnd > 0 && now - lastTouchEnd < 300 && event.cancelable) event.preventDefault()
+    lastTouchEnd = now
+  }, { passive: false })
+}
 
 function setupJoystick(): void {
   const joystick = requireElement<HTMLElement>('joystick')
@@ -475,6 +492,7 @@ function setupJoystick(): void {
   joystick.addEventListener('pointerup', stop)
   joystick.addEventListener('pointercancel', stop)
   joystick.addEventListener('lostpointercapture', stop)
+  preventRapidTouchZoom(joystick)
   window.addEventListener('blur', reset)
   window.addEventListener('resize', reset)
 }
