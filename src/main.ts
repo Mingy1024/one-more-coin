@@ -10,6 +10,10 @@ import { applyStaticTranslations, format, getLocale, getMessages, loadLocale, se
 setLocale(loadLocale())
 applyStaticTranslations()
 
+// iOS Safari can ignore the viewport zoom restriction during a pinch gesture.
+document.addEventListener('gesturestart', (event) => event.preventDefault(), { passive: false })
+document.addEventListener('gesturechange', (event) => event.preventDefault(), { passive: false })
+
 const loadingScreen = requireElement<HTMLElement>('loading-screen')
 const loadingCopy = requireElement<HTMLElement>('loading-copy')
 const introScreen = requireElement<HTMLElement>('intro-screen')

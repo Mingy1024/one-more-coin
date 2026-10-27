@@ -43,6 +43,7 @@ body[data-intro] .game-shell { visibility: hidden; }
   display: grid;
   align-items: center;
   overflow-y: auto;
+  touch-action: manipulation;
   padding: max(20px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
   background: radial-gradient(circle at 18% 22%, #6b5e91 0, transparent 32%), radial-gradient(circle at 83% 78%, #366f82 0, transparent 35%), #14233d;
 }

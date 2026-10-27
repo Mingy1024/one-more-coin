@@ -173,7 +173,7 @@ export class ClawMachineGame {
     this.onSnapshot = onSnapshot
     this.compactDisplay = Math.min(window.innerWidth, window.innerHeight) <= 600
     this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.compactDisplay ? 1.5 : 1.75))
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.compactDisplay ? 1.25 : 1.75))
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFShadowMap
@@ -493,7 +493,7 @@ export class ClawMachineGame {
     this.timer.update()
     const delta = Math.min(this.timer.getDelta(), 1 / 20)
     if (this.paused) {
-      this.renderFrame()
+      if (this.frameCallbacks.length) this.renderFrame()
       return
     }
     const previousPhase = this.round.phase
@@ -1357,6 +1357,7 @@ export class ClawMachineGame {
       : 11.4
     this.applyCameraOrbit()
     this.camera.updateProjectionMatrix()
+    if (this.running && this.paused) this.renderFrame()
   }
 
   private setupCameraDrag(): void {
