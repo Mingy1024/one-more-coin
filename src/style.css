@@ -799,8 +799,8 @@ html[lang="ja"] .clerk-call-button .topbar-button-label { letter-spacing: 0; }
 
 @media (max-width: 680px) {
   .topbar { top: var(--mobile-top); }
-  .status-card { top: calc(var(--mobile-top) + 64px); }
-  .start-panel { top: calc(var(--mobile-top) + 100px); }
+  .status-card { top: calc(var(--mobile-top) + 76px); }
+  .start-panel { top: calc(var(--mobile-top) + 112px); }
   .banter-card { top: calc(var(--mobile-top) + 102px); }
 }
 
