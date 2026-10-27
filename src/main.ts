@@ -4,6 +4,10 @@ import { ClawMachineGame, type GameSnapshot } from './game/ClawMachineGame'
 import { BanterPresenter, type BanterRender } from './game/banterPresenter'
 import { CoinLedger, spendTitles, type SpendSnapshot, type SpendTitle } from './game/coinLedger'
 import { ClerkAssistTrigger } from './game/clerkAssist'
+import { applyStaticTranslations, format, getLocale, getMessages, loadLocale, setLocale, type Locale } from './i18n'
+
+setLocale(loadLocale())
+applyStaticTranslations()
 
 const loadingScreen = requireElement<HTMLElement>('loading-screen')
 const loadingCopy = requireElement<HTMLElement>('loading-copy')
@@ -37,6 +41,11 @@ const clerkPlacementButton = requireElement<HTMLButtonElement>('clerk-placement-
 const clerkCallFeedback = requireElement<HTMLElement>('clerk-call-feedback')
 const startPanel = requireElement<HTMLElement>('start-panel')
 const gameControls = requireElement<HTMLElement>('game-controls')
+const joystick = requireElement<HTMLElement>('joystick')
+const localeButton = requireElement<HTMLButtonElement>('locale-button')
+const localeButtonLabel = requireElement<HTMLElement>('locale-button-label')
+const localeMenu = requireElement<HTMLElement>('locale-menu')
+const localeOptions = [...localeMenu.querySelectorAll<HTMLButtonElement>('button[data-locale]')]
 const banterCard = requireElement<HTMLElement>('banter-card')
 const banterEmoji = requireElement<HTMLElement>('banter-emoji')
 const banterSpeaker = requireElement<HTMLElement>('banter-speaker')
@@ -45,6 +54,9 @@ const restartButton = requireElement<HTMLButtonElement>('restart-button')
 const resultModal = requireElement<HTMLElement>('result-modal')
 const resultIcon = requireElement<HTMLElement>('result-icon')
 const resultTitle = requireElement<HTMLElement>('result-title')
+const resultPrize = requireElement<HTMLElement>('result-prize')
+const resultPrizePortrait = requireElement<HTMLImageElement>('result-prize-portrait')
+const resultPrizeName = requireElement<HTMLElement>('result-prize-name')
 const resultCopy = requireElement<HTMLElement>('result-copy')
 const resultSpend = requireElement<HTMLElement>('result-spend')
 const achievementToast = requireElement<HTMLElement>('achievement-toast')
@@ -56,6 +68,25 @@ const coinLedger = new CoinLedger()
 const clerkAssist = new ClerkAssistTrigger()
 let currentSnapshot: GameSnapshot | undefined
 let contextLost = false
+let lastResultSpend: SpendSnapshot | undefined
+let activeAchievement: { threshold: number; amount: number } | undefined
+
+function syncLocaleControl(): void {
+  const locale = getLocale()
+  for (const option of localeOptions) {
+    const selected = option.dataset.locale === locale
+    option.setAttribute('aria-pressed', String(selected))
+    if (selected) localeButtonLabel.textContent = option.textContent
+  }
+}
+
+function closeLocaleMenu(): void {
+  localeMenu.hidden = true
+  localeButton.setAttribute('aria-expanded', 'false')
+}
+
+syncLocaleControl()
+renderSpend(coinLedger.snapshot())
 
 function showLoading(message: string): void {
   loadingCopy.textContent = message
@@ -73,18 +104,47 @@ let game: ClawMachineGame
 try {
   game = await ClawMachineGame.create(canvas, updateHud)
 } catch (error) {
-  loadingCopy.textContent = '機台暫時無法啟動，請重新整理再試一次。'
+  loadingCopy.textContent = getMessages().dynamic.loadingFailed
   throw error
 }
 
 canvas.addEventListener('webglcontextlost', () => {
   contextLost = true
-  showLoading('機台畫面中斷，正在重新連接…')
+  showLoading(getMessages().dynamic.contextLost)
 })
 canvas.addEventListener('webglcontextrestored', () => {
   contextLost = false
-  showLoading('正在重新點亮機台…')
+  showLoading(getMessages().dynamic.contextRestored)
   game.onNextRenderedFrame(hideLoading)
+})
+
+localeButton.addEventListener('click', () => {
+  const opening = localeMenu.hidden
+  localeMenu.hidden = !opening
+  localeButton.setAttribute('aria-expanded', String(opening))
+  if (opening) localeOptions.find((option) => option.dataset.locale === getLocale())?.focus({ preventScroll: true })
+})
+localeMenu.addEventListener('click', (event) => {
+  const option = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-locale]')
+  if (!option) return
+  setLocale(option.dataset.locale as Locale)
+  syncLocaleControl()
+  closeLocaleMenu()
+  applyStaticTranslations()
+  renderSpend(lastResultSpend ?? coinLedger.snapshot())
+  if (activeAchievement) renderAchievement(activeAchievement.threshold, activeAchievement.amount)
+  banterPresenter.clear()
+  game.refreshLocale()
+  localeButton.focus({ preventScroll: true })
+})
+document.addEventListener('pointerdown', (event) => {
+  if (!localeButton.parentElement?.contains(event.target as Node)) closeLocaleMenu()
+})
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !localeMenu.hidden) {
+    closeLocaleMenu()
+    localeButton.focus({ preventScroll: true })
+  }
 })
 
 const keyboard = new Set<string>()
@@ -117,7 +177,7 @@ window.addEventListener('blur', () => {
 grabButton.addEventListener('click', () => game.grab())
 resetButton.addEventListener('click', () => {
   game.resetPrizes()
-  statusText.textContent = '娃娃已補回並重新擺放'
+  statusText.textContent = getMessages().dynamic.prizesReset
 })
 titlesButton.addEventListener('click', () => {
   renderTitleGallery()
@@ -154,22 +214,22 @@ clerkCallDialog.addEventListener('close', () => {
 })
 clerkRescueButton.addEventListener('click', () => {
   const rescued = game.rescueStuckPrizeForClerk()
+  const copy = getMessages().dynamic
   clerkCallFeedback.textContent = rescued
-    ? `店員把${rescued}撈出來：「牠是來給你夾，還是來洞口租房子？好啦，這局算你夾到！」`
-    : '店員探頭看了看：「卡住的目前只有你的期待。娃娃沒卡在洞口啦。」'
+    ? format(copy.rescued, { name: rescued })
+    : copy.rescueMissed
   clerkCallFeedback.hidden = false
 })
 clerkPlacementButton.addEventListener('click', () => {
+  const copy = getMessages().dynamic
   const amount = coinLedger.snapshot().amount
   if (!currentSnapshot?.isReady && currentSnapshot?.result !== 'lost') {
-    clerkCallFeedback.textContent = '店員指著忙碌的夾爪：「現在進去喬位置？我有上班，不是有九條命欸。」'
+    clerkCallFeedback.textContent = copy.placementBusy
     clerkCallFeedback.hidden = false
     return
   }
   if (!clerkAssist.canRequestPlacement(amount)) {
-    clerkCallFeedback.textContent = amount < 100
-      ? '店員看你一眼：「我們才剛認識，你就要我幫你喬娃娃？先跟機台培養感情啦。」'
-      : '店員雙手一攤：「剛剛不是才幫過？這裡是夾娃娃機，不是娃娃搬家公司欸。」'
+    clerkCallFeedback.textContent = amount < 100 ? copy.placementTooSoon : copy.placementUsed
     clerkCallFeedback.hidden = false
     return
   }
@@ -182,6 +242,7 @@ clerkDialog.addEventListener('close', () => {
   game.setPaused(false)
   game.restart()
   lastResult = undefined
+  lastResultSpend = undefined
   startButton.focus({ preventScroll: true })
 })
 startButton.addEventListener('click', () => {
@@ -195,6 +256,7 @@ restartButton.addEventListener('click', () => {
   resultModal.hidden = true
   if (lastResult === 'won') renderSpend(coinLedger.snapshot())
   lastResult = undefined
+  lastResultSpend = undefined
   game.restart()
   startButton.focus({ preventScroll: true })
 })
@@ -281,7 +343,7 @@ function updateHud(snapshot: GameSnapshot): void {
   grabLabel.textContent = snapshot.grabLabel
   startPanel.hidden = !snapshot.isReady
   gameControls.classList.toggle('is-locked', snapshot.isReady)
-  gameControls.setAttribute('aria-disabled', String(snapshot.isReady))
+  joystick.setAttribute('aria-disabled', String(snapshot.isReady))
 
   if (achievementToast.hidden) {
     banterPresenter.show(snapshot.banter, {
@@ -305,33 +367,43 @@ function updateHud(snapshot: GameSnapshot): void {
         showClerkAssist()
         return
       }
-      resultSpend.textContent = won
-        ? `這份獎品共投入 NT$${spend.amount} · ${spend.title}`
-        : `目前已投入 NT$${spend.amount} · ${spend.title}`
+      lastResultSpend = spend
       lastResult = snapshot.result
       if (!clerkCallDialog.open) requestAnimationFrame(() => restartButton.focus({ preventScroll: true }))
     }
     if (clerkDialog.open) return
     resultModal.hidden = false
     resultIcon.textContent = won ? '★' : '↻'
-    resultTitle.textContent = won ? '成功夾到了！' : '差一點點！'
+    const copy = getMessages().dynamic
+    const spend = lastResultSpend ?? coinLedger.snapshot()
+    resultSpend.textContent = format(won ? copy.spendWon : copy.spendLost, {
+      amount: spend.amount, title: titleForAmount(spend.amount),
+    })
+    resultTitle.textContent = won ? copy.resultWon : copy.resultLost
+    const prizeIndex = snapshot.wonPrizeIndex
+    resultPrize.hidden = !won || prizeIndex === undefined || prizeIndex < 0
+    if (!resultPrize.hidden) {
+      resultPrizePortrait.src = game.prizePortrait(prizeIndex!)
+      resultPrizeName.textContent = getMessages().prizes[prizeIndex!] ?? ''
+    }
     resultCopy.textContent = !won && game.hasStuckPrizeAtChute()
-      ? '娃娃好像卡在洞口了？呼叫店員確認，就不必白白再投一枚。'
+      ? copy.stuckAtChute
       : snapshot.banter.text
     resultClerkButton.hidden = won
   }
 }
 
 function showClerkAssist(): void {
+  const copy = getMessages().dynamic
   clerkDialog.removeAttribute('data-phase')
-  clerkSound.textContent = '欸！'
-  clerkCopy.textContent = '店員盯著你和機台看了很久，終於嘆了口氣：「好啦，這局我當你場外教練。想喬哪一隻？」'
-  clerkDecline.textContent = '不用，我自己來'
+  clerkSound.textContent = copy.clerkSound
+  clerkCopy.textContent = copy.clerkIntro
+  clerkDecline.textContent = copy.clerkDecline
   clerkChoices.replaceChildren(...game.availablePrizesForClerk().map(({ index, name }) => {
     const button = document.createElement('button')
     button.type = 'button'
     button.className = 'clerk-choice'
-    button.setAttribute('aria-label', `請店員移動${name}`)
+    button.setAttribute('aria-label', format(copy.movePrizeAria, { name }))
     const icon = document.createElement('img')
     icon.className = 'clerk-choice-portrait'
     icon.src = game.prizePortrait(index)
@@ -346,12 +418,12 @@ function showClerkAssist(): void {
       if (!placement) return
       clerkAssist.completePlacement()
       clerkDialog.dataset.phase = 'placing'
-      clerkSound.textContent = placement.type === 'swapped' ? '對調！' : '咻！'
+      clerkSound.textContent = placement.type === 'swapped' ? copy.swappedSound : copy.placedSound
       clerkCopy.textContent = placement.type === 'swapped'
-        ? `店員把${name}和洞口旁的${placement.displaced}對調：「位置喬好了，運氣我可沒辦法喬。」`
-        : `店員把${name}擺到洞口旁：「都送到門口了，再夾不到我也只能幫你鼓掌。」`
+        ? format(copy.swapped, { name, displaced: placement.displaced })
+        : format(copy.placed, { name })
       for (const choice of clerkChoices.querySelectorAll('button')) choice.disabled = true
-      clerkDecline.textContent = '完成擺位，繼續玩'
+      clerkDecline.textContent = copy.placementDone
       clerkDecline.focus({ preventScroll: true })
     })
     return button
@@ -363,12 +435,21 @@ function showClerkAssist(): void {
 
 function renderSpend(spend: SpendSnapshot): void {
   spendValue.textContent = String(spend.amount)
-  spendTitle.textContent = spend.title
+  spendTitle.textContent = titleForAmount(spend.amount)
+}
+
+function titleForAmount(amount: number): string {
+  for (let index = spendTitles.length - 1; index >= 0; index -= 1) {
+    if (amount >= spendTitles[index]!.threshold) return getMessages().titles[index]!.name
+  }
+  return getMessages().noTitle
 }
 
 function renderTitleGallery(): void {
   const unlocked = coinLedger.unlockedTitles()
-  titlesCount.textContent = `已獲得 ${unlocked.length} / ${spendTitles.length}`
+  titlesCount.textContent = format(getMessages().dynamic.titlesCount, {
+    count: unlocked.length, total: spendTitles.length,
+  })
   titlesEmpty.hidden = unlocked.length > 0
   titlesList.replaceChildren(...unlocked.map((title) => {
     const item = document.createElement('li')
@@ -386,7 +467,7 @@ function renderTitleGallery(): void {
     const detail = document.createElement('p')
     detail.textContent = title.description
     const requirement = document.createElement('small')
-    requirement.textContent = `單次夾出前累計投入 NT$${title.threshold} 達成`
+    requirement.textContent = format(getMessages().dynamic.titleRequirement, { amount: title.threshold })
     copy.append(name, detail, requirement)
     item.append(icon, copy)
     return item
@@ -396,9 +477,8 @@ function renderTitleGallery(): void {
 function showAchievement(title: SpendTitle, amount: number): void {
   if (achievementTimeout !== undefined) clearTimeout(achievementTimeout)
   banterPresenter.clear()
-  achievementIcon.textContent = title.emoji
-  achievementTitle.textContent = title.name
-  achievementCopy.textContent = `累計投入 NT$${amount}`
+  activeAchievement = { threshold: title.threshold, amount }
+  renderAchievement(title.threshold, amount)
   achievementToast.hidden = false
   achievementToast.classList.remove('is-showing')
   document.querySelector('.game-shell')?.classList.remove('is-achievement')
@@ -413,10 +493,19 @@ function showAchievement(title: SpendTitle, amount: number): void {
     achievementToast.classList.remove('is-showing')
     document.querySelector('.game-shell')?.classList.remove('is-achievement')
     achievementTimeout = undefined
+    activeAchievement = undefined
     if (currentSnapshot && !currentSnapshot.isReady && !currentSnapshot.result) {
       banterPresenter.show(currentSnapshot.banter)
     }
   }, 3_200)
+}
+
+function renderAchievement(threshold: number, amount: number): void {
+  const index = spendTitles.findIndex((title) => title.threshold === threshold)
+  if (index < 0) return
+  achievementIcon.textContent = spendTitles[index]!.emoji
+  achievementTitle.textContent = getMessages().titles[index]!.name
+  achievementCopy.textContent = format(getMessages().dynamic.achievementSpend, { amount })
 }
 
 function renderBanter({ durationMs, line }: BanterRender): void {

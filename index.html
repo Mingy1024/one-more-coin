@@ -34,34 +34,34 @@
     </style>
   </head>
   <body data-loading>
-    <section id="loading-screen" role="status" aria-live="polite" aria-label="遊戲載入中">
+    <section id="loading-screen" role="status" aria-live="polite" aria-label="遊戲載入中" data-i18n-aria="loadingAria">
       <div class="loading-card">
-        <span class="loading-kicker">ONE MORE COIN · 開機中</span>
+        <span class="loading-kicker" data-i18n="loadingKicker">ONE MORE COIN · 開機中</span>
         <span class="loading-coin" aria-hidden="true">10</span>
-        <strong class="loading-title">機台準備中</strong>
-        <span id="loading-copy" class="loading-copy">正在擺好娃娃，先別急著投幣…</span>
+        <strong class="loading-title" data-i18n="loadingTitle">機台準備中</strong>
+        <span id="loading-copy" class="loading-copy" data-i18n="loadingCopy">正在擺好娃娃，先別急著投幣…</span>
         <div class="loading-track" aria-hidden="true"></div>
-        <a class="loading-retry" href="">載入太久？重新整理</a>
+        <a class="loading-retry" href="" data-i18n="loadingRetry">載入太久？重新整理</a>
       </div>
     </section>
     <main class="game-shell">
-      <canvas id="game-canvas" aria-label="3D 夾娃娃機遊戲畫面"></canvas>
+      <canvas id="game-canvas" aria-label="3D 夾娃娃機遊戲畫面" data-i18n-aria="canvasAria"></canvas>
 
       <header class="topbar">
-        <button id="reset-button" class="reset-button" type="button" aria-label="重置娃娃位置並補回獎品" title="重置娃娃位置並補回獎品">
-          <span aria-hidden="true">↻</span><span class="topbar-button-label">重置</span>
+        <button id="reset-button" class="reset-button" type="button" aria-label="重置娃娃位置並補回獎品" title="重置娃娃位置並補回獎品" data-i18n-aria="resetAria" data-i18n-title="resetAria">
+          <span aria-hidden="true">↻</span><span class="topbar-button-label" data-i18n="reset">重置</span>
         </button>
         <button id="titles-button" class="titles-button" type="button" aria-haspopup="dialog" aria-controls="titles-dialog">
-          <span aria-hidden="true">✦</span><span class="topbar-button-label">稱號一覽</span>
+          <span aria-hidden="true">✦</span><span class="topbar-button-label" data-i18n="titles">稱號一覽</span>
         </button>
-        <button id="clerk-call-button" class="clerk-call-button" type="button" aria-label="呼叫店員" aria-haspopup="dialog" aria-controls="clerk-call-dialog">
-          <span aria-hidden="true">☎</span><span class="topbar-button-label">呼叫店員</span>
+        <button id="clerk-call-button" class="clerk-call-button" type="button" aria-label="呼叫店員" data-i18n-aria="callClerk" aria-haspopup="dialog" aria-controls="clerk-call-dialog">
+          <span aria-hidden="true">☎</span><span class="topbar-button-label" data-i18n="callClerk">呼叫店員</span>
         </button>
         <div class="hud" aria-live="polite">
-          <div class="timer-hud"><span class="hud-label">剩餘秒數</span><strong id="time-value">30</strong></div>
-          <div><span class="hud-label">出爪</span><strong id="attempt-value">0</strong></div>
+          <div class="timer-hud"><span class="hud-label" data-i18n="timeLeft">剩餘秒數</span><strong id="time-value">30</strong></div>
+          <div><span class="hud-label" data-i18n="attempts">出爪</span><strong id="attempt-value">0</strong></div>
           <div class="spend-hud">
-            <span class="hud-label">累計投入</span>
+            <span class="hud-label" data-i18n="totalSpend">累計投入</span>
             <strong>NT$<span id="spend-value">0</span></strong>
             <span id="spend-title" class="spend-title">尚未入坑</span>
           </div>
@@ -73,10 +73,10 @@
         <span id="status-text">移動搖桿，對準禮物</span>
       </section>
 
-      <section id="start-panel" class="start-panel" aria-label="開始遊戲">
-        <button id="start-button" type="button" aria-label="投入 10 元，開始挑戰">
+      <section id="start-panel" class="start-panel" aria-label="開始遊戲" data-i18n-aria="startAria">
+        <button id="start-button" type="button" aria-label="投入 10 元，開始挑戰" data-i18n-aria="insertCoinAria">
           <span class="coin-mark" aria-hidden="true"><i>10</i></span>
-          <strong>投入 10 元・開始挑戰</strong>
+          <strong data-i18n="insertCoin">投入 10 元・開始挑戰</strong>
         </button>
       </section>
 
@@ -84,7 +84,7 @@
         <div class="achievement-rays" aria-hidden="true"></div>
         <div class="achievement-panel">
           <span id="achievement-icon" class="achievement-icon" aria-hidden="true">🪙</span>
-          <span class="achievement-eyebrow">機台認證・新稱號</span>
+          <span class="achievement-eyebrow" data-i18n="achievementEyebrow">機台認證・新稱號</span>
           <strong id="achievement-title">試水溫選手</strong>
           <span id="achievement-copy">累計投入 NT$10</span>
         </div>
@@ -98,12 +98,22 @@
         </span>
       </aside>
 
-      <section id="game-controls" class="controls is-locked" aria-label="遊戲控制" aria-disabled="true">
+      <section id="game-controls" class="controls is-locked" aria-label="遊戲控制" data-i18n-aria="controlsAria">
         <div class="joystick-wrap">
-          <div id="joystick" class="joystick" role="group" aria-label="移動夾爪">
+          <div id="joystick" class="joystick" role="group" aria-label="移動夾爪" aria-disabled="true" data-i18n-aria="moveClawAria">
             <div id="joystick-knob" class="joystick-knob"></div>
           </div>
-          <span>移動</span>
+          <span data-i18n="move">移動</span>
+        </div>
+
+        <div class="locale-switch">
+          <button id="locale-button" class="locale-button" type="button" aria-label="切換語言" data-i18n-aria="languageAria" aria-expanded="false" aria-controls="locale-menu">
+            <span id="locale-button-label">中文</span>
+          </button>
+          <div id="locale-menu" class="locale-menu" role="group" aria-label="切換語言" data-i18n-aria="languageAria" hidden>
+            <button type="button" data-locale="zh-Hant" aria-pressed="true">中文</button>
+            <button type="button" data-locale="jp" aria-pressed="false">日本語</button>
+          </div>
         </div>
 
         <button id="grab-button" class="grab-button" type="button">
@@ -112,33 +122,40 @@
         </button>
       </section>
 
-      <p class="view-hint">↔ 拖曳旋轉視角</p>
-      <p class="desktop-hint">拖曳畫面旋轉・WASD / 方向鍵移動・空白鍵出爪／二收</p>
+      <p class="view-hint" data-i18n="viewHint">↔ 拖曳旋轉視角</p>
+      <p class="desktop-hint" data-i18n="desktopHint">拖曳畫面旋轉・WASD / 方向鍵移動・空白鍵出爪／二收</p>
 
       <section id="result-modal" class="result-modal" role="dialog" aria-modal="true" aria-labelledby="result-title" hidden>
         <div class="result-panel">
           <span id="result-icon" class="result-icon" aria-hidden="true">★</span>
-          <p class="eyebrow">景品研究結果</p>
+          <p class="eyebrow" data-i18n="resultEyebrow">景品研究結果</p>
           <h1 id="result-title">成功夾到了！</h1>
+          <div id="result-prize" class="result-prize" hidden>
+            <img id="result-prize-portrait" class="clerk-choice-portrait" alt="" width="64" height="64">
+            <div class="result-prize-details">
+              <span data-i18n="resultPrizeLabel">本次夾中</span>
+              <strong id="result-prize-name"></strong>
+            </div>
+          </div>
           <p id="result-copy">禮物已安全抵達取物口。</p>
           <p id="result-spend" class="result-spend">本次投入 NT$10</p>
-          <button id="restart-button" type="button">再玩一次</button>
-          <button id="result-clerk-button" class="result-clerk-button" type="button">呼叫店員</button>
+          <button id="restart-button" type="button" data-i18n="playAgain">再玩一次</button>
+          <button id="result-clerk-button" class="result-clerk-button" type="button" data-i18n="callClerk">呼叫店員</button>
         </div>
       </section>
     </main>
     <dialog id="titles-dialog" class="titles-dialog" aria-labelledby="titles-dialog-title" aria-describedby="titles-dialog-copy">
       <div class="titles-dialog-inner">
         <div class="titles-dialog-header">
-          <span class="titles-dialog-kicker">COIN RECORD / 01</span>
-          <button id="titles-close" class="titles-close" type="button" aria-label="關閉稱號一覽">×</button>
+          <span class="titles-dialog-kicker" data-i18n="titlesKicker">投幣紀錄 / 01</span>
+          <button id="titles-close" class="titles-close" type="button" aria-label="關閉稱號一覽" data-i18n-aria="closeTitlesAria">×</button>
           <span class="titles-dialog-emblem" aria-hidden="true">✦</span>
-          <h2 id="titles-dialog-title">稱號一覽</h2>
-          <p id="titles-dialog-copy">每一枚十元，都是你和機台的共同回憶。</p>
+          <h2 id="titles-dialog-title" data-i18n="titles">稱號一覽</h2>
+          <p id="titles-dialog-copy" data-i18n="titlesCopy">每一枚十元，都是你和機台的共同回憶。</p>
           <span id="titles-count" class="titles-count">已獲得 0 / 8</span>
         </div>
-        <ol id="titles-list" class="titles-list" aria-label="已獲得的稱號"></ol>
-        <p id="titles-empty" class="titles-empty">還沒有獲得稱號。投入第一枚 10 元，從試水溫開始！</p>
+        <ol id="titles-list" class="titles-list" aria-label="已獲得的稱號" data-i18n-aria="titlesListAria"></ol>
+        <p id="titles-empty" class="titles-empty" data-i18n="titlesEmpty">還沒有獲得稱號。投入第一枚 10 元，從試水溫開始！</p>
       </div>
     </dialog>
     <dialog id="clerk-dialog" class="clerk-dialog" aria-labelledby="clerk-dialog-title" aria-describedby="clerk-dialog-copy">
@@ -148,11 +165,11 @@
         <span id="clerk-sound" class="clerk-sound">欸！</span>
       </div>
       <div class="clerk-content">
-        <span class="clerk-kicker">HIDDEN EVENT · 店員介入</span>
-        <h2 id="clerk-dialog-title">店員看不下去了！</h2>
+        <span class="clerk-kicker" data-i18n="clerkKicker">隱藏事件 · 店員介入</span>
+        <h2 id="clerk-dialog-title" data-i18n="clerkTitle">店員看不下去了！</h2>
         <p id="clerk-dialog-copy">店員盯著你和機台看了很久，終於嘆了口氣：「好啦，這局我當你場外教練。想喬哪一隻？」</p>
-        <p class="clerk-prompt">想請店員幫哪一隻？</p>
-        <div id="clerk-choices" class="clerk-choices" role="group" aria-label="選擇要移動的娃娃"></div>
+        <p class="clerk-prompt" data-i18n="clerkPrompt">想請店員幫哪一隻？</p>
+        <div id="clerk-choices" class="clerk-choices" role="group" aria-label="選擇要移動的娃娃" data-i18n-aria="clerkChoicesAria"></div>
         <button id="clerk-decline" class="clerk-decline" type="button">不用，我自己來</button>
       </div>
     </dialog>
@@ -160,18 +177,18 @@
       <div class="clerk-scene" aria-hidden="true">
         <span class="clerk-speedlines"></span>
         <span class="clerk-character">🧑‍💼</span>
-        <span class="clerk-sound">嗯？</span>
+        <span class="clerk-sound" data-i18n="clerkCallSound">嗯？</span>
       </div>
       <div class="clerk-content">
-        <span class="clerk-kicker">STAFF CALL · 現場支援</span>
-        <h2 id="clerk-call-title">呼叫店員</h2>
-        <p id="clerk-call-copy">這位客人，請問需要什麼協助？</p>
+        <span class="clerk-kicker" data-i18n="clerkCallKicker">店員支援 · 現場協助</span>
+        <h2 id="clerk-call-title" data-i18n="callClerk">呼叫店員</h2>
+        <p id="clerk-call-copy" data-i18n="clerkCallCopy">這位客人，請問需要什麼協助？</p>
         <div class="clerk-call-options">
-          <button id="clerk-rescue-button" class="clerk-choice" type="button">🧸 娃娃卡在洞口，幫我拿取</button>
-          <button id="clerk-placement-button" class="clerk-choice" type="button">↔ 請幫忙擺娃娃位置</button>
+          <button id="clerk-rescue-button" class="clerk-choice" type="button" data-i18n="clerkRescue">🧸 娃娃卡在洞口，幫我拿取</button>
+          <button id="clerk-placement-button" class="clerk-choice" type="button" data-i18n="clerkPlacement">↔ 請幫忙擺娃娃位置</button>
         </div>
         <p id="clerk-call-feedback" class="clerk-call-feedback" role="status" aria-live="polite" hidden></p>
-        <button id="clerk-call-close" class="clerk-decline" type="button">關閉</button>
+        <button id="clerk-call-close" class="clerk-decline" type="button" data-i18n="close">關閉</button>
       </div>
     </dialog>
     <script type="module" src="/src/main.ts"></script>

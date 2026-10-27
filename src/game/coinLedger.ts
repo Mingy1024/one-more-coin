@@ -1,3 +1,5 @@
+import { getMessages } from '../i18n'
+
 export interface SpendTitle {
   description: string
   emoji: string
@@ -19,15 +21,11 @@ interface TitleStorage {
   setItem(key: string, value: string): void
 }
 
-export const spendTitles: SpendTitle[] = [
-  { threshold: 10, name: '試水溫選手', emoji: '🪙', description: '第一枚硬幣落下，朋友已經開始看戲。' },
-  { threshold: 30, name: '再一枚就好', emoji: '🤏', description: '每次都說最後一次，機台都記得。' },
-  { threshold: 50, name: '上好美盤', emoji: '🥏', description: '盤得很有自信，至少姿勢要漂亮。' },
-  { threshold: 80, name: '不信邪挑戰者', emoji: '😤', description: '角度沒問題，一定是剛剛風比較大。' },
-  { threshold: 100, name: '無情的投幣機器', emoji: '🦾', description: '手比腦快，十元硬幣自動上膛。' },
-  { threshold: 150, name: '機台榮譽股東', emoji: '📈', description: '投入這麼多，差點想參加股東會。' },
-  { threshold: 200, name: '老闆看到會敬禮', emoji: '🫡', description: '老闆遠遠看見你，先把燈打亮。' },
-  { threshold: 300, name: '今晚真的不用睡', emoji: '🌙', description: '娃娃還沒出來，睡意已經先走了。' },
+export const spendTitles = [
+  { threshold: 10, emoji: '🪙' }, { threshold: 30, emoji: '🤏' },
+  { threshold: 50, emoji: '🥏' }, { threshold: 80, emoji: '😤' },
+  { threshold: 100, emoji: '🦾' }, { threshold: 150, emoji: '📈' },
+  { threshold: 200, emoji: '🫡' }, { threshold: 300, emoji: '🌙' },
 ]
 
 export class CoinLedger {
@@ -66,15 +64,15 @@ export class CoinLedger {
 
     return {
       amount: this.amount,
-      title: currentTitle?.name ?? '尚未入坑',
-      achievement: currentTitle !== previousTitle ? currentTitle : undefined,
+      title: currentTitle?.name ?? getMessages().noTitle,
+      achievement: currentTitle?.threshold !== previousTitle?.threshold ? currentTitle : undefined,
     }
   }
 
   snapshot(): SpendSnapshot {
     return {
       amount: this.amount,
-      title: this.currentTitle()?.name ?? '尚未入坑',
+      title: this.currentTitle()?.name ?? getMessages().noTitle,
     }
   }
 
@@ -85,16 +83,23 @@ export class CoinLedger {
   }
 
   unlockedTitles(): SpendTitle[] {
-    return spendTitles.filter((title) => this.unlockedThresholds.has(title.threshold))
+    return spendTitles.flatMap((title, index) =>
+      this.unlockedThresholds.has(title.threshold) ? [localizedTitle(index)] : [])
   }
 
   private currentTitle(): SpendTitle | undefined {
     for (let index = spendTitles.length - 1; index >= 0; index -= 1) {
       const title = spendTitles[index]
-      if (title && this.amount >= title.threshold) return title
+      if (title && this.amount >= title.threshold) return localizedTitle(index)
     }
     return undefined
   }
+}
+
+function localizedTitle(index: number): SpendTitle {
+  const meta = spendTitles[index]!
+  const copy = getMessages().titles[index]!
+  return { ...meta, ...copy }
 }
 
 function browserStorage(): TitleStorage | undefined {

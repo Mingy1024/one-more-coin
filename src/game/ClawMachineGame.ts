@@ -42,6 +42,8 @@ import { createGantryAssembly } from './gantry'
 import { createArcadeRoom } from './arcadeRoom'
 import { createSideStickers } from './sideStickers'
 import { chooseClerkPlacement, findClerkSwapIndex } from './clerkAssist'
+import { getMessages } from '../i18n'
+import { zhHant } from '../i18n/zh-Hant'
 import {
   TILT_GRIP_OPENING,
   tiltAmountForPhase,
@@ -53,9 +55,10 @@ export interface GameSnapshot {
   attempts: number
   banter: BanterLine
   canGrab: boolean
-  grabLabel: '出爪' | '二收'
+  grabLabel: string
   isReady: boolean
   result?: 'won' | 'lost'
+  wonPrizeIndex?: number
   status: string
   timeLeft: number
 }
@@ -106,7 +109,7 @@ export const INITIAL_PRIZE_PLACEMENTS = [
   prizePlacement(1.12, 0.62, 0.68, 0, 0.22),
   prizePlacement(-1.25, 0.62, -0.35, 0, -0.32),
 ] as const
-export const PRIZE_NAMES = ['哆啦A夢', '風速狗', '史努比', '呆呆獸', '妙蛙種子', '三眼怪'] as const
+export const PRIZE_NAMES = zhHant.prizes
 // Round, bulky plushes retain less grip; these tune difficulty without rolling a win probability.
 const PRIZE_GRIP_PROFILES = [
   { retention: 0.92, mass: 0.55 },
@@ -141,6 +144,8 @@ export class ClawMachineGame {
   private clawPosition = { ...CHUTE }
   private cycleStart = { ...CHUTE }
   private closingHeight: number = CLAW_LOW_Y
+  private closingStartOpening = 1
+  private openedForRelease = false
   private driveVelocity: PlanarMotion = { x: 0, z: 0 }
   private carried = false
   private lastGrabSucceeded = false
@@ -256,13 +261,17 @@ export class ClawMachineGame {
 
   grab(): void {
     if (this.round.phase === 'lowering') {
-      this.closingHeight = clawHeadHeight('lowering', phaseProgress(this.round), this.closingHeight)
+      const loweringProgress = phaseProgress(this.round)
+      this.closingHeight = clawHeadHeight('lowering', loweringProgress, this.closingHeight)
+      this.closingStartOpening = clawOpeningForPhase('lowering', loweringProgress, false, 1)
       this.round = stepRound(this.round, { type: 'SECOND_GRAB' })
       this.publishSnapshot()
       return
     }
     if (this.round.phase !== 'aiming') return
     this.closingHeight = CLAW_LOW_Y
+    this.closingStartOpening = 1
+    this.openedForRelease = false
     this.lastGrabSucceeded = false
     this.enteredChute = false
     this.slipped = false
@@ -317,6 +326,8 @@ export class ClawMachineGame {
     this.clawPosition = { ...CHUTE }
     this.cycleStart = { ...CHUTE }
     this.closingHeight = CLAW_LOW_Y
+    this.closingStartOpening = 1
+    this.openedForRelease = false
     this.driveVelocity = { x: 0, z: 0 }
     this.articulatedClaw.reset(CHUTE.x, CHUTE.z, ROPE_ANCHOR_Y - CLAW_TOP_Y)
     for (const prize of this.prizes) {
@@ -350,7 +361,11 @@ export class ClawMachineGame {
 
   availablePrizesForClerk(): Array<{ index: number; name: string }> {
     return this.prizes.flatMap((prize, index) =>
-      prize.claimed ? [] : [{ index, name: PRIZE_NAMES[index]! }])
+      prize.claimed ? [] : [{ index, name: getMessages().prizes[index]! }])
+  }
+
+  refreshLocale(): void {
+    this.publishSnapshot()
   }
 
   prizePortrait(index: number): string {
@@ -426,7 +441,7 @@ export class ClawMachineGame {
       const neighborPose = { position: { ...neighbor.body.translation() }, rotation: { ...neighbor.body.rotation() } }
       this.setPrizePose(prize, neighborPose.position, neighborPose.rotation)
       this.setPrizePose(neighbor, selectedPose.position, selectedPose.rotation)
-      return { type: 'swapped', displaced: PRIZE_NAMES[swapIndex]! }
+      return { type: 'swapped', displaced: getMessages().prizes[swapIndex]! }
     }
     const neighbors = this.prizes.filter((other) => other !== prize && !other.claimed)
       .map((other) => other.body.translation())
@@ -450,7 +465,7 @@ export class ClawMachineGame {
     prize.mesh.visible = false
     this.round = stepRound(this.round, { type: 'CLERK_RESCUE' })
     this.publishSnapshot()
-    return PRIZE_NAMES[this.prizes.indexOf(prize)]
+    return getMessages().prizes[this.prizes.indexOf(prize)]
   }
 
   hasStuckPrizeAtChute(): boolean {
@@ -546,9 +561,11 @@ export class ClawMachineGame {
       + (this.carried ? Math.max(0, 0.4 - this.gripStrength) * 0.25 : 0)
     const prongOpen = clawOpeningForPhase(
       phase,
-      phase === 'lowering' ? phaseFraction : progress,
+      phase === 'lowering' || phase === 'closing' ? phaseFraction : progress,
       this.carried || this.slipped,
       this.slipped ? 0.72 : holdingOpening,
+      this.closingStartOpening,
+      this.openedForRelease,
     )
 
     if (phase === 'returning') {
@@ -566,7 +583,10 @@ export class ClawMachineGame {
   }
 
   private handlePhaseChange(previous: RoundPhase, next: RoundPhase): void {
-    if (previous === 'returning' && next === 'releasing') this.releasePrize()
+    if (previous === 'returning' && next === 'releasing') {
+      this.openedForRelease = this.carried
+      this.releasePrize()
+    }
   }
 
   private tryPickup(): void {
@@ -1291,6 +1311,7 @@ export class ClawMachineGame {
   }
 
   private publishSnapshot(): void {
+    const messages = getMessages().game
     const showingSlip = this.slipped && (this.round.phase === 'lifting' || this.round.phase === 'returning'
       || this.round.phase === 'releasing' || this.round.phase === 'resetting')
     this.onSnapshot({
@@ -1302,15 +1323,17 @@ export class ClawMachineGame {
         timeLeft: this.round.timeLeft,
       }),
       canGrab: this.round.phase === 'aiming' || this.round.phase === 'lowering',
-      grabLabel: this.round.phase === 'lowering' ? '二收' : '出爪',
+      grabLabel: this.round.phase === 'lowering' ? messages.earlyClose : messages.grab,
       isReady: this.round.phase === 'ready',
       result: this.round.phase === 'won' || this.round.phase === 'lost' ? this.round.phase : undefined,
-      status: showingSlip ? '滑了滑了！娃娃說它還沒下班。'
+      wonPrizeIndex: this.round.phase === 'won' && this.activePrize?.claimed
+        ? this.prizes.indexOf(this.activePrize) : undefined,
+      status: showingSlip ? messages.slipped
         : this.round.phase === 'aiming' && this.prizes.some((prize) =>
         tiltPlanForAim(this.clawPosition, prize.body.translation()))
-        ? '偏側下爪：可試試倒爪！'
+        ? messages.tiltHint
         : this.round.phase === 'lowering' && this.tiltPlan
-          ? '倒爪中：再按二收可提早夾住！'
+          ? messages.tilting
           : statusForPhase(this.round.phase),
       timeLeft: this.round.timeLeft,
     })
@@ -1375,19 +1398,7 @@ export class ClawMachineGame {
 }
 
 function statusForPhase(phase: RoundPhase): string {
-  const messages: Record<RoundPhase, string> = {
-    ready: '先拖曳畫面確認目標，準備好再開始',
-    aiming: '移動搖桿，讓夾爪對準娃娃',
-    lowering: '夾爪下降中，再按二收可提早收爪',
-    closing: '正在夾取！',
-    lifting: '穩住，慢慢升起…',
-    returning: '送往發光的取物口',
-    releasing: '放開禮物！',
-    resetting: '夾爪準備歸位',
-    won: '成功！禮物到手了',
-    lost: '本局結束，請重新投幣再挑戰',
-  }
-  return messages[phase]
+  return getMessages().game.status[phase]
 }
 
 function smoothStep(value: number): number {

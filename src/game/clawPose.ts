@@ -22,15 +22,25 @@ export function clawOpeningForPhase(
   progress: number,
   carried: boolean,
   gripOpening: number,
+  closingStartOpening = 1,
+  openedForRelease = true,
 ): number {
   if (phase === 'ready' || phase === 'aiming') return 0
   if (phase === 'lowering') {
     const opening = Math.min(1, Math.max(0, progress / 0.2))
     return opening * opening * (3 - 2 * opening)
   }
-  if (phase === 'closing') return 1 + (gripOpening - 1) * progress
+  if (phase === 'closing') {
+    const closingProgress = 1 - (1 - progress) ** 2
+    return closingStartOpening + (gripOpening - closingStartOpening) * closingProgress
+  }
   if (phase === 'lifting' || phase === 'returning') return carried ? gripOpening : 0
-  if (phase === 'releasing') return gripOpening + (1 - gripOpening) * progress
-  if (phase === 'resetting') return 1 - Math.max(0, (progress - 0.5) * 2)
+  if (phase === 'releasing') {
+    return openedForRelease ? gripOpening + (1 - gripOpening) * progress : carried ? gripOpening : 0
+  }
+  if (phase === 'resetting') {
+    const initialOpening = openedForRelease ? 1 : carried ? gripOpening : 0
+    return initialOpening * (1 - Math.max(0, (progress - 0.5) * 2))
+  }
   return 0
 }

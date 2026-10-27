@@ -1,4 +1,5 @@
 import type { RoundPhase } from './round'
+import { getMessages } from '../i18n'
 
 export interface BanterContext {
   attempts: number
@@ -15,42 +16,43 @@ export interface BanterLine {
 
 export function banterFor(context: BanterContext): BanterLine {
   const { attempts, carried, phase, timeLeft } = context
+  const b = getMessages().banter
 
   if (phase === 'ready') {
-    return line('朋友群', '👀', '大家先安靜，他又在研究角度了。')
+    return line(b.friends, '👀', b.ready)
   }
 
   if (phase === 'aiming') {
-    if (timeLeft <= 5) return line('朋友 A', '⏱', '最後五秒，尊嚴不要了，直接下！')
-    if (timeLeft <= 10) return line('本人', '😤', '這裡不夾出來，晚上睡不著。')
-    if (attempts >= 2) return line('朋友 B', '🧾', '都夾這麼多了，盤要盤得有價值。')
-    if (attempts === 1) return line('朋友 A', '🤔', '剛剛那次不算，手感才剛熱。')
-    return line('本人', '😎', '夾了啦，哪次不夾。')
+    if (timeLeft <= 5) return line(b.friendA, '⏱', b.lastFive)
+    if (timeLeft <= 10) return line(b.player, '😤', b.lastTen)
+    if (attempts >= 2) return line(b.friendB, '🧾', b.repeated)
+    if (attempts === 1) return line(b.friendA, '🤔', b.firstTry)
+    return line(b.player, '😎', b.confident)
   }
 
   if (phase === 'lowering' || phase === 'closing') {
-    return line('朋友群', '👀', '有喔有喔，感覺要夾到了！')
+    return line(b.friends, '👀', b.lowering)
   }
 
   if (phase === 'lifting' || phase === 'returning' || phase === 'releasing') {
     return carried
-      ? line('朋友 A', '🤫', '有有有！先不要叫，還沒進洞！')
-      : line('機台', '✨', '感謝使用「摸一下就走」服務。')
+      ? line(b.friendA, '🤫', b.carried)
+      : line(b.machine, '✨', b.missed)
   }
 
   if (phase === 'resetting') {
     return carried
-      ? line('朋友 A', '🤫', '有有有！先不要叫，還沒進洞！')
-      : line('機台', '✨', '感謝使用「摸一下就走」服務。')
+      ? line(b.friendA, '🤫', b.carried)
+      : line(b.machine, '✨', b.missed)
   }
 
   if (phase === 'won') {
     return attempts <= 1
-      ? line('朋友 A', '😳', '欸不是，你真的一次就夾到了。')
-      : line('朋友群', '🎉', '花多少先不要問，至少真的夾到了。')
+      ? line(b.friendA, '😳', b.firstWin)
+      : line(b.friends, '🎉', b.win)
   }
 
-  return line('機台', '🫡', '本局結束，再投 10 元繼續證明自己。')
+  return line(b.machine, '🫡', b.lost)
 }
 
 function line(speaker: string, emoji: string, text: string): BanterLine {
