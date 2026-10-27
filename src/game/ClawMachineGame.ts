@@ -395,6 +395,23 @@ export class ClawMachineGame {
     const previousColor = this.renderer.getClearColor(new THREE.Color())
     const previousAlpha = this.renderer.getClearAlpha()
     const portraits: string[] = []
+    const portraitMaterials = new Map<THREE.Material, THREE.Material>()
+    const restorePortraitMaterial = (material: THREE.Material): THREE.Material => {
+      const cached = portraitMaterials.get(material)
+      if (cached) return cached
+
+      const restored = material.clone()
+      if (restored instanceof THREE.MeshStandardMaterial) {
+        restored.color.multiplyScalar(1 / PRIZE_MATERIAL_BRIGHTNESS)
+        if (restored instanceof THREE.MeshPhysicalMaterial) {
+          restored.sheenColor.multiplyScalar(1 / PRIZE_MATERIAL_BRIGHTNESS)
+        }
+      } else if (restored instanceof THREE.LineBasicMaterial) {
+        restored.color.multiplyScalar(1 / PRIZE_MATERIAL_BRIGHTNESS)
+      }
+      portraitMaterials.set(material, restored)
+      return restored
+    }
 
     try {
       this.renderer.setClearColor(0x000000, 0)
@@ -403,7 +420,13 @@ export class ClawMachineGame {
         const model = prize.mesh.clone(true)
         model.position.set(0, 0, 0)
         model.quaternion.identity()
-        model.traverse((part) => { if (part instanceof THREE.Light) part.visible = false })
+        model.traverse((part) => {
+          if (part instanceof THREE.Light) part.visible = false
+          if (!(part instanceof THREE.Mesh || part instanceof THREE.LineSegments)) return
+          part.material = Array.isArray(part.material)
+            ? part.material.map(restorePortraitMaterial)
+            : restorePortraitMaterial(part.material)
+        })
         const bounds = new THREE.Box3().setFromObject(model)
         const center = bounds.getCenter(new THREE.Vector3())
         const extent = bounds.getSize(new THREE.Vector3())
@@ -427,6 +450,7 @@ export class ClawMachineGame {
       this.renderer.setRenderTarget(previousTarget)
       this.renderer.setClearColor(previousColor, previousAlpha)
       target.dispose()
+      for (const material of portraitMaterials.values()) material.dispose()
     }
 
     return portraits
