@@ -3,10 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { banterFor } from './banter'
 
 describe('contextual banter', () => {
-  it('opens with the player acting confident', () => {
+  it('has a friend tease the player for acting confident', () => {
     const line = banterFor({ phase: 'aiming', attempts: 0, timeLeft: 30, carried: false })
 
-    expect(line).toMatchObject({ speaker: '本人', text: '夾了啦，哪次不夾。' })
+    expect(line).toMatchObject({ speaker: '朋友 B', text: '又來了，「這把穩了」是吧？' })
   })
 
   it('makes the friends react while the claw is lowering', () => {
@@ -18,13 +18,13 @@ describe('contextual banter', () => {
   it('escalates the joke when time is running out', () => {
     const line = banterFor({ phase: 'aiming', attempts: 2, timeLeft: 8, carried: false })
 
-    expect(line.text).toBe('這裡不夾出來，晚上睡不著。')
+    expect(line.text).toBe('你這把再夾不到，晚上又要睡不著了吧。')
   })
 
   it('turns repeated attempts into a sunk-cost joke', () => {
     const line = banterFor({ phase: 'aiming', attempts: 2, timeLeft: 18, carried: false })
 
-    expect(line.text).toBe('都夾這麼多了，盤要盤得有價值。')
+    expect(line.text).toBe('都夾這麼多了，至少夾個回憶回去吧。')
   })
 
   it('celebrates the ending without asking what it cost', () => {

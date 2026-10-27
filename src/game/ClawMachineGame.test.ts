@@ -90,7 +90,7 @@ describe('claw machine session', () => {
     expect(events).toEqual(['render', 'ready'])
 
     ;(game as unknown as { update(): void }).update()
-    expect(events).toEqual(['render', 'ready', 'render'])
+    expect(events).toEqual(['render', 'ready'])
   })
 
   it('releases a weak grip into a physical fall without awarding a win', () => {
@@ -198,13 +198,14 @@ describe('claw machine session', () => {
       renderer: { render },
       scene: {},
       camera: {},
+      frameCallbacks: [],
     }) as ClawMachineGame
 
     game.setPaused(true)
     ;(game as unknown as { update(): void }).update()
 
     expect((game as unknown as { round: RoundState }).round).toBe(round)
-    expect(render).toHaveBeenCalledOnce()
+    expect(render).not.toHaveBeenCalled()
   })
 
   it('starts with a reachable side-lying prize and other varied angles', () => {

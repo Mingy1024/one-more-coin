@@ -42,4 +42,13 @@ describe('side-aimed tilt grab', () => {
     expect(canTiltPickup(prize, [top, lowerLeft, { x: -0.9, y: 0.44, z: 0.32 }])).toBe(false)
     expect(canTiltPickup(prize, [lowerLeft, lowerRight])).toBe(false)
   })
+
+  it('allows a small simulation tolerance at the high pad without accepting a clear miss', () => {
+    const prize = { x: 0, y: 0.62, z: 0 }
+    const lowerLeft = { x: -0.1, y: 0.44, z: -0.32 }
+    const lowerRight = { x: -0.1, y: 0.44, z: 0.32 }
+
+    expect(canTiltPickup(prize, [{ x: 0.545, y: 1.05, z: 0 }, lowerLeft, lowerRight])).toBe(true)
+    expect(canTiltPickup(prize, [{ x: 0.57, y: 1.05, z: 0 }, lowerLeft, lowerRight])).toBe(false)
+  })
 })

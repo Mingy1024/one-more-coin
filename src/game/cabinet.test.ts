@@ -181,10 +181,10 @@ describe('cabinet containment and chute', () => {
     const game = Object.assign(Object.create(ClawMachineGame.prototype), { scene, world }) as ClawMachineGame
     const placement = { position: { x: -0.38, y: 0.68, z: 0.55 }, rotation: { x: 0, y: 0, z: 0, w: 1 } }
     const prize = (game as unknown as {
-      createPrize(start: typeof placement, mesh: THREE.Group, color: number, glow: number, kind: string): {
+      createPrize(start: typeof placement, mesh: THREE.Group, kind: 'slowpoke'): {
         body: RAPIER.RigidBody
       }
-    }).createPrize(placement, new THREE.Group(), 0xffffff, 0, 'slowpoke')
+    }).createPrize(placement, new THREE.Group(), 'slowpoke')
     expect(prize.body.numColliders()).toBeGreaterThan(1)
     const tail = prize.body.collider(1)
     expect(tail.translation().z).toBeLessThan(placement.position.z - 0.35)

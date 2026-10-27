@@ -11,7 +11,7 @@ describe('language switching', () => {
     setLocale('jp')
 
     expect(banterFor({ phase: 'aiming', attempts: 2, timeLeft: 18, carried: false }))
-      .toMatchObject({ speaker: '友人B', text: 'ここまで来たら、せめて思い出くらい持ち帰ろう。' })
+      .toMatchObject({ speaker: '友人B', text: 'ここまで使ったんだから、思い出くらい持って帰らないとね。' })
     expect(getMessages().prizes[3]).toBe('ヤドン')
     expect(getMessages().game.status.lowering).toContain('早めに閉じます')
   })
