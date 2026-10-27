@@ -24,10 +24,10 @@ export function banterFor(context: BanterContext): BanterLine {
 
   if (phase === 'aiming') {
     if (timeLeft <= 5) return line(b.friendA, '⏱', b.lastFive)
-    if (timeLeft <= 10) return line(b.player, '😤', b.lastTen)
+    if (timeLeft <= 10) return line(b.friendB, '😤', b.lastTen)
     if (attempts >= 2) return line(b.friendB, '🧾', b.repeated)
     if (attempts === 1) return line(b.friendA, '🤔', b.firstTry)
-    return line(b.player, '😎', b.confident)
+    return line(b.friendB, '😎', b.confident)
   }
 
   if (phase === 'lowering' || phase === 'closing') {
