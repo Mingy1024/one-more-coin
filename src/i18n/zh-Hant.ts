@@ -90,6 +90,7 @@ export const zhHant = {
     contextLost: '機台畫面中斷，正在重新連接…', contextRestored: '正在重新點亮機台…',
     prizesReset: '娃娃已補回並重新擺放',
     rescued: '店員把{name}撈出來：「牠是來給你夾，還是打算住在機台裡？好啦，這局算你夾到！」',
+    rescuedRepositioned: '店員把卡住的{name}放回機台：「先讓牠站好，我們再來！」',
     rescueMissed: '店員探頭看了看：「卡住的目前只有你的期待。洞口和夾爪上都沒有卡住的娃娃啦。」',
     placementBusy: '店員指著忙碌的夾爪：「現在進去喬位置？我有上班，不是有九條命欸。」',
     placementTooSoon: '店員看你一眼：「我們才剛認識，你就要我幫你喬娃娃？先跟機台培養感情啦。」',

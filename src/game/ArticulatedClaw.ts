@@ -149,6 +149,24 @@ export class ArticulatedClaw {
     return this.headBody.linvel()
   }
 
+  isTouchingPrize(colliders: readonly RAPIER.Collider[]): boolean {
+    const clawBodies = new Set([this.headBody.handle, ...this.fingers.map(finger => finger.body.handle)])
+    let touching = false
+    for (const collider of colliders) {
+      this.world.contactPairsWith(collider, other => {
+        const parent = other.parent()
+        if (!parent || !clawBodies.has(parent.handle)) return
+        this.world.contactPair(collider, other, manifold => {
+          for (let i = 0; i < manifold.numContacts(); i++) {
+            if (manifold.contactDist(i) <= 0.03) touching = true
+          }
+        })
+      })
+      if (touching) return true
+    }
+    return false
+  }
+
   getGrabPosition(): RAPIER.Vector {
     const pose = this.getGrabPose()
     return { x: pose.x, y: pose.y, z: pose.z }

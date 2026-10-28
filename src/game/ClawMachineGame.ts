@@ -499,10 +499,19 @@ export class ClawMachineGame {
   }
 
   rescueStuckPrizeForClerk(): string | undefined {
-    if (!this.hasStuckPrizeForClerk() || !this.activePrize) return undefined
-    const prize = this.activePrize
+    const prize = this.findStuckPrizeForClerk()
+    if (!prize) return undefined
     this.carried = false
     this.articulatedClaw?.releaseGrip()
+    if (this.round.phase === 'ready') {
+      const neighbors = this.prizes.filter(other => other !== prize && !other.claimed)
+        .map(other => other.body.translation())
+      this.setPrizePose(prize, chooseClerkPlacement(neighbors), { x: 0, y: 0, z: 0, w: 1 })
+      this.stalePrizes?.delete(prize)
+      this.publishSnapshot()
+      return getMessages().prizes[this.prizes.indexOf(prize)]
+    }
+    this.activePrize = prize
     prize.claimed = true
     prize.carry.release()
     this.setPrizeSensor(prize, true)
@@ -522,15 +531,28 @@ export class ClawMachineGame {
   }
 
   hasStuckPrizeForClerk(): boolean {
-    if (this.hasStuckPrizeAtChute()) return true
-    if (this.round.phase !== 'lost' || !this.lastGrabSucceeded || !this.activePrize || this.activePrize.claimed) return false
+    return this.findStuckPrizeForClerk() !== undefined
+  }
+
+  private findStuckPrizeForClerk(): Prize | undefined {
+    if (this.hasStuckPrizeAtChute()) return this.activePrize
+    if (this.round.phase !== 'lost' && this.round.phase !== 'ready') return undefined
+    const candidates = this.activePrize
+      ? [this.activePrize, ...this.prizes.filter(prize => prize !== this.activePrize)]
+      : this.prizes
+    const touching = candidates.find(prize => !prize.claimed
+      && prize.body.translation().y > 1.1
+      && this.articulatedClaw?.isTouchingPrize?.(prize.colliders ?? [prize.collider]))
+    if (touching) return touching
+    if (this.round.phase !== 'lost' || !this.lastGrabSucceeded || !this.activePrize || this.activePrize.claimed) return undefined
     const position = this.activePrize.body.translation()
     const velocity = this.activePrize.body.linvel()
     const grab = this.articulatedClaw.getGrabPosition()
     return position.y > 1.1
       && Math.hypot(position.x - grab.x, position.z - grab.z) < 0.85
       && Math.abs(position.y - grab.y) < 1
-      && Math.hypot(velocity.x, velocity.y, velocity.z) < 0.5
+      && Math.hypot(velocity.x, velocity.y, velocity.z) < 1.2
+      ? this.activePrize : undefined
   }
 
   private setPrizePose(

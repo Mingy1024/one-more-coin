@@ -387,10 +387,11 @@ clerkCallDialog.addEventListener('close', () => {
   }
 })
 clerkRescueButton.addEventListener('click', () => {
+  const wasReady = currentSnapshot?.isReady
   const rescued = game.rescueStuckPrizeForClerk()
   const copy = getMessages().dynamic
   clerkCallFeedback.textContent = rescued
-    ? format(copy.rescued, { name: rescued })
+    ? format(wasReady ? copy.rescuedRepositioned : copy.rescued, { name: rescued })
     : copy.rescueMissed
   clerkCallFeedback.hidden = false
 })

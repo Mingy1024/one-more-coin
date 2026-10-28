@@ -92,6 +92,7 @@ export const jp = {
     contextLost: '画面が切れました。接続し直しています…', contextRestored: 'ゲーム機の画面を戻しています…',
     prizesReset: 'ぬいぐるみを補充して並べ直しました',
     rescued: '店員が{name}を救出。「ゲーム機に住み着く気だったの？はい、今回は獲得で！」',
+    rescuedRepositioned: '店員が引っかかった{name}を戻した。「体勢を整えたら、もう一回！」',
     rescueMissed: '店員が確認。「出口にもアームにも、引っかかった景品はありませんね。」',
     placementBusy: '店員「アームが動いている間は入れません。私の残機、九つもないので。」',
     placementTooSoon: '店員「まだ出会ったばかりですよ。まずはゲーム機と仲良くなってください。」',
