@@ -846,8 +846,12 @@ html[lang="ja"] .clerk-call-button .topbar-button-label { letter-spacing: 0; }
   .clerk-speedlines, .clerk-character, .clerk-sound, .clerk-dialog[data-phase="placing"] .clerk-character { animation-duration: 1ms; }
 }
 
+@media (max-width: 799px) {
+  .controls { padding-inline: 18px; }
+}
+
 @media (max-width: 359px) {
-  .controls { padding-inline: 4px; }
+  .controls { padding-inline: 10px; }
   .joystick, .grab-button { width: 82px; height: 82px; }
 }
 
@@ -871,6 +875,10 @@ html[lang="ja"] .clerk-call-button .topbar-button-label { letter-spacing: 0; }
   .joystick-knob { top: calc(50% - 21px); left: calc(50% - 21px); width: 42px; height: 42px; }
   .joystick-wrap > span, .view-hint, .desktop-hint { display: none; }
   .banter-card { top: 73px; width: min(300px, calc(100% - 190px)); }
+}
+
+@media (min-width: 800px) and (max-width: 860px) and (max-height: 620px) and (orientation: landscape) {
+  .controls { padding-inline: 18px; }
 }
 
 @media (max-height: 620px) and (orientation: portrait) {
