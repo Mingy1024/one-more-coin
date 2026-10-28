@@ -4,6 +4,17 @@ import { beforeAll, describe, expect, it } from 'vitest'
 
 import { ClawMachineGame, INITIAL_PRIZE_PLACEMENTS } from './ClawMachineGame'
 import { PRIZE_HALF_DEPTH, PRIZE_HALF_HEIGHT, PRIZE_HALF_WIDTH } from './prizeInteraction'
+import { ArticulatedClaw } from './ArticulatedClaw'
+import { createPrizeModel } from './prizeModel'
+import { createArcanineModel } from './arcanineModel'
+import { createSnoopyModel } from './snoopyModel'
+import { createSlowpokeModel } from './slowpokeModel'
+import { createBulbasaurModel } from './bulbasaurModel'
+import { createAlienModel } from './alienModel'
+
+import { prizeCollisionVertices } from './prizeCollision'
+import { CLAW_TRAVEL_BOUNDS } from './clawWorkspace'
+import { MACHINE_DIMENSIONS } from './machineDimensions'
 
 beforeAll(async () => { await RAPIER.init() })
 
@@ -16,6 +27,32 @@ function cabinet() {
 }
 
 describe('cabinet containment and chute', () => {
+  it('keeps both rows inside direct aiming reach after the real bodies settle together', () => {
+    const { world, scene } = cabinet()
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), { scene, world }) as ClawMachineGame
+    const internals = game as unknown as {
+      createPrize(placement: typeof INITIAL_PRIZE_PLACEMENTS[number], mesh: THREE.Group, kind?: 'slowpoke'): { body: RAPIER.RigidBody }
+      settleInitialPrizes(): void
+    }
+    const prizes = INITIAL_PRIZE_PLACEMENTS.map((placement, index) => internals.createPrize(placement, [createPrizeModel, createArcanineModel, createSnoopyModel, createSlowpokeModel, createBulbasaurModel, createAlienModel][index]!()))
+    Object.assign(game, {
+      prizes,
+      articulatedClaw: new ArticulatedClaw(world, scene, {
+        anchorY: MACHINE_DIMENSIONS.ropeAnchorY, headY: MACHINE_DIMENSIONS.clawTopY, x: -1.2, z: 0.96,
+      }),
+    })
+    internals.settleInitialPrizes()
+    const layout = JSON.stringify(prizes.map(prize => prize.body.translation()))
+    for (const [index, prize] of prizes.entries()) {
+      const p = prize.body.translation()
+      const detail = `prize ${index}; settled layout: ${layout}`
+      expect(p.x, detail).toBeGreaterThan(CLAW_TRAVEL_BOUNDS.minX + 0.04)
+      expect(p.x, detail).toBeLessThan(CLAW_TRAVEL_BOUNDS.maxX - 0.04)
+      expect(p.z, detail).toBeGreaterThan(CLAW_TRAVEL_BOUNDS.minZ + 0.04)
+      expect(p.z, detail).toBeLessThan(CLAW_TRAVEL_BOUNDS.maxZ - 0.04)
+    }
+    world.free()
+  })
   it('displays four unique trip-quote stickers across both side panels without overlap', () => {
     const { scene } = cabinet()
     const stickers = scene.getObjectByName('cabinet-side-stickers') as THREE.Group | undefined
@@ -143,15 +180,17 @@ describe('cabinet containment and chute', () => {
       const { x, y, z } = collider.translation()
       if (y > 0 && y < 0.3 && (Math.abs(x + 0.5) < 0.15 || Math.abs(z - 0.24) < 0.15)) guards.push(collider)
     })
-    for (const placement of INITIAL_PRIZE_PLACEMENTS) {
+    for (const [index, placement] of INITIAL_PRIZE_PLACEMENTS.entries()) {
+      const model = [createPrizeModel, createArcanineModel, createSnoopyModel, createSlowpokeModel, createBulbasaurModel, createAlienModel][index]!()
+      const { vertices } = prizeCollisionVertices(model)
       const overlaps: RAPIER.Collider[] = []
       world.intersectionsWithShape(
         placement.position,
         placement.rotation,
-        new RAPIER.Cuboid(PRIZE_HALF_WIDTH, PRIZE_HALF_HEIGHT, PRIZE_HALF_DEPTH),
+        new RAPIER.ConvexPolyhedron(vertices),
         collider => { if (guards.includes(collider)) overlaps.push(collider); return true },
       )
-      expect(overlaps).toHaveLength(0)
+      expect(overlaps, `prize ${index}`).toHaveLength(0)
     }
 
     const slowpoke = INITIAL_PRIZE_PLACEMENTS[3]
@@ -176,7 +215,7 @@ describe('cabinet containment and chute', () => {
     }
   })
 
-  it('gives Slowpoke’s projecting tail its own collision volume', () => {
+  it('includes Slowpoke’s projecting tail in its collision envelope', () => {
     const { scene, world } = cabinet()
     const game = Object.assign(Object.create(ClawMachineGame.prototype), { scene, world }) as ClawMachineGame
     const placement = { position: { x: -0.38, y: 0.68, z: 0.55 }, rotation: { x: 0, y: 0, z: 0, w: 1 } }
@@ -184,9 +223,10 @@ describe('cabinet containment and chute', () => {
       createPrize(start: typeof placement, mesh: THREE.Group, kind: 'slowpoke'): {
         body: RAPIER.RigidBody
       }
-    }).createPrize(placement, new THREE.Group(), 'slowpoke')
+    }).createPrize(placement, createSlowpokeModel(), 'slowpoke')
     expect(prize.body.numColliders()).toBeGreaterThan(1)
-    const tail = prize.body.collider(1)
-    expect(tail.translation().z).toBeLessThan(placement.position.z - 0.35)
+    const vertices = Array.from({ length: prize.body.numColliders() }, (_, i) =>
+      Array.from((prize.body.collider(i).shape as RAPIER.ConvexPolyhedron).vertices))
+    expect(vertices.some(points => points.some((value, index) => index % 3 === 2 && value < -0.56))).toBe(true)
   })
 })

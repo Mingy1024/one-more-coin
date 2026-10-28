@@ -95,6 +95,7 @@ export class ArticulatedClaw {
     )
     world.createCollider(
       RAPIER.ColliderDesc.cylinder(HEAD_HALF_HEIGHT, HEAD_RADIUS)
+        .setCollisionGroups(0x0002ffff).setSolverGroups(0x0002ffff)
         .setDensity(2.2)
         .setFriction(0.55)
         .setRestitution(0.05),
@@ -142,6 +143,10 @@ export class ArticulatedClaw {
 
   getHeadPosition(): RAPIER.Vector {
     return this.headBody.translation()
+  }
+
+  getHeadVelocity(): RAPIER.Vector {
+    return this.headBody.linvel()
   }
 
   getGrabPosition(): RAPIER.Vector {
@@ -616,6 +621,7 @@ export class ArticulatedClaw {
       )
       this.world.createCollider(
         RAPIER.ColliderDesc.capsule(length / 2, segment === 3 ? 0.045 : 0.035)
+          .setCollisionGroups(0x0002ffff).setSolverGroups(0x0002ffff)
           .setTranslation(
             (from.x + to.x) / 2,
             (from.y + to.y) / 2,
@@ -641,7 +647,7 @@ export class ArticulatedClaw {
       body,
       true,
     ) as RAPIER.RevoluteImpulseJoint
-    joint.setLimits(-0.3, 0.5)
+    joint.setLimits(CLOSED_ANGLE - 0.05, OPEN_ANGLE)
     joint.setContactsEnabled(false)
 
     const visual = this.createFingerVisual()

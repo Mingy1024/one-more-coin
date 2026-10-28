@@ -4,6 +4,13 @@ import { beforeAll, expect, it } from 'vitest'
 
 import { ClawMachineGame, INITIAL_PRIZE_PLACEMENTS } from './ClawMachineGame'
 import { ArticulatedClaw } from './ArticulatedClaw'
+import { createPrizeModel } from './prizeModel'
+import { createArcanineModel } from './arcanineModel'
+import { createSnoopyModel } from './snoopyModel'
+import { createSlowpokeModel } from './slowpokeModel'
+import { createBulbasaurModel } from './bulbasaurModel'
+import { createAlienModel } from './alienModel'
+
 import { MACHINE_DIMENSIONS } from './machineDimensions'
 
 beforeAll(async () => { await RAPIER.init() })
@@ -15,7 +22,7 @@ it('settles the real prize colliders before display and saves grounded reset pos
   type Prize = { body: RAPIER.RigidBody; mesh: THREE.Group; start: Placement }
   const game = Object.assign(Object.create(ClawMachineGame.prototype), { world, scene }) as {
     addCabinet(): void
-    createPrize(placement: Placement, mesh: THREE.Group, color: number, glow: number, kind?: 'slowpoke'): Prize
+    createPrize(placement: Placement, mesh: THREE.Group, kind?: 'slowpoke'): Prize
     settleInitialPrizes(): void
     articulatedClaw: ArticulatedClaw
     prizes: Prize[]
@@ -25,7 +32,7 @@ it('settles the real prize colliders before display and saves grounded reset pos
     anchorY: MACHINE_DIMENSIONS.ropeAnchorY, headY: MACHINE_DIMENSIONS.clawTopY, x: -1.2, z: 0.96,
   })
   game.prizes = INITIAL_PRIZE_PLACEMENTS.map((placement, index) =>
-    game.createPrize(placement, new THREE.Group(), 0xffffff, 0, index === 3 ? 'slowpoke' : undefined))
+    game.createPrize(placement, [createPrizeModel, createArcanineModel, createSnoopyModel, createSlowpokeModel, createBulbasaurModel, createAlienModel][index]!()))
 
   game.settleInitialPrizes()
 

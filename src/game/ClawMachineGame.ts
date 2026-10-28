@@ -6,6 +6,7 @@ import {
   createRound,
   phaseDurations,
   phaseProgress,
+  roundPhaseDuration,
   stepRound,
   type RoundPhase,
   type RoundState,
@@ -16,10 +17,13 @@ import { approachVelocity, type PlanarMotion } from './clawMotion'
 import { clawHeadHeight, clawOpeningForPhase } from './clawPose'
 import { ArticulatedClaw } from './ArticulatedClaw'
 import { MACHINE_DIMENSIONS } from './machineDimensions'
+import { CLAW_TRAVEL_BOUNDS } from './clawWorkspace'
+import { createReturnDisturbance, returnDisturbanceAt, returnTripDuration, type ReturnDisturbance } from './returnMotion'
 import { PrizeCarryController } from './PrizeCarryController'
+import { prizeCollisionVertices } from './prizeCollision'
 import {
-  CAPTURE_QUALITY, DROP_STRENGTH, evaluateGrip, nextGripStrength, normalGripHeight,
-  PLUSH_HALF_SEGMENT, PLUSH_RADIUS, transportStress,
+  CAPTURE_QUALITY, DROP_STRENGTH, chooseGripLevel, evaluateGrip, nextGripStrength, normalGripHeight,
+  transportStress,
 } from './gripMechanics'
 import {
   CHUTE_OPENING_HALF_X,
@@ -105,12 +109,12 @@ function prizePlacement(
 }
 
 export const INITIAL_PRIZE_PLACEMENTS = [
-  prizePlacement(0.48, 0.62, -0.18),
-  prizePlacement(-0.2, 0.62, -1.14, 0, 0.3),
-  prizePlacement(1.18, 0.43, -1.12, 0, 0, Math.PI / 2),
-  prizePlacement(0.15, 0.68, 0.8, 0.2, 0.5),
-  prizePlacement(1.12, 0.62, 0.68, 0, 0.22),
-  prizePlacement(-1.25, 0.62, -0.35, 0, -0.32),
+  prizePlacement(1.02, 0.62, 0.8),
+  prizePlacement(0.2, 0.62, 0.55, 0, 0.3),
+  prizePlacement(1.0, 0.43, -0.6, 0, 0, Math.PI / 2),
+  prizePlacement(-1.0, 0.68, -0.35, 0.2, 0.08, -0.16),
+  prizePlacement(-0.15, 0.68, -0.74, 0.18, 0.22, 0.12),
+  prizePlacement(1.05, 0.62, 0.02, 0, -0.1),
 ] as const
 export const PRIZE_NAMES = zhHant.prizes
 // Round, bulky plushes retain less grip; these tune difficulty without rolling a win probability.
@@ -136,7 +140,7 @@ export class ClawMachineGame {
   private readonly articulatedClaw: ArticulatedClaw
   private readonly prizes: Prize[]
   private readonly onSnapshot: (snapshot: GameSnapshot) => void
-  private readonly resizeObserver: ResizeObserver
+  private readonly resizeObserver?: ResizeObserver
   private readonly canvas: HTMLCanvasElement
   private readonly compactDisplay: boolean
   private prizePortraits?: string[]
@@ -157,7 +161,7 @@ export class ClawMachineGame {
   private paused = false
   private lastPublishedSecond = -1
   private lastPhase: RoundPhase = 'aiming'
-  private orbit: OrbitState = { yaw: 0.08, pitch: 0.24 }
+  private orbit: OrbitState = { yaw: 0.12, pitch: 0.32 }
   private orbitRadius = 10
   private cameraDrag?: { pointerId: number; x: number; y: number }
   private tiltPlan?: TiltPlan
@@ -165,10 +169,15 @@ export class ClawMachineGame {
   private pendingPrizeExit?: { prize: Prize; elapsed: number }
   private stalePrizes = new Set<Prize>()
   private gripQuality = 0
+  private gripLevel = 1
   private gripStrength = 0
   private gripMass = 0.5
   private slipped = false
   private physicsRemainder = 0
+  private returnDisturbance?: ReturnDisturbance
+  private machineStick?: THREE.Group
+  private machineButtonCap?: THREE.Mesh
+  private machineButtonPulse = 0
 
   private constructor(canvas: HTMLCanvasElement, onSnapshot: (snapshot: GameSnapshot) => void) {
     this.canvas = canvas
@@ -200,14 +209,18 @@ export class ClawMachineGame {
       this.createPrize(INITIAL_PRIZE_PLACEMENTS[0], createPrizeModel()),
       this.createPrize(INITIAL_PRIZE_PLACEMENTS[1], createArcanineModel()),
       this.createPrize(INITIAL_PRIZE_PLACEMENTS[2], createSnoopyModel()),
-      this.createPrize(INITIAL_PRIZE_PLACEMENTS[3], createSlowpokeModel(), 'slowpoke'),
+      this.createPrize(INITIAL_PRIZE_PLACEMENTS[3], createSlowpokeModel()),
       this.createPrize(INITIAL_PRIZE_PLACEMENTS[4], createBulbasaurModel()),
       this.createPrize(INITIAL_PRIZE_PLACEMENTS[5], createAlienModel()),
     ]
     this.settleInitialPrizes()
 
-    this.resizeObserver = new ResizeObserver(() => this.resize())
-    this.resizeObserver.observe(canvas)
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => this.resize())
+      this.resizeObserver.observe(canvas)
+    } else {
+      window.addEventListener('resize', () => this.resize())
+    }
     this.setupCameraDrag()
     this.timer.connect(document)
     this.resize()
@@ -263,6 +276,7 @@ export class ClawMachineGame {
   }
 
   grab(): void {
+    if (this.round.phase === 'aiming' || this.round.phase === 'lowering') this.machineButtonPulse = 0.18
     if (this.round.phase === 'lowering') {
       const loweringProgress = phaseProgress(this.round)
       this.closingHeight = clawHeadHeight('lowering', loweringProgress, this.closingHeight)
@@ -299,13 +313,17 @@ export class ClawMachineGame {
       y: 0,
       z: this.driveVelocity.z * 0.025,
     })
-    this.round = stepRound(this.round, { type: 'GRAB' })
+    this.round = {
+      ...stepRound(this.round, { type: 'GRAB' }),
+      returnDuration: returnTripDuration(Math.hypot(CHUTE.x - this.cycleStart.x, CHUTE.z - this.cycleStart.z)),
+    }
     this.lastPhase = 'aiming'
     this.publishSnapshot()
   }
 
   startRound(): void {
     if (this.round.phase !== 'ready') return
+    this.gripLevel = chooseGripLevel()
     this.round = stepRound(this.round, { type: 'START' })
     this.timer.reset()
     this.publishSnapshot()
@@ -319,6 +337,7 @@ export class ClawMachineGame {
     }
     this.slipped = false
     this.gripStrength = 0
+    this.returnDisturbance = undefined
     this.round = createRound()
     this.lastPhase = 'aiming'
     this.carried = false
@@ -480,9 +499,10 @@ export class ClawMachineGame {
   }
 
   rescueStuckPrizeForClerk(): string | undefined {
-    if (!this.hasStuckPrizeAtChute() || !this.activePrize) return undefined
+    if (!this.hasStuckPrizeForClerk() || !this.activePrize) return undefined
     const prize = this.activePrize
-    if (!isPrizeStuckAtChute(prize.body.translation(), prize.body.linvel(), CHUTE)) return undefined
+    this.carried = false
+    this.articulatedClaw?.releaseGrip()
     prize.claimed = true
     prize.carry.release()
     this.setPrizeSensor(prize, true)
@@ -499,6 +519,18 @@ export class ClawMachineGame {
     return this.round.phase === 'lost' && this.lastGrabSucceeded
       && !!this.activePrize && !this.activePrize.claimed
       && isPrizeStuckAtChute(this.activePrize.body.translation(), this.activePrize.body.linvel(), CHUTE)
+  }
+
+  hasStuckPrizeForClerk(): boolean {
+    if (this.hasStuckPrizeAtChute()) return true
+    if (this.round.phase !== 'lost' || !this.lastGrabSucceeded || !this.activePrize || this.activePrize.claimed) return false
+    const position = this.activePrize.body.translation()
+    const velocity = this.activePrize.body.linvel()
+    const grab = this.articulatedClaw.getGrabPosition()
+    return position.y > 1.1
+      && Math.hypot(position.x - grab.x, position.z - grab.z) < 0.85
+      && Math.abs(position.y - grab.y) < 1
+      && Math.hypot(velocity.x, velocity.y, velocity.z) < 0.5
   }
 
   private setPrizePose(
@@ -530,7 +562,10 @@ export class ClawMachineGame {
 
     if (this.round.phase === 'aiming') this.updatePlayerMovement(delta)
     else this.driveVelocity = approachVelocity(this.driveVelocity, { x: 0, z: 0 }, delta)
+    this.updateMachineControls(delta)
     this.updateClawAnimation(pickupFrame)
+    // Keep the prize supported until the fingers have visibly opened clear of it.
+    if (this.round.phase === 'releasing' && this.carried && phaseProgress(this.round) >= 0.8) this.releasePrize()
     this.updatePhysics(delta, pickupFrame)
     if (pickupFrame) this.tryPickup()
     this.advanceGrip(delta)
@@ -555,6 +590,21 @@ export class ClawMachineGame {
     }
   }
 
+  private updateMachineControls(delta: number): void {
+    if (this.machineStick) {
+      const x = this.round.phase === 'aiming' ? this.movement.x : 0
+      const z = this.round.phase === 'aiming' ? this.movement.z : 0
+      const scale = 1 / Math.max(1, Math.hypot(x, z))
+      const blend = 1 - Math.exp(-14 * Math.max(0, delta))
+      this.machineStick.rotation.x = THREE.MathUtils.lerp(this.machineStick.rotation.x, z * scale * 0.32, blend)
+      this.machineStick.rotation.z = THREE.MathUtils.lerp(this.machineStick.rotation.z, -x * scale * 0.32, blend)
+    }
+    if (this.machineButtonCap && this.machineButtonPulse > 0) {
+      this.machineButtonPulse = Math.max(0, this.machineButtonPulse - delta)
+      this.machineButtonCap.position.y = 0.095 - 0.025 * Math.sin(Math.PI * this.machineButtonPulse / 0.18)
+    }
+  }
+
   private updatePlayerMovement(delta: number): void {
     const length = Math.hypot(this.movement.x, this.movement.z)
     const scale = length > 1 ? 1 / length : 1
@@ -565,16 +615,16 @@ export class ClawMachineGame {
     }, delta)
     const nextX = THREE.MathUtils.clamp(
       this.clawPosition.x + this.driveVelocity.x * delta,
-      -1.28,
-      1.28,
+      CLAW_TRAVEL_BOUNDS.minX,
+      CLAW_TRAVEL_BOUNDS.maxX,
     )
     const nextZ = THREE.MathUtils.clamp(
       this.clawPosition.z + this.driveVelocity.z * delta,
-      -0.94,
-      0.96,
+      CLAW_TRAVEL_BOUNDS.minZ,
+      CLAW_TRAVEL_BOUNDS.maxZ,
     )
-    if (nextX === -1.28 || nextX === 1.28) this.driveVelocity.x = 0
-    if (nextZ === -0.94 || nextZ === 0.96) this.driveVelocity.z = 0
+    if (nextX === CLAW_TRAVEL_BOUNDS.minX || nextX === CLAW_TRAVEL_BOUNDS.maxX) this.driveVelocity.x = 0
+    if (nextZ === CLAW_TRAVEL_BOUNDS.minZ || nextZ === CLAW_TRAVEL_BOUNDS.maxZ) this.driveVelocity.z = 0
     this.clawPosition.x = nextX
     this.clawPosition.z = nextZ
   }
@@ -596,8 +646,9 @@ export class ClawMachineGame {
     )
 
     if (phase === 'returning') {
-      this.clawPosition.x = THREE.MathUtils.lerp(this.cycleStart.x, CHUTE.x, progress)
-      this.clawPosition.z = THREE.MathUtils.lerp(this.cycleStart.z, CHUTE.z, progress)
+      const travel = progress
+      this.clawPosition.x = THREE.MathUtils.lerp(this.cycleStart.x, CHUTE.x, travel)
+      this.clawPosition.z = THREE.MathUtils.lerp(this.cycleStart.z, CHUTE.z, travel)
     }
 
     this.gantry.bridge.position.z = this.clawPosition.z
@@ -612,7 +663,7 @@ export class ClawMachineGame {
   private handlePhaseChange(previous: RoundPhase, next: RoundPhase): void {
     if (previous === 'returning' && next === 'releasing') {
       this.openedForRelease = this.carried
-      this.releasePrize()
+      if (this.carried) this.articulatedClaw.releaseGrip()
     }
   }
 
@@ -637,8 +688,9 @@ export class ClawMachineGame {
     this.activePrize = selected
     const profile = PRIZE_GRIP_PROFILES[this.prizes.indexOf(selected)] ?? PRIZE_GRIP_PROFILES[0]
     this.gripQuality = bestQuality
-    this.gripStrength = bestQuality * profile.retention
+    this.gripStrength = bestQuality * profile.retention * this.gripLevel
     this.gripMass = profile.mass
+    this.returnDisturbance = createReturnDisturbance()
 
     this.carried = true
     this.lastGrabSucceeded = true
@@ -652,26 +704,30 @@ export class ClawMachineGame {
     const progress = phaseProgress(this.round)
     const head = this.articulatedClaw.getHeadPosition()
     const returning = this.round.phase === 'returning'
-    const travel = returning ? Math.hypot(CHUTE.x - this.cycleStart.x, CHUTE.z - this.cycleStart.z) / 2.4 : 0.9
-    this.gripStrength = nextGripStrength(this.gripStrength, delta, transportStress({
+    const duration = roundPhaseDuration(this.round, 'returning')!
+    // Longer trips move more slowly and accrue the same fatigue per completed trip.
+    const wearDelta = returning ? delta * phaseDurations.returning! / duration : delta
+    this.gripStrength = nextGripStrength(this.gripStrength, wearDelta, transportStress({
       quality: this.gripQuality,
       mass: this.gripMass,
-      acceleration: Math.abs(1 - 2 * progress) * travel,
+      acceleration: Math.abs(1 - 2 * progress) * (returning ? 1 : 0.9),
       swing: Math.hypot(head.x - this.clawPosition.x, head.z - this.clawPosition.z) / 0.34,
-    }))
-    this.activePrize.carry.loosen(delta * Math.max(0, 0.4 - this.gripStrength) * 0.45)
+      disturbance: returning ? returnDisturbanceAt(this.returnDisturbance, progress) : 0,
+    }) + Math.max(0, this.activePrize.carry.getSupportError() - 0.2) * 1.5)
+    this.activePrize.carry.loosen(wearDelta * Math.max(0, 0.4 - this.gripStrength) * 0.45)
     if (this.gripStrength > DROP_STRENGTH) return
 
     this.carried = false
     this.slipped = true
     this.articulatedClaw.releaseGrip()
-    this.activePrize.carry.release()
+    this.activePrize.carry.release(true)
     // Carry the travel momentum into the fall, so a late slip can still reach the chute.
-    const speed = returning ? 6 * progress * (1 - progress) / phaseDurations.returning! : 0
+    const speed = returning ? 6 * progress * (1 - progress) / duration : 0
+    const swingVelocity = this.articulatedClaw.getHeadVelocity()
     this.activePrize.body.setLinvel({
-      x: (CHUTE.x - this.cycleStart.x) * speed,
+      x: (CHUTE.x - this.cycleStart.x) * speed + THREE.MathUtils.clamp(swingVelocity.x, -0.3, 0.3),
       y: -0.15,
-      z: (CHUTE.z - this.cycleStart.z) * speed,
+      z: (CHUTE.z - this.cycleStart.z) * speed + THREE.MathUtils.clamp(swingVelocity.z, -0.3, 0.3),
     }, true)
     this.activePrize.body.setAngvel({ x: 0.25, y: 0.35, z: -0.2 }, true)
     this.publishSnapshot()
@@ -681,7 +737,7 @@ export class ClawMachineGame {
     if (!this.carried || !this.activePrize) return
     this.carried = false
     this.articulatedClaw.releaseGrip()
-    this.activePrize.carry.release()
+    this.activePrize.carry.release(true)
     this.enteredChute = false
     this.activePrize.body.setLinvel({ x: 0, y: -0.25, z: 0 }, true)
     this.activePrize.body.setAngvel(prizeReleaseAngularVelocity(), true)
@@ -693,10 +749,19 @@ export class ClawMachineGame {
     const steps = Math.max(forceStep ? 1 : 0, Math.floor((this.physicsRemainder + 1e-9) / PHYSICS_STEP))
     this.physicsRemainder = Math.max(0, this.physicsRemainder - steps * PHYSICS_STEP)
     const returnProgress = this.round.phase === 'returning'
-      ? smoothStep(phaseProgress(this.round))
+      ? phaseProgress(this.round)
       : 0
-    const centerStrength = returnProgress > 0 ? 4 + returnProgress * 8 : 0
+    const centerStrength = returnProgress > 0.78 ? smoothStep((returnProgress - 0.78) / 0.22) * 7 : 0
     for (let step = 0; step < steps; step += 1) {
+      if (this.carried && this.returnDisturbance && this.round.phase === 'returning') {
+        const jolt = returnDisturbanceAt(this.returnDisturbance, returnProgress) * 0.3 * this.world.timestep
+          * phaseDurations.returning! / roundPhaseDuration(this.round, 'returning')!
+        this.articulatedClaw.applyImpulse({
+          x: Math.cos(this.returnDisturbance.direction) * jolt,
+          y: 0,
+          z: Math.sin(this.returnDisturbance.direction) * jolt,
+        })
+      }
       if (this.tiltPlan) {
         this.articulatedClaw.applyTiltToward(
           this.tiltPlan.directionX,
@@ -710,10 +775,13 @@ export class ClawMachineGame {
         && (this.round.phase === 'releasing' || this.round.phase === 'resetting'
           || this.round.phase === 'lost' || this.slipped)
         && isPrizeEnteringChute(this.activePrize.body.translation(), CHUTE)) {
-        this.setPrizeSensor(this.activePrize, true)
         this.enteredChute = true
       }
       this.articulatedClaw.stabilizeSwing()
+      if (!this.carried && this.activePrize) {
+        const lowestTip = Math.min(...this.articulatedClaw.getFingerTipPositions().map(tip => tip.y))
+        this.activePrize.carry.updateReleaseClearance(lowestTip)
+      }
       if (this.carried && this.activePrize) {
         if (centerStrength > 0) {
           this.articulatedClaw.settleSwing(this.world.timestep, centerStrength)
@@ -1217,16 +1285,22 @@ export class ClawMachineGame {
     coinPanelInset.position.set(0.94, lowerCabinetCenterY - 0.02, 2.01)
     this.scene.add(coinPanelInset)
 
-    const coinSlot = new THREE.Mesh(
-      new RoundedBoxGeometry(0.3, 0.065, 0.025, 2, 0.02),
+    const coinSlotBezel = new THREE.Mesh(
+      new RoundedBoxGeometry(0.14, 0.4, 0.035, 3, 0.025),
       new THREE.MeshStandardMaterial({
         color: COLORS.warm,
-        emissive: COLORS.warm,
-        emissiveIntensity: 0.5,
-        roughness: 0.28,
+        roughness: 0.32,
+        metalness: 0.65,
       }),
     )
-    coinSlot.position.set(0.94, lowerCabinetCenterY - 0.18, 2.045)
+    coinSlotBezel.position.set(0.94, lowerCabinetCenterY + 0.04, 2.045)
+    this.scene.add(coinSlotBezel)
+
+    const coinSlot = new THREE.Mesh(
+      new RoundedBoxGeometry(0.045, 0.29, 0.02, 2, 0.015),
+      new THREE.MeshStandardMaterial({ color: 0x111923, roughness: 0.65 }),
+    )
+    coinSlot.position.set(0.94, lowerCabinetCenterY + 0.04, 2.07)
     this.scene.add(coinSlot)
 
     // A shallow physical console mirrors the touchscreen controls without stealing their input.
@@ -1242,7 +1316,7 @@ export class ClawMachineGame {
     deckTop.position.set(0, -0.225, 2.04)
     controlDeck.add(deckTop)
 
-    const metal = new THREE.MeshStandardMaterial({ color: 0xa7bac7, roughness: 0.26, metalness: 0.8 })
+    const metal = new THREE.MeshStandardMaterial({ color: 0xa8d5d8, roughness: 0.3, metalness: 0.7 })
     const rubber = new THREE.MeshStandardMaterial({ color: 0x122338, roughness: 0.78 })
     const joystick = new THREE.Group()
     joystick.name = 'machine-joystick'
@@ -1250,13 +1324,18 @@ export class ClawMachineGame {
     const stickBezel = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.035, 32), metal)
     const stickBoot = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.19, 0.085, 24), rubber)
     stickBoot.position.y = 0.06
+    const stickPivot = new THREE.Group()
+    stickPivot.name = 'machine-joystick-pivot'
+    stickPivot.position.y = 0.08
+    this.machineStick = stickPivot
     const stickShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 0.2, 16), metal)
-    stickShaft.position.y = 0.19
+    stickShaft.position.y = 0.11
     const stickKnob = new THREE.Mesh(new THREE.SphereGeometry(0.15, 24, 16), new THREE.MeshPhysicalMaterial({
-      color: COLORS.aqua, roughness: 0.18, metalness: 0.1, clearcoat: 1,
+      color: 0xb77db5, roughness: 0.28, metalness: 0.08, clearcoat: 0.8,
     }))
-    stickKnob.position.y = 0.32
-    joystick.add(stickBezel, stickBoot, stickShaft, stickKnob)
+    stickKnob.position.y = 0.24
+    stickPivot.add(stickShaft, stickKnob)
+    joystick.add(stickBezel, stickBoot, stickPivot)
     controlDeck.add(joystick)
 
     const grabControl = new THREE.Group()
@@ -1266,10 +1345,11 @@ export class ClawMachineGame {
     const buttonRim = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.23, 0.055, 36), rubber)
     buttonRim.position.y = 0.04
     const buttonCap = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.19, 0.09, 36), new THREE.MeshPhysicalMaterial({
-      color: COLORS.pink, emissive: COLORS.pink, emissiveIntensity: 0.28,
-      roughness: 0.2, metalness: 0.05, clearcoat: 1,
+      color: 0xad3a65, emissive: 0x8a214e, emissiveIntensity: 0.12,
+      roughness: 0.26, metalness: 0.08, clearcoat: 0.85,
     }))
     buttonCap.position.y = 0.095
+    this.machineButtonCap = buttonCap
     grabControl.add(buttonBezel, buttonRim, buttonCap)
     controlDeck.add(grabControl)
     this.scene.add(controlDeck)
@@ -1278,7 +1358,6 @@ export class ClawMachineGame {
   private createPrize(
     placement: PrizePlacement,
     mesh: THREE.Group,
-    kind?: 'slowpoke',
   ): Prize {
     const tonedMaterials = new Set<THREE.Material>()
     mesh.traverse((part) => {
@@ -1312,32 +1391,19 @@ export class ClawMachineGame {
         .setLinearDamping(0.35)
         .setAngularDamping(3.2),
     )
-    const collider = this.world.createCollider(
-      RAPIER.ColliderDesc.capsule(PLUSH_HALF_SEGMENT, PLUSH_RADIUS)
-        .setRestitution(0.15)
-        .setFriction(0.8),
-      body,
-    )
-    const colliders = [collider]
-    if (kind === 'slowpoke') {
-      for (const part of [
-        { radius: 0.17, x: 0.29, y: 0.36, z: -0.56 },
-        { radius: 0.11, x: 0.36, y: 0.62, z: -0.5 },
-        { radius: 0.31, x: 0, y: 0.12, z: 0.39 },
-      ]) {
-        colliders.push(this.world.createCollider(
-          RAPIER.ColliderDesc.ball(part.radius)
-            .setTranslation(part.x, part.y, part.z)
-            .setRestitution(0.15)
-            .setFriction(0.8),
-          body,
-        ))
-      }
+    const { parts, bounds } = prizeCollisionVertices(mesh)
+    const colliders: RAPIER.Collider[] = []
+    for (const points of parts) {
+      const shape = RAPIER.ColliderDesc.convexHull(points)
+      if (shape) colliders.push(this.world.createCollider(shape.setRestitution(0.04).setFriction(0.65), body))
     }
+    const collider = colliders[0]
+    if (!collider) throw new Error('Unable to create plush collision envelope')
+    body.enableCcd(true)
 
     this.scene.add(mesh)
 
-    return { body, collider, colliders, mesh, carry: new PrizeCarryController(body, colliders), start, claimed: false }
+    return { body, collider, colliders, mesh, carry: new PrizeCarryController(body, colliders, bounds), start, claimed: false }
   }
 
   private setPrizeSensor(prize: Prize, enabled: boolean): void {
@@ -1352,6 +1418,10 @@ export class ClawMachineGame {
       RAPIER.ColliderDesc.cuboid(halfExtents.x, halfExtents.y, halfExtents.z),
       body,
     )
+  }
+
+  isMachineCleared(): boolean {
+    return this.prizes.length > 0 && this.prizes.every(prize => prize.claimed)
   }
 
   private publishSnapshot(): void {
@@ -1400,7 +1470,7 @@ export class ClawMachineGame {
 
   private setupCameraDrag(): void {
     this.canvas.addEventListener('pointerdown', (event) => {
-      if (event.pointerType === 'mouse' && event.button !== 0) return
+      if (this.cameraDrag || (event.pointerType === 'mouse' && event.button !== 0)) return
       this.cameraDrag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY }
       this.canvas.setPointerCapture(event.pointerId)
       this.canvas.classList.add('is-dragging')
@@ -1421,15 +1491,20 @@ export class ClawMachineGame {
 
     const stopDragging = (event: PointerEvent): void => {
       if (!this.cameraDrag || this.cameraDrag.pointerId !== event.pointerId) return
+      this.cameraDrag = undefined
       if (this.canvas.hasPointerCapture(event.pointerId)) {
         this.canvas.releasePointerCapture(event.pointerId)
       }
-      this.cameraDrag = undefined
       this.canvas.classList.remove('is-dragging')
     }
 
     this.canvas.addEventListener('pointerup', stopDragging)
     this.canvas.addEventListener('pointercancel', stopDragging)
+    this.canvas.addEventListener('lostpointercapture', stopDragging)
+    window.addEventListener('blur', () => {
+      this.cameraDrag = undefined
+      this.canvas.classList.remove('is-dragging')
+    })
   }
 
   private applyCameraOrbit(): void {

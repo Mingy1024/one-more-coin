@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest'
 
-import { createRound, phaseDurations, stepRound } from './round'
+import { createRound, phaseDurations, phaseProgress, stepRound } from './round'
 
 const fullCycleSeconds = Object.values(phaseDurations).reduce((sum, duration) => sum + duration, 0)
 
 describe('claw machine round', () => {
+  it('uses the actual return duration for progress and the releasing transition', () => {
+    const returning = { ...createRound(), phase: 'returning' as const, returnDuration: 2.6 }
+    const halfway = stepRound(returning, { type: 'TICK', deltaSeconds: 1.3 })
+    expect(halfway.phase).toBe('returning')
+    expect(phaseProgress(halfway)).toBeCloseTo(0.5)
+    const released = stepRound(halfway, { type: 'TICK', deltaSeconds: 1.4 })
+    expect(released.phase).toBe('releasing')
+    expect(released.phaseElapsed).toBeCloseTo(0.1)
+  })
   it('allows a clerk to correct a lost round after a verified rescue', () => {
     const lost = { ...createRound(), phase: 'lost' as const }
     expect(stepRound(lost, { type: 'CLERK_RESCUE' }).phase).toBe('won')

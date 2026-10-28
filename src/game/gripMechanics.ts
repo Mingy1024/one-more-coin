@@ -19,12 +19,20 @@ export interface TransportLoad {
   mass: number
   acceleration: number
   swing: number
+  disturbance?: number
 }
 
 export const DROP_STRENGTH = 0.18
 export const CAPTURE_QUALITY = 0.55
 export const PLUSH_RADIUS = 0.38
 export const PLUSH_HALF_SEGMENT = 0.22
+
+export const GRIP_LEVELS = [1, 0.92, 0.84, 0.76] as const
+
+export function chooseGripLevel(random: () => number = Math.random): number {
+  const sample = Math.max(0, Math.min(0.999999, random()))
+  return GRIP_LEVELS[Math.floor(sample * GRIP_LEVELS.length)]!
+}
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value))
 
@@ -81,8 +89,9 @@ export function evaluateGrip(prize: PrizePose, grab: Point3, tips: Point3[], kin
 }
 
 export function transportStress(load: TransportLoad): number {
-  return 0.045 + 0.095 * clamp01(load.acceleration) + 0.075 * clamp01(load.swing)
-    + 0.05 * clamp01(load.mass) + 0.06 * (1 - clamp01(load.quality))
+  return 0.05 + 0.085 * clamp01(load.acceleration) + 0.065 * clamp01(load.swing)
+    + 0.05 * clamp01(load.mass) + 0.10 * (1 - clamp01(load.quality))
+    + 0.16 * Math.max(0, Math.min(1.2, load.disturbance ?? 0))
 }
 
 export function nextGripStrength(current: number, delta: number, stress: number): number {

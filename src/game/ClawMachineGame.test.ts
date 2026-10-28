@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import * as THREE from 'three'
 
 import { ClawMachineGame, INITIAL_PRIZE_PLACEMENTS, PRIZE_NAMES } from './ClawMachineGame'
 import { clawHeadHeight } from './clawPose'
@@ -7,6 +8,81 @@ import { canPickupPrize } from './prizeInteraction'
 import { createRound, phaseProgress, stepRound, type RoundState } from './round'
 
 describe('claw machine session', () => {
+  it('moves the cabinet stick with the player input and returns it to centre', () => {
+    const stick = new THREE.Group()
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      machineStick: stick, movement: { x: 1, z: -1 },
+      round: { ...createRound(), phase: 'aiming' },
+    }) as ClawMachineGame
+    const internals = game as unknown as { updateMachineControls(delta: number): void; movement: {x: number; z: number}; round: RoundState }
+    for (let i = 0; i < 60; i++) internals.updateMachineControls(1 / 60)
+    expect(stick.rotation.x).toBeCloseTo(-0.32 / Math.sqrt(2), 3)
+    expect(stick.rotation.z).toBeCloseTo(-0.32 / Math.sqrt(2), 3)
+    internals.round = { ...internals.round, phase: 'lowering' }
+    for (let i = 0; i < 60; i++) internals.updateMachineControls(1 / 60)
+    expect(stick.rotation.x).toBeCloseTo(0, 3)
+    expect(stick.rotation.z).toBeCloseTo(0, 3)
+  })
+  it('recognizes an empty machine only after all six prizes are claimed and refills them on reset', () => {
+    const prizes = Array.from({length: 6}, () => ({ claimed: true, mesh: {visible: false, position: {set: vi.fn()}, quaternion: {set: vi.fn()}},
+      body: {setEnabled: vi.fn(), setTranslation: vi.fn(), setRotation: vi.fn(), setLinvel: vi.fn(), setAngvel: vi.fn()},
+      carry: {release: vi.fn()}, collider: {setSensor: vi.fn()},
+      start: {position: {x: 0,y: 0.6,z: 0}, rotation: {x: 0,y: 0,z: 0,w: 1}},
+    }))
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      prizes, round: createRound(), publishSnapshot: vi.fn(),
+    }) as ClawMachineGame
+    expect(game.isMachineCleared()).toBe(true)
+    game.resetPrizes()
+    expect(game.isMachineCleared()).toBe(false)
+    expect(prizes.every(prize => !prize.claimed && prize.mesh.visible)).toBe(true)
+  })
+
+  it('selects grip once when starting a challenge and preserves it for an early close', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValueOnce(0.3).mockReturnValueOnce(0.8)
+    try {
+      const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+        round: createRound(), timer: { reset: vi.fn() }, publishSnapshot: vi.fn(),
+        closingHeight: 1.28,
+      }) as ClawMachineGame
+      const state = game as unknown as { round: RoundState; gripLevel: number }
+      game.startRound()
+      expect(state.gripLevel).toBe(0.92)
+      game.startRound()
+      state.round = { ...state.round, phase: 'lowering', phaseElapsed: 0.5 }
+      game.grab()
+      expect(state.gripLevel).toBe(0.92)
+      expect(random).toHaveBeenCalledTimes(1)
+      state.round = createRound()
+      game.startRound()
+      expect(state.gripLevel).toBe(0.76)
+      expect(random).toHaveBeenCalledTimes(2)
+    } finally {
+      random.mockRestore()
+    }
+  })
+
+  it('applies comparable return fatigue to front and rear prizes despite different travel times', () => {
+    const finishReturn = (duration: number): number => {
+      const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+        round: { ...createRound(), phase: 'returning', returnDuration: duration },
+        carried: true,
+        activePrize: { carry: { loosen: vi.fn(), getSupportError: () => 0 } },
+        gripStrength: 0.9, gripQuality: 0.9, gripMass: 0.5,
+        clawPosition: { x: 0, z: 0 },
+        articulatedClaw: { getHeadPosition: () => ({ x: 0, y: 3.5, z: 0 }) },
+        returnDisturbance: { peak: 0.47, strength: 0.9, direction: 0 },
+      }) as ClawMachineGame
+      const internals = game as unknown as { round: RoundState; gripStrength: number; advanceGrip(delta: number): void }
+      const steps = Math.round(duration * 120)
+      for (let frame = 0; frame < steps; frame += 1) {
+        internals.round.phaseElapsed = duration * (frame + 0.5) / steps
+        internals.advanceGrip(duration / steps)
+      }
+      return internals.gripStrength
+    }
+    expect(finishReturn(1.4)).toBeCloseTo(finishReturn(2.6), 4)
+  })
   it('uses the final physical finger positions before deciding a pickup', () => {
     const calls: string[] = []
     const game = Object.assign(Object.create(ClawMachineGame.prototype), {
@@ -34,7 +110,7 @@ describe('claw machine session', () => {
     const initialTarget = makePrize(0.7)
     const contactedPrize = makePrize(0)
     const game = Object.assign(Object.create(ClawMachineGame.prototype), {
-      prizes: [initialTarget, contactedPrize], activePrize: initialTarget,
+      prizes: [initialTarget, contactedPrize], activePrize: initialTarget, gripLevel: 1,
       articulatedClaw: {
         getGrabPose: () => ({ x: 0, y: 0.46, z: 0 }),
         getFingerTipPositions: () => [
@@ -51,6 +127,11 @@ describe('claw machine session', () => {
     expect(initialTarget.carry.capture).not.toHaveBeenCalled()
     expect(contactedPrize.carry.capture).toHaveBeenCalledOnce()
     expect((game as unknown as { activePrize: unknown }).activePrize).toBe(contactedPrize)
+    const state = game as unknown as { gripLevel: number; gripStrength: number; tryPickup(): void }
+    const strongest = state.gripStrength
+    state.gripLevel = 0.76
+    state.tryPickup()
+    expect(state.gripStrength).toBeCloseTo(strongest * 0.76)
   })
 
   it('runs fixed physics steps across different display refresh rates', () => {
@@ -95,7 +176,7 @@ describe('claw machine session', () => {
 
   it('releases a weak grip into a physical fall without awarding a win', () => {
     const prize = {
-      carry: { loosen: vi.fn(), release: vi.fn() },
+      carry: { loosen: vi.fn(), release: vi.fn(), getSupportError: () => 0 },
       body: { setLinvel: vi.fn(), setAngvel: vi.fn(), setTranslation: vi.fn() },
     }
     const game = Object.assign(Object.create(ClawMachineGame.prototype), {
@@ -103,7 +184,7 @@ describe('claw machine session', () => {
       carried: true, activePrize: prize, lastGrabSucceeded: true,
       gripStrength: 0.181, gripQuality: 0.56, gripMass: 0.8,
       cycleStart: { x: 0.8, z: -0.2 }, clawPosition: { x: -0.2, z: 0.38 },
-      articulatedClaw: { getHeadPosition: () => ({ x: 0, y: 3.5, z: 0.5 }), releaseGrip: vi.fn() },
+      articulatedClaw: { getHeadPosition: () => ({ x: 0, y: 3.5, z: 0.5 }), getHeadVelocity: () => ({ x: 0, y: 0, z: 0 }), releaseGrip: vi.fn() },
       publishSnapshot: vi.fn(),
     }) as ClawMachineGame
     const internals = game as unknown as { advanceGrip(delta: number): void; carried: boolean; slipped: boolean; round: RoundState }
@@ -434,6 +515,22 @@ describe('claw machine session', () => {
     expect(game.rescueStuckPrizeForClerk()).toBe('哆啦A夢')
     expect(prize.claimed).toBe(true)
     expect((game as unknown as { round: RoundState }).round.phase).toBe('won')
+    expect(game.rescueStuckPrizeForClerk()).toBeUndefined()
+  })
+
+  it('rescues a successfully grabbed doll genuinely stuck on the claw after the round', () => {
+    const prize = {
+      claimed: false,
+      body: { translation: () => ({ x: -1.15, y: 2.65, z: 0.95 }), linvel: () => ({ x: 0, y: 0, z: 0 }), setLinvel: vi.fn(), setAngvel: vi.fn(), setEnabled: vi.fn() },
+      carry: { release: vi.fn() }, collider: { setSensor: vi.fn() }, mesh: { visible: true },
+    }
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round: { ...createRound(), phase: 'lost' }, prizes: [prize], activePrize: prize, lastGrabSucceeded: true,
+      articulatedClaw: { getGrabPosition: () => ({ x: -1.2, y: 2.7, z: 0.96 }), releaseGrip: vi.fn() },
+      publishSnapshot: vi.fn(),
+    }) as ClawMachineGame
+    expect(game.rescueStuckPrizeForClerk()).toBe('哆啦A夢')
+    expect(prize.claimed).toBe(true)
     expect(game.rescueStuckPrizeForClerk()).toBeUndefined()
   })
 

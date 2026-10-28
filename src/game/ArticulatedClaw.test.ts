@@ -18,6 +18,24 @@ beforeAll(async () => {
 })
 
 describe('articulated claw physics', () => {
+  it('opens the physical fingers beyond the old stop after releasing a held prize', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    try {
+      const claw = new ArticulatedClaw(world, new THREE.Scene(), { anchorY: 4.05, headY: 3.55, x: 0, z: 0 })
+      world.timestep = 1 / 120
+      claw.setOpening(PRIZE_GRIP_OPENING)
+      for (let i = 0; i < 120; i++) world.step()
+      claw.holdCurrentGrip()
+      claw.releaseGrip()
+      claw.setOpening(1)
+      for (let i = 0; i < 120; i++) world.step()
+      claw.holdCurrentGrip()
+      const angles = (claw as unknown as { heldFingerAngles: number[] }).heldFingerAngles
+      for (const angle of angles) expect(angle).toBeGreaterThan(0.53)
+    } finally {
+      world.free()
+    }
+  })
   it('builds three independently simulated fingers under one suspended head', () => {
     const claw = new ArticulatedClaw(
       new RAPIER.World({ x: 0, y: -9.81, z: 0 }),

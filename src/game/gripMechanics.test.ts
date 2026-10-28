@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { evaluateGrip, nextGripStrength, transportStress, DROP_STRENGTH } from './gripMechanics'
+import { chooseGripLevel, GRIP_LEVELS, evaluateGrip, nextGripStrength, transportStress, DROP_STRENGTH } from './gripMechanics'
 
 const prize = {
   position: { x: 0, y: 0.62, z: 0 },
@@ -12,6 +12,14 @@ const supportedTips = [
   { x: -0.17, y: 0.34, z: 0.294 },
   { x: -0.17, y: 0.34, z: -0.294 },
 ]
+
+describe('claw grip levels', () => {
+  it('selects each level with equal intervals and keeps the original strength as the maximum', () => {
+    expect([0, 0.25, 0.5, 0.75].map(value => chooseGripLevel(() => value))).toEqual(GRIP_LEVELS)
+    expect(chooseGripLevel(() => 0.999)).toBe(0.76)
+    expect(Math.max(...GRIP_LEVELS)).toBe(1)
+  })
+})
 
 describe('claw grip quality', () => {
   it('requires opposed finger support rather than a centre-only overlap', () => {

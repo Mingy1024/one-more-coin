@@ -15,6 +15,7 @@ export interface RoundState {
   phaseElapsed: number
   timeLeft: number
   attempts: number
+  returnDuration?: number
 }
 
 export type RoundAction =
@@ -35,9 +36,13 @@ export const phaseDurations: Partial<Record<RoundPhase, number>> = {
 }
 
 export function phaseProgress(state: RoundState): number {
-  const duration = phaseDurations[state.phase]
+  const duration = roundPhaseDuration(state, state.phase)
   if (duration === undefined) return 0
   return Math.min(1, state.phaseElapsed / duration)
+}
+
+export function roundPhaseDuration(state: RoundState, phase: RoundPhase): number | undefined {
+  return phase === 'returning' ? state.returnDuration ?? phaseDurations.returning : phaseDurations[phase]
 }
 
 const nextPhase: Partial<Record<RoundPhase, RoundPhase>> = {
@@ -102,7 +107,7 @@ export function stepRound(state: RoundState, action: RoundAction): RoundState {
   let phaseElapsed = state.phaseElapsed + action.deltaSeconds
 
   while (phase !== 'aiming' && phase !== 'ready') {
-    const duration = phaseDurations[phase]
+    const duration = roundPhaseDuration(state, phase)
     if (duration === undefined || phaseElapsed < duration) break
     phaseElapsed -= duration
     phase = nextPhase[phase] ?? 'aiming'

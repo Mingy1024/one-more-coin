@@ -20,17 +20,41 @@ function createPrize(world: RAPIER.World, x = 0.14, z = -0.08, y = 0.38) {
 }
 
 describe('carried prize', () => {
-  it('stops pushing against the claw while it is held', () => {
+  it('lets a released prize clear an overlapping claw while retaining floor collisions', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+    try {
+      const prize = createPrize(world, 0, 0, 2)
+      const groups = prize.collider.collisionGroups()
+      world.createCollider(RAPIER.ColliderDesc.ball(0.4).setTranslation(0, 1.9, 0).setCollisionGroups(0x0002ffff).setSolverGroups(0x0002ffff))
+      world.createCollider(RAPIER.ColliderDesc.cuboid(2, 0.1, 2).setTranslation(0, -0.1, 0).setCollisionGroups(0x0001ffff).setSolverGroups(0x0001ffff))
+      const carry = new PrizeCarryController(prize.body, prize.collider)
+      carry.capture({ x: 0, y: 2, z: 0 })
+      carry.release(true)
+      expect(prize.collider.isSensor()).toBe(false)
+      world.timestep = 1 / 120
+      for (let frame = 0; frame < 180; frame++) {
+        world.step()
+        carry.updateReleaseClearance(1.5)
+      }
+      expect(prize.body.translation().y).toBeGreaterThan(0.3)
+      expect(prize.body.translation().y).toBeLessThan(0.45)
+      expect(prize.collider.collisionGroups()).toBe(groups)
+    } finally {
+      world.free()
+    }
+  })
+  it('keeps real claw collisions while held', () => {
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
     const prize = createPrize(world)
     const carry = new PrizeCarryController(prize.body, prize.collider)
 
     carry.capture({ x: 0, y: 0.38, z: 0 })
 
-    expect(prize.collider.isSensor()).toBe(true)
+    expect(prize.collider.isSensor()).toBe(false)
+    expect(prize.collider.collisionGroups() & 2).toBe(2)
   })
 
-  it('disables every protruding-part collider while held and restores them on release', () => {
+  it('keeps claw and environment collisions on every protruding part', () => {
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
     const prize = createPrize(world)
     const tail = world.createCollider(
@@ -40,8 +64,10 @@ describe('carried prize', () => {
     const carry = new PrizeCarryController(prize.body, [prize.collider, tail])
 
     carry.capture({ x: 0, y: 0.38, z: 0 })
-    expect(prize.collider.isSensor()).toBe(true)
-    expect(tail.isSensor()).toBe(true)
+    expect(prize.collider.isSensor()).toBe(false)
+    expect(prize.collider.collisionGroups() & 2).toBe(2)
+    expect(tail.isSensor()).toBe(false)
+    expect(tail.collisionGroups() & 2).toBe(2)
 
     carry.release()
     expect(prize.collider.isSensor()).toBe(false)
@@ -59,7 +85,7 @@ describe('carried prize', () => {
     expect(prize.body.translation().y).toBeCloseTo(0.62)
   })
 
-  it('follows the latest claw pose without a one-frame lag', () => {
+  it('moves toward the latest claw pose through physics without teleporting', () => {
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
     const prize = createPrize(world)
     const carry = new PrizeCarryController(prize.body, prize.collider)
@@ -67,10 +93,16 @@ describe('carried prize', () => {
     world.step()
 
     carry.follow({ x: 0.5, y: 1.2, z: -0.2 })
+    expect(prize.body.translation().x).toBeCloseTo(0.14)
+    world.timestep = 1 / 180
+    for (let frame = 0; frame < 180; frame++) {
+      carry.follow({ x: 0.5, y: 1.2, z: -0.2 }, world.timestep)
+      world.step()
+    }
 
     const position = prize.body.translation()
     expect(position.x).toBeCloseTo(0.64)
-    expect(position.y).toBeCloseTo(1.2, 5)
+    expect(position.y).toBeCloseTo(1.2, 2)
     expect(Math.hypot(position.x - 0.5, position.z + 0.2)).toBeGreaterThan(0.1)
   })
 
@@ -88,6 +120,8 @@ describe('carried prize', () => {
     const tilted = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.4)
     for (let frame = 0; frame < 120; frame += 1) {
       carry.follow({ ...target, rotation: tilted }, 1 / 180)
+      world.timestep = 1 / 180
+      world.step()
     }
 
     const rotation = prize.body.rotation()
@@ -110,6 +144,8 @@ describe('carried prize', () => {
 
     for (let frame = 0; frame < 180; frame += 1) {
       carry.follow(target, 1 / 180, 10)
+      world.timestep = 1 / 180
+      world.step()
     }
 
     const position = prize.body.translation()
@@ -134,10 +170,10 @@ describe('carried prize', () => {
     const carry = new PrizeCarryController(prize.body, prize.collider)
     const target = { x: 0, y: 1.4, z: 0 }
     carry.capture({ x: 0, y: 0.38, z: 0 })
-    carry.follow(target)
+    for (let i = 0; i < 90; i++) { carry.follow(target); world.step() }
     const heldY = prize.body.translation().y
     carry.loosen(0.06)
-    carry.follow(target)
+    for (let i = 0; i < 60; i++) { carry.follow(target); world.step() }
     expect(prize.body.translation().y).toBeCloseTo(heldY - 0.06)
     carry.release()
     for (let frame = 0; frame < 30; frame += 1) world.step()
