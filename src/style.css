@@ -212,7 +212,7 @@ html[lang="ja"] .clerk-call-button .topbar-button-label { letter-spacing: 0; }
     top: calc(100% + 8px);
     left: 0;
     display: none;
-    width: min(220px, calc(100vw - 20px));
+    width: min(260px, calc(100vw - 20px));
     flex-direction: column;
     gap: 6px;
     padding: 8px;
@@ -231,11 +231,11 @@ html[lang="ja"] .clerk-call-button .topbar-button-label { letter-spacing: 0; }
     display: flex;
     width: 100%;
     min-width: 0;
-    min-height: 48px;
+    min-height: 56px;
     align-items: center;
     justify-content: flex-start;
     gap: 10px;
-    padding: 7px 10px;
+    padding: 10px 12px;
     text-align: left;
   }
   .topbar-actions > button > span:first-child { display: inline-grid; width: 24px; place-items: center; font-size: 19px; }
@@ -248,10 +248,11 @@ html[lang="ja"] .clerk-call-button .topbar-button-label { letter-spacing: 0; }
     white-space: nowrap;
   }
   .topbar-actions .locale-switch { width: 100%; }
-  .topbar-actions .locale-button { width: 100%; min-height: 48px; gap: 10px; padding: 7px 10px; text-align: left; }
+  .topbar-actions .locale-button { width: 100%; min-height: 56px; gap: 10px; padding: 10px 12px; text-align: left; }
   .topbar-actions .locale-glyph { width: 24px; height: 24px; flex-basis: 24px; }
   .topbar-actions .locale-menu { position: relative; top: auto; right: auto; bottom: auto; left: auto; width: 100%; margin-top: 6px; box-sizing: border-box; transform: none; }
   .topbar-actions .locale-menu::after { content: none; }
+  .topbar-actions .locale-menu button { min-height: 52px; }
 }
 
 .hud { display: flex; flex: 0 0 auto; gap: 4px; margin-left: auto; }
