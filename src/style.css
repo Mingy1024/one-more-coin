@@ -947,3 +947,27 @@ html[lang="ja"] .clerk-call-button .topbar-button-label { letter-spacing: 0; }
   .is-collection .collection-fanfare i { display: none; }
   .joystick-knob, .grab-button { transition: none; }
 }
+
+/* 保夾登場與更新日誌 */
+.guarantee-event[hidden] { display: none; }
+.guarantee-event { display: grid; gap: 5px; margin: 12px 0; padding: 10px 12px 14px; overflow: hidden; color: #fff7e7; background: radial-gradient(circle at 50% 18%, #56818a, #1f4359 66%, #172b43); border: 2px solid #f5cce1; border-radius: 10px; box-shadow: inset 0 0 24px #f1a6c644, 0 0 20px #ef8dbc55; animation: guarantee-entrance .65s cubic-bezier(.2,1.3,.3,1) both; }
+.guarantee-event strong { color: #ffe8a6; font-size: 21px; }
+.guarantee-event > span { font-size: 13px; line-height: 1.5; }
+.guarantee-art { position: relative; height: 140px; overflow: hidden; }
+.guarantee-art img { width: 100%; height: 100%; object-fit: contain; object-position: center 20%; filter: drop-shadow(0 3px 9px #f9c0db88); animation: guarantee-attendant 2s ease-in-out infinite alternate; }
+.guarantee-art i { position: absolute; color: #ffe9a3; font-style: normal; font-size: 26px; animation: guarantee-spark 1.4s ease-in-out infinite alternate; }
+.guarantee-art i:nth-of-type(1) { left: 15%; top: 20%; }
+.guarantee-art i:nth-of-type(2) { right: 14%; top: 12%; animation-delay: .3s; }
+.guarantee-art i:nth-of-type(3) { right: 22%; bottom: 10%; animation-delay: .6s; }
+@keyframes guarantee-entrance { from { opacity: 0; transform: scale(.75) rotate(-3deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
+@keyframes guarantee-attendant { from { transform: translateY(4px) rotate(-2deg) scale(.96); } to { transform: translateY(-3px) rotate(2deg) scale(1.03); } }
+@keyframes guarantee-spark { from { opacity: .4; transform: scale(.65) rotate(-20deg); } to { opacity: 1; transform: scale(1.2) rotate(20deg); } }
+.changelog-dialog { overflow-y: auto; }
+.changelog-list { padding: 18px 22px 24px; color: #e8faff; text-align: left; }
+.changelog-list time { color: #ffdfa4; font-weight: 900; }
+.changelog-list ul { padding-left: 1.3em; margin: 10px 0; line-height: 1.6; }
+.changelog-list li + li { margin-top: 7px; }
+@media (prefers-reduced-motion: reduce) { .guarantee-event, .guarantee-art img, .guarantee-art i { animation: none; } }
+
+.result-panel .result-guarantee[hidden] { display: none; }
+.result-panel .result-guarantee { margin: 16px 0 12px; padding: 12px; color: #fff2ca; background: #58405d; border: 1px solid #e4b4ce; border-radius: 7px; font-size: 14px; line-height: 1.65; text-align: left; }

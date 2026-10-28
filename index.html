@@ -106,6 +106,7 @@
           <button id="titles-button" class="titles-button" type="button" aria-haspopup="dialog" aria-controls="titles-dialog">
             <span aria-hidden="true">✦</span><span class="topbar-button-label" data-i18n="titles">稱號一覽</span>
           </button>
+          <button id="changelog-button" class="titles-button" type="button" aria-haspopup="dialog" aria-controls="changelog-dialog"><span aria-hidden="true">▤</span><span class="topbar-button-label" data-i18n="changelog">熱修日誌</span></button>
           <button id="clerk-call-button" class="clerk-call-button" type="button" aria-label="呼叫店員" data-i18n-aria="callClerk" aria-haspopup="dialog" aria-controls="clerk-call-dialog">
             <span aria-hidden="true">☎</span><span class="topbar-button-label" data-i18n="callClerk">呼叫店員</span>
           </button>
@@ -196,6 +197,7 @@
           <span id="result-icon" class="result-icon" aria-hidden="true">★</span>
           <p class="eyebrow" data-i18n="resultEyebrow">景品研究結果</p>
           <h1 id="result-title">成功夾到了！</h1>
+          <div id="guarantee-event" class="guarantee-event" hidden><div class="guarantee-art"><img src="/images/events/guarantee-attendant.png" alt="" width="512" height="512"><i>✦</i><i>✦</i><i>✦</i></div><strong data-i18n="guaranteeTitle">店員看不下去了！</strong><span data-i18n="guaranteeAnnouncement">累積投入 200 元，保夾啟動！下次夾住娃娃就能帶走，沒夾起也會保留。</span></div>
           <div id="hidden-result-event" class="hidden-result-event" hidden>
             <div class="hidden-event-burst" aria-hidden="true"></div>
             <div class="event-art-stage" aria-hidden="true">
@@ -213,6 +215,7 @@
               <strong id="result-prize-name"></strong>
             </div>
           </div>
+          <p id="result-guarantee" class="result-guarantee" hidden></p>
           <p id="result-copy">禮物已安全抵達取物口。</p>
           <p id="result-spend" class="result-spend">本次投入 NT$10</p>
           <button id="restart-button" type="button">再玩一次</button>
@@ -234,6 +237,7 @@
         <p id="titles-empty" class="titles-empty" data-i18n="titlesEmpty">還沒有獲得稱號。投入第一枚 10 元，從試水溫開始！</p>
       </div>
     </dialog>
+    <dialog id="changelog-dialog" class="titles-dialog changelog-dialog" aria-labelledby="changelog-title"><div class="titles-dialog-inner"><div class="titles-dialog-header"><button id="changelog-close" class="titles-close" type="button" data-i18n-aria="close">×</button><span class="titles-dialog-kicker">ONE MORE COIN · UPDATE</span><h2 id="changelog-title" data-i18n="changelog">熱修日誌</h2></div><div id="changelog-list" class="changelog-list"></div></div></dialog>
     <dialog id="clerk-dialog" class="clerk-dialog" aria-labelledby="clerk-dialog-title" aria-describedby="clerk-dialog-copy">
       <div class="clerk-scene" aria-hidden="true">
         <span class="clerk-speedlines"></span>

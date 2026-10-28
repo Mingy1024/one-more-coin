@@ -7,6 +7,8 @@ export const jp = {
   },
   ui: {
     restartMachine: '補充してもう一度',
+    changelog: '更新履歴', guaranteeTitle: '店員が見かねて登場！',
+    guaranteeAnnouncement: '200元投入で救済モード発動！次から景品をつかめば獲得。つかめなければ持ち越し！',
     loadingAria: 'ゲームを読み込み中', loadingKicker: 'ONE MORE COIN · 起動中',
     loadingTitle: '景品を準備中', loadingCopy: 'ぬいぐるみを並べています。硬貨はもう少し待って…',
     loadingRetry: '読み込みが長い？再読み込み', canvasAria: '3Dクレーンゲームの画面',
@@ -84,6 +86,11 @@ export const jp = {
     { name: '今夜は眠れない', description: '景品はまだ出てこないのに、眠気だけ先に消えた。' },
   ],
   dynamic: {
+    guaranteeWon: '今回は救済モードで景品をゲット！救済はここで終了し、次の挑戦は通常のアームの力に戻ります。また条件を満たせば再び発動します。',
+    guaranteeActive: '救済中：つかめば獲得！',
+    guaranteeEarly: '早閉じでアームが景品をつかめませんでした。救済は次回も有効です！',
+    guaranteePosition: 'アームが景品を囲めず、持ち上がりませんでした。救済は次回も有効です！',
+    guaranteeTimeout: '今回はアームを下ろしませんでした。救済は次回も有効です！',
     machineCleared: '全台クリア！店長、補充よろしく！',
     collectionTitle: 'ぬいぐるみ全員お持ち帰り',
     collectionDescription: '仲間が全員集合。店長はせっせと補充中。',

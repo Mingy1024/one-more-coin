@@ -13,3 +13,5 @@ Use case: stylized-concept. Asset type: transparent PNG game animation foregroun
 ## clerk-judgment.webp
 
 Use case: stylized-concept. Asset type: transparent PNG game animation foreground, wide 3:2 composition. Create an extravagant humorous manga expert arcade attendant: original chibi clerk in teal work apron and rolled sleeves, intensely serious face with glasses gleaming, holding an absurdly oversized golden measuring ruler diagonally and pointing confidently at a small plush bear, surrounded by coral impact shapes, golden geometric measuring arcs and diamond sparkles. Funny overqualified precision engineer vibe. Thick dark navy ink outlines, crisp cel shading, halftone details, teal coral and rich gold palette. Centered waist-up figure fills 70 percent, all props inside image with transparent margin. Genuine transparent alpha background. No letters, numbers, measurement labels, text, captions, watermark or UI. Readable at 260 pixels wide.
+
+- `guarantee-attendant.png`：為保夾啟動畫面生成的店員插畫。

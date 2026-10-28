@@ -5,6 +5,8 @@ export const zhHant = {
   },
   ui: {
     restartMachine: '重新開始',
+    changelog: '熱修日誌', guaranteeTitle: '店員看不下去了！',
+    guaranteeAnnouncement: '累積投入 200 元，保夾啟動！下次夾住娃娃就能帶走，沒夾起也會保留。',
     loadingAria: '遊戲載入中', loadingKicker: 'ONE MORE COIN · 開機中',
     loadingTitle: '機台準備中', loadingCopy: '正在擺好娃娃，先別急著投幣…',
     loadingRetry: '載入太久？重新整理', canvasAria: '3D 夾娃娃機遊戲畫面',
@@ -83,6 +85,11 @@ export const zhHant = {
   ],
   dynamic: {
     machineCleared: '全場清空！老闆補貨中',
+    guaranteeWon: '本次透過保夾機制獲得娃娃！保夾效果已使用完畢，下次夾取將恢復一般爪力；之後仍可重新累積保夾條件。',
+    guaranteeActive: '保夾生效中：夾住就帶走',
+    guaranteeEarly: '二收後夾爪沒有包覆住娃娃，這次沒能夾起。保夾仍然有效，下次再試！',
+    guaranteePosition: '下爪位置沒有讓夾爪包覆娃娃，這次沒能夾起。保夾仍然有效，下次再試！',
+    guaranteeTimeout: '這次沒有出爪，保夾仍然有效，下次瞄準後再試！',
     collectionTitle: '全場娃娃我帶走',
     collectionDescription: '六位新朋友全員到齊，老闆正在重新進貨。',
     collectionRequirement: '未重置前夾出全部六種娃娃',

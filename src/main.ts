@@ -7,6 +7,7 @@ import { CoinLedger, spendTitles, type SpendSnapshot } from './game/coinLedger'
 import { ClerkAssistTrigger } from './game/clerkAssist'
 import { HiddenEventSequence, type HiddenResultEvent } from './game/hiddenEvents'
 import { GameAudio } from './game/audio'
+import { changelog } from './changelog'
 import { applyStaticTranslations, format, getLocale, getMessages, loadLocale, setLocale, type Locale } from './i18n'
 
 setLocale(loadLocale())
@@ -37,6 +38,11 @@ const grabLabel = requireElement<HTMLElement>('grab-label')
 const startButton = requireElement<HTMLButtonElement>('start-button')
 const resetButton = requireElement<HTMLButtonElement>('reset-button')
 const titlesButton = requireElement<HTMLButtonElement>('titles-button')
+const changelogButton = requireElement<HTMLButtonElement>('changelog-button')
+const changelogDialog = requireElement<HTMLDialogElement>('changelog-dialog')
+const changelogClose = requireElement<HTMLButtonElement>('changelog-close')
+const changelogList = requireElement<HTMLElement>('changelog-list')
+const guaranteeEvent = requireElement<HTMLElement>('guarantee-event')
 const titlesDialog = requireElement<HTMLDialogElement>('titles-dialog')
 const titlesClose = requireElement<HTMLButtonElement>('titles-close')
 const titlesCount = requireElement<HTMLElement>('titles-count')
@@ -85,6 +91,7 @@ const resultPrize = requireElement<HTMLElement>('result-prize')
 const resultPrizePortrait = requireElement<HTMLImageElement>('result-prize-portrait')
 const resultPrizeName = requireElement<HTMLElement>('result-prize-name')
 const resultCopy = requireElement<HTMLElement>('result-copy')
+const resultGuarantee = requireElement<HTMLElement>('result-guarantee')
 const resultSpend = requireElement<HTMLElement>('result-spend')
 const hiddenResultEvent = requireElement<HTMLElement>('hidden-result-event')
 const hiddenEventIcon = requireElement<HTMLImageElement>('hidden-event-icon')
@@ -97,6 +104,21 @@ const achievementCopy = requireElement<HTMLElement>('achievement-copy')
 const banterPresenter = new BanterPresenter(renderBanter, undefined, hideBanter)
 const coinLedger = new CoinLedger()
 const prizeCollection = new PrizeCollection()
+const GUARANTEE_STORAGE_KEY = 'one-more-coin:guarantee'
+let guaranteeActive = false
+let guaranteeAnnouncementVisible = false
+try {
+  const saved = JSON.parse(localStorage.getItem(GUARANTEE_STORAGE_KEY) ?? 'null')
+  const amount = typeof saved === 'number' && saved >= 200 ? saved
+    : saved?.active === true && typeof saved.amount === 'number' && saved.amount >= 0 ? saved.amount : undefined
+  if (amount !== undefined && Number.isFinite(amount)) { guaranteeActive = true; coinLedger.restoreGuaranteedSpend(amount) }
+} catch { /* Storage is optional. */ }
+function saveGuarantee(): void {
+  try {
+    if (guaranteeActive) localStorage.setItem(GUARANTEE_STORAGE_KEY, JSON.stringify({ active: true, amount: coinLedger.snapshot().amount }))
+    else localStorage.removeItem(GUARANTEE_STORAGE_KEY)
+  } catch { /* Keep the current session playable. */ }
+}
 const clerkAssist = new ClerkAssistTrigger()
 const hiddenEvents = new HiddenEventSequence()
 const gameAudio = new GameAudio()
@@ -209,6 +231,7 @@ function changeLocale(locale: Locale): void {
   renderSpend(lastResultSpend ?? coinLedger.snapshot())
   if (activeAchievement) renderAchievement(activeAchievement.threshold, activeAchievement.amount)
   renderHiddenResultEvent()
+  renderChangelog()
   banterPresenter.clear()
   game.refreshLocale()
 }
@@ -312,7 +335,7 @@ window.addEventListener('keydown', (event) => {
   if (!hasEnteredGame) return
   if (!introScreen.hidden || topbarActions.classList.contains('is-open')) return
   if (event.code === 'Space' && event.target instanceof HTMLElement && (event.target === topbarMenuButton || topbarActions.contains(event.target))) return
-  if (titlesDialog.open || clerkDialog.open || clerkCallDialog.open || !resultModal.hidden) return
+  if (titlesDialog.open || changelogDialog.open || clerkDialog.open || clerkCallDialog.open || !resultModal.hidden) return
   keyboard.add(event.code)
   if (event.code === 'Space') {
     event.preventDefault()
@@ -352,6 +375,32 @@ resetButton.addEventListener('click', () => {
   prizeCollection.reset()
   statusText.textContent = getMessages().dynamic.prizesReset
 })
+function renderChangelog(): void {
+  changelogList.replaceChildren()
+  for (const update of changelog) {
+    const section = document.createElement('section')
+    const date = document.createElement('time')
+    date.dateTime = update.date
+    date.textContent = update.date
+    const list = document.createElement('ul')
+    for (const entry of update.entries[getLocale()]) {
+      const item = document.createElement('li')
+      item.textContent = entry
+      list.append(item)
+    }
+    section.append(date, list)
+    changelogList.append(section)
+  }
+}
+changelogButton.addEventListener('click', () => {
+  renderChangelog()
+  setGamePaused(true)
+  changelogDialog.showModal()
+  changelogClose.focus({ preventScroll: true })
+})
+changelogClose.addEventListener('click', () => changelogDialog.close())
+changelogDialog.addEventListener('click', event => { if (event.target === changelogDialog) changelogDialog.close() })
+changelogDialog.addEventListener('close', () => { setGamePaused(false); focusTopbarAction(changelogButton) })
 titlesButton.addEventListener('click', () => {
   renderTitleGallery()
   setGamePaused(true)
@@ -426,14 +475,17 @@ startButton.addEventListener('click', () => {
   gameAudio.playEffect('coinInsert')
   const spend = coinLedger.insertCoin()
   renderSpend(spend)
+  if (guaranteeActive) saveGuarantee()
   if (spend.achievement) showAchievement(spend.achievement.threshold, spend.amount)
-  game.startRound()
+  game.startRound(guaranteeActive)
   grabButton.focus({ preventScroll: true })
 })
 restartButton.addEventListener('click', () => {
   const machineCleared = game.isMachineCleared()
   resultModal.hidden = true
   activeHiddenResultEvent = undefined
+  guaranteeAnnouncementVisible = false
+  guaranteeEvent.hidden = true
   renderHiddenResultEvent()
   if (lastResult === 'won') renderSpend(coinLedger.snapshot())
   lastResult = undefined
@@ -548,7 +600,8 @@ function updateHud(snapshot: GameSnapshot): void {
   }
   timeValue.textContent = String(Math.ceil(snapshot.timeLeft))
   attemptValue.textContent = String(snapshot.attempts)
-  statusText.textContent = snapshot.status
+  statusText.textContent = guaranteeActive && snapshot.phase === 'aiming'
+    ? `${snapshot.status} · ${getMessages().dynamic.guaranteeActive}` : snapshot.status
   grabButton.disabled = !snapshot.canGrab
   resetButton.disabled = !snapshot.isReady
   grabLabel.textContent = snapshot.grabLabel
@@ -569,6 +622,17 @@ function updateHud(snapshot: GameSnapshot): void {
     const won = snapshot.result === 'won'
     if (snapshot.result !== lastResult) {
       const spend = won ? coinLedger.settleWin() : coinLedger.snapshot()
+      if (won) {
+        if (snapshot.wonWithGuarantee) guaranteeActive = false
+        guaranteeAnnouncementVisible = false
+        saveGuarantee()
+      }
+      if (!won && !guaranteeActive && spend.amount >= 200) {
+        guaranteeActive = true
+        guaranteeAnnouncementVisible = true
+        saveGuarantee()
+      }
+      guaranteeEvent.hidden = !guaranteeAnnouncementVisible
       const stuckAtChute = !won && game.hasStuckPrizeForClerk()
       if (won) {
         hiddenEvents.onWin()
@@ -576,9 +640,9 @@ function updateHud(snapshot: GameSnapshot): void {
           showAchievement(-1, 0)
         }
       }
-      activeHiddenResultEvent = won || stuckAtChute ? undefined : hiddenEvents.onLoss()
+      activeHiddenResultEvent = won || stuckAtChute || guaranteeAnnouncementVisible ? undefined : hiddenEvents.onLoss()
       renderHiddenResultEvent()
-      const shouldOfferHelp = stuckAtChute
+      const shouldOfferHelp = stuckAtChute || guaranteeAnnouncementVisible
         ? false
         : clerkAssist.onResult(snapshot.result, spend.amount)
       if (shouldOfferHelp && game.availablePrizesForClerk().length > 0) {
@@ -609,9 +673,13 @@ function updateHud(snapshot: GameSnapshot): void {
       resultPrizePortrait.src = game.prizePortrait(prizeIndex!)
       resultPrizeName.textContent = getMessages().prizes[prizeIndex!] ?? ''
     }
-    resultCopy.textContent = !won && game.hasStuckPrizeForClerk()
-      ? copy.stuckAtChute
-      : snapshot.banter.text
+    resultGuarantee.hidden = !won || !snapshot.wonWithGuarantee
+    resultGuarantee.textContent = copy.guaranteeWon
+    const guaranteeMiss = !won ? game.guaranteedMissReason() : undefined
+    resultCopy.textContent = guaranteeMiss === 'early' ? copy.guaranteeEarly
+      : guaranteeMiss === 'position' ? copy.guaranteePosition
+      : guaranteeMiss === 'timeout' ? copy.guaranteeTimeout
+      : !won && game.hasStuckPrizeForClerk() ? copy.stuckAtChute : snapshot.banter.text
     resultClerkButton.hidden = won
   }
 }
