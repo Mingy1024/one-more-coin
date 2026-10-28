@@ -443,57 +443,63 @@ describe('claw machine session', () => {
     ])
   })
 
-  it('uses a free spot near the chute when no doll is already there', () => {
-    const selected = {
-      claimed: false,
-      body: {
-        translation: () => ({ x: 1, y: 0.6, z: -0.8 }),
-        setTranslation: vi.fn(), setRotation: vi.fn(), setLinvel: vi.fn(), setAngvel: vi.fn(),
-      },
-      mesh: { position: { set: vi.fn() }, quaternion: { set: vi.fn() } },
-      carry: { release: vi.fn() },
-    }
-    const neighbor = {
-      claimed: false,
-      body: { translation: () => ({ x: 1, y: 0.6, z: -0.8 }), setTranslation: vi.fn() },
+  it('places the selected doll beside a chute guard rather than its original position', () => {
+    const mesh = new THREE.Group()
+    mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.2, 0.6)))
+    mesh.position.set(1, 0.6, -0.8)
+    const prize = {
+      claimed: false, mesh, carry: { release: vi.fn() },
+      body: { rotation: () => ({ x: 0, y: 0, z: 0, w: 1 }), translation: () => ({ x: 1, y: 0.6, z: -0.8 }),
+        setTranslation: vi.fn(), setRotation: vi.fn(), setLinvel: vi.fn(), setAngvel: vi.fn() },
     }
     const game = Object.assign(Object.create(ClawMachineGame.prototype), {
-      round: { ...createRound(), phase: 'lost' },
-      prizes: [selected, neighbor],
-      publishSnapshot: vi.fn(),
+      round: { ...createRound(), phase: 'lost' }, prizes: [prize],
     }) as ClawMachineGame
-
     expect(game.placePrizeForClerk(0)).toEqual({ type: 'placed' })
-    expect(selected.body.setTranslation).toHaveBeenCalledOnce()
-    expect(neighbor.body.setTranslation).not.toHaveBeenCalled()
-    const position = selected.body.setTranslation.mock.calls[0]?.[0] as { x: number; y: number; z: number }
-    expect(position.x).toBeGreaterThan(-0.3)
-    expect(position.y).toBeCloseTo(0.62)
-    expect(Math.hypot(position.x - 1, position.z + 0.8)).toBeGreaterThan(0.7)
+    const position = prize.body.setTranslation.mock.calls[0]?.[0] as { x: number; y: number; z: number }
+    expect(position.x).toBeLessThan(0.5)
+    const rotation = prize.body.setRotation.mock.calls[0]?.[0] as { x: number; z: number }
+    expect(Math.hypot(rotation.x, rotation.z)).toBeGreaterThan(0.2)
   })
 
-  it('swaps complete poses with an existing doll near the chute', () => {
-    const makePrize = (position: { x: number; y: number; z: number }, rotation: { x: number; y: number; z: number; w: number }) => ({
-      claimed: false,
-      body: {
-        translation: () => position, rotation: () => rotation,
-        setTranslation: vi.fn(), setRotation: vi.fn(), setLinvel: vi.fn(), setAngvel: vi.fn(),
-      },
-      mesh: { position: { set: vi.fn() }, quaternion: { set: vi.fn() } },
-      carry: { release: vi.fn() },
-    })
-    const far = makePrize({ x: 1.1, y: 0.6, z: -1 }, { x: 0, y: 0, z: 0, w: 1 })
-    const near = makePrize({ x: -0.08, y: 0.6, z: 0.53 }, { x: 0, y: 0.3, z: 0, w: 0.954 })
+  it('keeps a selected doll that started beside the chute beside the guard', () => {
+    const mesh = new THREE.Group()
+    mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.2, 0.6)))
+    mesh.position.set(-0.08, 0.6, 0.53)
+    const prize = {
+      claimed: false, mesh, carry: { release: vi.fn() },
+      body: { rotation: () => ({ x: 0, y: 0, z: 0, w: 1 }), translation: () => ({ x: -0.08, y: 0.6, z: 0.53 }),
+        setTranslation: vi.fn(), setRotation: vi.fn(), setLinvel: vi.fn(), setAngvel: vi.fn() },
+    }
     const game = Object.assign(Object.create(ClawMachineGame.prototype), {
-      round: { ...createRound(), phase: 'lost' },
-      prizes: [far, near],
+      round: { ...createRound(), phase: 'lost' }, prizes: [prize],
     }) as ClawMachineGame
+    expect(game.placePrizeForClerk(0)).toEqual({ type: 'placed' })
+    const position = prize.body.setTranslation.mock.calls[0]?.[0] as { x: number; z: number }
+    expect(position.x).toBeLessThan(0.5)
+    expect(position.z).toBeGreaterThan(-0.3)
+  })
 
+  it('exchanges a nearby doll with the selected doll and leans the selection against the guard', () => {
+    const makePrize = (x: number, z: number) => {
+      const mesh = new THREE.Group()
+      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.2, 0.5)))
+      mesh.position.set(x, 0.6, z)
+      return { claimed: false, mesh, carry: { release: vi.fn() },
+        body: { translation: () => ({ x, y: 0.6, z }), rotation: () => ({ x: 0, y: 0, z: 0, w: 1 }),
+          setTranslation: vi.fn(), setRotation: vi.fn(), setLinvel: vi.fn(), setAngvel: vi.fn() } }
+    }
+    const selected = makePrize(1, -0.8)
+    const neighbor = makePrize(-0.1, 0.65)
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round: { ...createRound(), phase: 'lost' }, prizes: [selected, neighbor],
+    }) as ClawMachineGame
     expect(game.placePrizeForClerk(0)).toEqual({ type: 'swapped', displaced: '風速狗' })
-    expect(far.body.setTranslation).toHaveBeenCalledWith({ x: -0.08, y: 0.6, z: 0.53 }, true)
-    expect(near.body.setTranslation).toHaveBeenCalledWith({ x: 1.1, y: 0.6, z: -1 }, true)
-    expect(far.body.setRotation).toHaveBeenCalledWith({ x: 0, y: 0.3, z: 0, w: 0.954 }, true)
-    expect(near.body.setRotation).toHaveBeenCalledWith({ x: 0, y: 0, z: 0, w: 1 }, true)
+    const replacement = neighbor.body.setTranslation.mock.calls[0]?.[0] as { x: number; z: number }
+    expect(replacement.x).toBe(1)
+    expect(replacement.z).toBe(-0.8)
+    const rotation = selected.body.setRotation.mock.calls[0]?.[0] as { x: number; z: number }
+    expect(Math.hypot(rotation.x, rotation.z)).toBeGreaterThan(0.2)
   })
 
   it('lets the clerk rescue only the released doll genuinely stuck at the chute', () => {

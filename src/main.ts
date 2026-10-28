@@ -622,7 +622,8 @@ function showClerkAssist(): void {
   clerkDialog.removeAttribute('data-phase')
   clerkJudgment.hidden = true
   clerkSound.textContent = copy.clerkSound
-  clerkCopy.textContent = copy.clerkIntro
+  const repeatPlacement = clerkAssist.hasPlacedThisCycle()
+  clerkCopy.textContent = repeatPlacement ? copy.clerkRepeatIntro : copy.clerkIntro
   clerkDecline.textContent = copy.clerkDecline
   clerkChoices.replaceChildren(...game.availablePrizesForClerk().map(({ index, name }) => {
     const button = document.createElement('button')
@@ -640,13 +641,16 @@ function showClerkAssist(): void {
     button.append(icon, label)
     button.addEventListener('click', () => {
       const placement = game.placePrizeForClerk(index)
-      if (!placement) return
-      clerkAssist.completePlacement()
+      if (!placement) {
+        clerkCopy.textContent = copy.placementNoSpace
+        return
+      }
+      clerkAssist.completePlacement(coinLedger.snapshot().amount)
       clerkDialog.dataset.phase = 'placing'
       clerkSound.textContent = placement.type === 'swapped' ? copy.swappedSound : copy.placedSound
       clerkCopy.textContent = placement.type === 'swapped'
-        ? format(copy.swapped, { name, displaced: placement.displaced })
-        : format(copy.placed, { name })
+        ? format(repeatPlacement ? copy.swappedAgain : copy.swapped, { name, displaced: placement.displaced })
+        : format(repeatPlacement ? copy.placedAgain : copy.placed, { name })
       clerkJudgmentTitle.textContent = copy.judgmentTitle
       clerkJudgmentCopy.textContent = copy.judgmentCopy
       clerkJudgment.hidden = false

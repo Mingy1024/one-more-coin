@@ -46,7 +46,8 @@ import { selectPrizeForAim } from './prizeSelection'
 import { createGantryAssembly } from './gantry'
 import { createArcadeRoom } from './arcadeRoom'
 import { createSideStickers } from './sideStickers'
-import { chooseClerkPlacement, findClerkSwapIndex } from './clerkAssist'
+import { chooseClerkPlacement } from './clerkAssist'
+import { clerkLeanPose, CHUTE_GUARD_OUTER_X, CHUTE_GUARD_OUTER_Z, type ChuteGuard } from './clerkLean'
 import { getMessages } from '../i18n'
 import { zhHant } from '../i18n/zh-Hant'
 import {
@@ -496,23 +497,105 @@ export class ClawMachineGame {
   placePrizeForClerk(index: number): { type: 'swapped'; displaced: string } | { type: 'placed' } | undefined {
     const prize = this.prizes[index]
     if ((this.round.phase !== 'lost' && this.round.phase !== 'ready') || !prize || prize.claimed) return undefined
-    const positions = this.prizes.map((entry) => entry.claimed ? undefined : entry.body.translation())
-    const swapIndex = findClerkSwapIndex(index, positions)
-    if (swapIndex !== undefined) {
-      const neighbor = this.prizes[swapIndex]!
-      const selectedPose = { position: { ...prize.body.translation() }, rotation: { ...prize.body.rotation() } }
-      const neighborPose = { position: { ...neighbor.body.translation() }, rotation: { ...neighbor.body.rotation() } }
-      this.setPrizePose(prize, neighborPose.position, neighborPose.rotation)
-      this.setPrizePose(neighbor, selectedPose.position, selectedPose.rotation)
-      return { type: 'swapped', displaced: getMessages().prizes[swapIndex]! }
+    const origin = { ...prize.body.translation() }
+    const originalRotation = { ...prize.body.rotation() }
+    const neighbors = this.prizes.filter(other => other !== prize && !other.claimed)
+      .map(other => ({ prize: other, box: new THREE.Box3().setFromObject(other.mesh) }))
+    const overlaps = (a: THREE.Box3, b: THREE.Box3): boolean =>
+      a.min.x < b.max.x + 0.01 && a.max.x > b.min.x - 0.01
+      && a.min.z < b.max.z + 0.01 && a.max.z > b.min.z - 0.01
+    const inside = (box: THREE.Box3): boolean =>
+      box.min.x >= -1.87 && box.max.x <= 1.87 && box.min.z >= -1.63 && box.max.z <= 1.63
+    const collidesWith = (moving: Prize, position: RAPIER.Vector, rotation: RAPIER.Rotation, other: Prize, movingBox: THREE.Box3, otherBox: THREE.Box3): boolean => {
+      if (!overlaps(movingBox, otherBox)) return false
+      if (!moving.colliders || !other.colliders) return true
+      return moving.colliders.some(shape => other.colliders.some(collider => {
+        const contact = collider.contactShape(shape.shape, position, rotation, 0)
+        return contact !== null && contact.distance < -0.012
+      }))
     }
-    const neighbors = this.prizes.filter((other) => other !== prize && !other.claimed)
-      .map((other) => other.body.translation())
-    const destination = chooseClerkPlacement(neighbors)
-    const upright = { x: 0, y: 0, z: 0, w: 1 }
+    const hitsCabinet = (moving: Prize, position: RAPIER.Vector, rotation: RAPIER.Rotation): boolean => {
+      if (!this.world || !moving.colliders) return false
+      let hit = false
+      this.world.forEachCollider(collider => {
+        if (hit || collider.parent()?.isDynamic()) return
+        hit = moving.colliders.some(shape => {
+          const contact = collider.contactShape(shape.shape, position, rotation, 0)
+          return contact !== null && contact.distance < -0.015
+        })
+      })
+      return hit
+    }
+    const nearGuard = neighbors.filter(({ prize: other, box }) => {
+      const y = other.body.translation().y
+      return y > 0.05 && y < 1.2 && (
+        (box.max.z >= 0.24 && box.min.z <= 1.6 && Math.abs(box.min.x - CHUTE_GUARD_OUTER_X) < 0.65)
+        || (box.min.x <= -0.5 && Math.abs(box.max.z - CHUTE_GUARD_OUTER_Z) < 0.65))
+    })
+    nearGuard.sort((a, b) => Math.min(Math.abs(a.box.min.x - CHUTE_GUARD_OUTER_X), Math.abs(a.box.max.z - CHUTE_GUARD_OUTER_Z))
+      - Math.min(Math.abs(b.box.min.x - CHUTE_GUARD_OUTER_X), Math.abs(b.box.max.z - CHUTE_GUARD_OUTER_Z)))
 
-    this.setPrizePose(prize, destination, upright)
-    return { type: 'placed' }
+    type Candidate = { guard: ChuteGuard; along: number; partner?: typeof neighbors[number] }
+    const candidates: Candidate[] = []
+    if (nearGuard.length) {
+      for (const partner of nearGuard) {
+        const position = partner.prize.body.translation()
+        const right = { guard: 'right' as const, along: THREE.MathUtils.clamp(position.z, 0.4, 1.1), partner }
+        const back = { guard: 'back' as const, along: THREE.MathUtils.clamp(position.x, -1.28, -0.65), partner }
+        for (const offset of [0, -0.15, 0.15, -0.3, 0.3]) {
+          const side = { ...right, along: THREE.MathUtils.clamp(right.along + offset, 0.35, 1.1) }
+          const rear = { ...back, along: THREE.MathUtils.clamp(back.along + offset, -1.28, -0.65) }
+          if (position.x > -0.5) candidates.push(side, rear)
+          else candidates.push(rear, side)
+        }
+      }
+    } else {
+      for (const z of [0.65, 0.4, 0.9, 1.1]) candidates.push({ guard: 'right', along: z })
+      for (const x of [-1.02, -0.76, -1.28]) candidates.push({ guard: 'back', along: x })
+    }
+
+    for (const candidate of candidates) {
+      const pose = clerkLeanPose(prize.mesh, candidate.guard, candidate.along)
+      if (!pose || !inside(pose.box)) continue
+      const remaining = neighbors.filter(other => other !== candidate.partner)
+      if (hitsCabinet(prize, pose.position, pose.rotation)
+        || remaining.some(other => collidesWith(prize, pose.position, pose.rotation, other.prize, pose.box, other.box))) continue
+      let replacementPose: { position: RAPIER.Vector; rotation: RAPIER.Rotation } | undefined
+      if (candidate.partner) {
+        const partner = candidate.partner.prize
+        const partnerBounds = prizeCollisionVertices(partner.mesh).bounds
+        const rotations = [originalRotation, partner.body.rotation(), { x: 0, y: 0, z: 0, w: 1 }]
+        for (const rotation of rotations) {
+          const local = partnerBounds.clone().applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(
+            new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w),
+          ))
+          const floorY = -local.min.y + 0.008
+          const box = local.clone().translate(new THREE.Vector3(origin.x, floorY, origin.z))
+          const supportingTop = Math.max(0, ...remaining.filter(other => overlaps(box, other.box)).map(other => other.box.max.y))
+          // Keep the exchanged doll in the selected doll's old footprint; if occupied by a
+          // neighboring plush's overhang, rest it on that plush instead of moving it elsewhere.
+          for (const y of [floorY, supportingTop - local.min.y + 0.015]) {
+            const position = { x: origin.x, y, z: origin.z }
+            const replacement = local.clone().translate(new THREE.Vector3(position.x, y, position.z))
+            if (replacement.max.y > 2.8 || !inside(replacement) || hitsCabinet(partner, position, rotation)) continue
+            if (remaining.some(other => collidesWith(partner, position, rotation, other.prize, replacement, other.box))) continue
+            if (replacement.intersectsBox(pose.box)) continue
+            replacementPose = { position, rotation }
+            break
+          }
+          if (replacementPose) break
+        }
+        if (!replacementPose) continue
+        this.setPrizePose(partner, replacementPose.position, replacementPose.rotation)
+        this.stalePrizes?.delete(partner)
+      }
+      this.setPrizePose(prize, pose.position, pose.rotation)
+      this.stalePrizes?.delete(prize)
+      return candidate.partner
+        ? { type: 'swapped', displaced: getMessages().prizes[this.prizes.indexOf(candidate.partner.prize)]! }
+        : { type: 'placed' }
+    }
+    return undefined
   }
 
   rescueStuckPrizeForClerk(): string | undefined {

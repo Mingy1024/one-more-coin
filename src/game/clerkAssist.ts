@@ -1,11 +1,11 @@
 export class ClerkAssistTrigger {
   private offeredThisCycle = false
-  private placedThisCycle = false
+  private lastPlacementAmount: number | undefined
 
   onResult(result: 'won' | 'lost', amount: number): boolean {
     if (result === 'won') {
       this.offeredThisCycle = false
-      this.placedThisCycle = false
+      this.lastPlacementAmount = undefined
       return false
     }
     if (amount < 100 || this.offeredThisCycle) return false
@@ -14,39 +14,18 @@ export class ClerkAssistTrigger {
   }
 
   canRequestPlacement(amount: number): boolean {
-    return amount >= 100 && !this.placedThisCycle
+    return this.lastPlacementAmount === undefined
+      ? amount >= 100
+      : amount - this.lastPlacementAmount >= 50
   }
 
-  completePlacement(): void {
-    this.placedThisCycle = true
+  hasPlacedThisCycle(): boolean {
+    return this.lastPlacementAmount !== undefined
   }
-}
 
-interface DollPosition { x: number; y: number; z: number }
-
-function distanceFromChuteLip(position: DollPosition): number {
-  const xGap = Math.max(0, -1.9 - position.x, position.x + 0.5)
-  const zGap = Math.max(0, 0.24 - position.z, position.z - 1.68)
-  return Math.hypot(xGap, zGap)
-}
-
-export function findClerkSwapIndex(
-  selectedIndex: number,
-  positions: ReadonlyArray<DollPosition | undefined>,
-): number | undefined {
-  const selected = positions[selectedIndex]
-  if (!selected || distanceFromChuteLip(selected) <= 0.65) return undefined
-
-  let nearestIndex: number | undefined
-  let nearestDistance = Infinity
-  positions.forEach((position, index) => {
-    if (index === selectedIndex || !position || position.y < 0.4) return
-    const distance = distanceFromChuteLip(position)
-    if (distance > 0.65 || distance < 0.05 || distance >= nearestDistance) return
-    nearestDistance = distance
-    nearestIndex = index
-  })
-  return nearestIndex
+  completePlacement(amount: number): void {
+    this.lastPlacementAmount = amount
+  }
 }
 
 export function chooseClerkPlacement(otherPositions: ReadonlyArray<{ x: number; z: number }>): { x: number; y: number; z: number } {

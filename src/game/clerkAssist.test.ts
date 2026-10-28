@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { ClerkAssistTrigger, chooseClerkPlacement, findClerkSwapIndex } from './clerkAssist'
+import { ClerkAssistTrigger, chooseClerkPlacement } from './clerkAssist'
 
 describe('clerk assist hidden event', () => {
   it('offers help only after a failed round reaches NT$100', () => {
@@ -25,8 +25,13 @@ describe('clerk assist hidden event', () => {
     expect(trigger.canRequestPlacement(90)).toBe(false)
     expect(trigger.onResult('lost', 100)).toBe(true)
     expect(trigger.canRequestPlacement(100)).toBe(true)
-    trigger.completePlacement()
+    trigger.completePlacement(100)
     expect(trigger.canRequestPlacement(110)).toBe(false)
+    expect(trigger.canRequestPlacement(149)).toBe(false)
+    expect(trigger.canRequestPlacement(150)).toBe(true)
+    trigger.completePlacement(150)
+    expect(trigger.canRequestPlacement(199)).toBe(false)
+    expect(trigger.canRequestPlacement(200)).toBe(true)
     trigger.onResult('won', 110)
     expect(trigger.canRequestPlacement(100)).toBe(true)
   })
@@ -52,23 +57,4 @@ describe('clerk assist hidden event', () => {
       Math.hypot(destination.x - neighbor.x, destination.z - neighbor.z)))).toBeGreaterThan(0.72)
   })
 
-  it('prefers an existing doll by the chute when the requested doll is farther away', () => {
-    const positions = [
-      { x: 0.9, y: 0.62, z: -0.9 },
-      { x: -0.08, y: 0.62, z: 0.53 },
-      { x: -1.25, y: 0.62, z: -0.35 },
-    ]
-
-    expect(findClerkSwapIndex(0, positions)).toBe(1)
-    expect(findClerkSwapIndex(1, positions)).toBeUndefined()
-  })
-
-  it('does not swap with a prize that has already fallen below the cabinet floor', () => {
-    const positions = [
-      { x: 1, y: 0.62, z: -1 },
-      { x: -0.08, y: -0.8, z: 0.53 },
-    ]
-
-    expect(findClerkSwapIndex(0, positions)).toBeUndefined()
-  })
 })
