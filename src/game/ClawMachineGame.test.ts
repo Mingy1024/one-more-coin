@@ -47,15 +47,15 @@ describe('claw machine session', () => {
       }) as ClawMachineGame
       const state = game as unknown as { round: RoundState; gripLevel: number }
       game.startRound()
-      expect(state.gripLevel).toBe(1.0304)
+      expect(state.gripLevel).toBe(0.9752)
       game.startRound()
       state.round = { ...state.round, phase: 'lowering', phaseElapsed: 0.5 }
       game.grab()
-      expect(state.gripLevel).toBe(1.0304)
+      expect(state.gripLevel).toBe(0.9752)
       expect(random).toHaveBeenCalledTimes(1)
       state.round = createRound()
       game.startRound()
-      expect(state.gripLevel).toBe(0.8512)
+      expect(state.gripLevel).toBe(0.8056)
       expect(random).toHaveBeenCalledTimes(2)
     } finally {
       random.mockRestore()

@@ -14,10 +14,10 @@ const supportedTips = [
 ]
 
 describe('claw grip levels', () => {
-  it('selects each level with equal intervals and raises every grip level by 12 percent', () => {
+  it('selects each level with equal intervals and raises every grip level by 6 percent', () => {
     expect([0, 0.25, 0.5, 0.75].map(value => chooseGripLevel(() => value))).toEqual(GRIP_LEVELS)
-    expect(chooseGripLevel(() => 0.999)).toBe(0.8512)
-    expect(Math.max(...GRIP_LEVELS)).toBe(1.12)
+    expect(chooseGripLevel(() => 0.999)).toBe(0.8056)
+    expect(Math.max(...GRIP_LEVELS)).toBe(1.06)
   })
 })
 

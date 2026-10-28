@@ -27,7 +27,7 @@ export const CAPTURE_QUALITY = 0.55
 export const PLUSH_RADIUS = 0.38
 export const PLUSH_HALF_SEGMENT = 0.22
 
-export const GRIP_LEVELS = [1.12, 1.0304, 0.9408, 0.8512] as const
+export const GRIP_LEVELS = [1.06, 0.9752, 0.8904, 0.8056] as const
 
 export function chooseGripLevel(random: () => number = Math.random): number {
   const sample = Math.max(0, Math.min(0.999999, random()))
