@@ -3,6 +3,21 @@ import { describe, expect, it } from 'vitest'
 import { CoinLedger } from './coinLedger'
 
 describe('coin spend ledger', () => {
+  it('does not reannounce earned titles after a win or after reloading', () => {
+    const saved = new Map<string, string>()
+    const storage = {
+      getItem: (key: string) => saved.get(key) ?? null,
+      setItem: (key: string, value: string) => { saved.set(key, value) },
+    }
+    const ledger = new CoinLedger(storage)
+    for (let i = 0; i < 3; i++) ledger.insertCoin()
+    ledger.settleWin()
+    for (let i = 0; i < 3; i++) expect(ledger.insertCoin().achievement).toBeUndefined()
+    const reloaded = new CoinLedger(storage)
+    for (let i = 0; i < 3; i++) expect(reloaded.insertCoin().achievement).toBeUndefined()
+    reloaded.insertCoin()
+    expect(reloaded.insertCoin().achievement?.threshold).toBe(50)
+  })
   it('adds ten dollars for every new round', () => {
     const ledger = new CoinLedger()
 

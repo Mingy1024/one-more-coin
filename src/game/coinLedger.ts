@@ -50,9 +50,9 @@ export class CoinLedger {
   }
 
   insertCoin(): SpendSnapshot {
-    const previousTitle = this.currentTitle()
     this.amount += COIN_VALUE
     const currentTitle = this.currentTitle()
+    const newlyUnlocked = currentTitle && !this.unlockedThresholds.has(currentTitle.threshold)
     if (currentTitle && !this.unlockedThresholds.has(currentTitle.threshold)) {
       this.unlockedThresholds.add(currentTitle.threshold)
       try {
@@ -65,7 +65,7 @@ export class CoinLedger {
     return {
       amount: this.amount,
       title: currentTitle?.name ?? getMessages().noTitle,
-      achievement: currentTitle?.threshold !== previousTitle?.threshold ? currentTitle : undefined,
+      achievement: newlyUnlocked ? currentTitle : undefined,
     }
   }
 
