@@ -65,6 +65,7 @@ export interface GameSnapshot {
   phase: RoundPhase
   result?: 'won' | 'lost'
   wonPrizeIndex?: number
+  wonWithGuarantee?: boolean
   status: string
   timeLeft: number
 }
@@ -156,6 +157,10 @@ export class ClawMachineGame {
   private driveVelocity: PlanarMotion = { x: 0, z: 0 }
   private carried = false
   private lastGrabSucceeded = false
+  private guaranteedPrizes = new Set<Prize>()
+  private wonWithGuarantee = false
+  private guaranteedRound = false
+  private secondGrabUsed = false
   private enteredChute = false
   private running = false
   private paused = false
@@ -278,6 +283,7 @@ export class ClawMachineGame {
   grab(): void {
     if (this.round.phase === 'aiming' || this.round.phase === 'lowering') this.machineButtonPulse = 0.18
     if (this.round.phase === 'lowering') {
+      this.secondGrabUsed = true
       const loweringProgress = phaseProgress(this.round)
       this.closingHeight = clawHeadHeight('lowering', loweringProgress, this.closingHeight)
       this.closingStartOpening = clawOpeningForPhase('lowering', loweringProgress, false, 1)
@@ -321,12 +327,20 @@ export class ClawMachineGame {
     this.publishSnapshot()
   }
 
-  startRound(): void {
+  startRound(guaranteed = false): void {
     if (this.round.phase !== 'ready') return
+    this.guaranteedRound = guaranteed
+    this.secondGrabUsed = false
     this.gripLevel = chooseGripLevel()
     this.round = stepRound(this.round, { type: 'START' })
     this.timer.reset()
     this.publishSnapshot()
+  }
+
+  guaranteedMissReason(): 'timeout' | 'early' | 'position' | undefined {
+    if (!this.guaranteedRound || this.round.phase !== 'lost' || this.lastGrabSucceeded) return undefined
+    if (this.round.attempts === 0) return 'timeout'
+    return this.secondGrabUsed ? 'early' : 'position'
   }
 
   restart(): void {
@@ -338,6 +352,7 @@ export class ClawMachineGame {
     this.slipped = false
     this.gripStrength = 0
     this.returnDisturbance = undefined
+    this.wonWithGuarantee = false
     this.round = createRound()
     this.lastPhase = 'aiming'
     this.carried = false
@@ -361,6 +376,8 @@ export class ClawMachineGame {
   resetPrizes(): void {
     if (this.round.phase !== 'ready') return
     this.pendingPrizeExit = undefined
+    this.guaranteedPrizes?.clear()
+    this.wonWithGuarantee = false
     this.stalePrizes?.clear()
     for (const prize of this.prizes) {
       prize.claimed = false
@@ -512,6 +529,8 @@ export class ClawMachineGame {
       return getMessages().prizes[this.prizes.indexOf(prize)]
     }
     this.activePrize = prize
+    this.wonWithGuarantee = this.guaranteedPrizes?.has(prize) ?? false
+    this.guaranteedPrizes?.delete(prize)
     prize.claimed = true
     prize.carry.release()
     this.setPrizeSensor(prize, true)
@@ -579,6 +598,10 @@ export class ClawMachineGame {
     const previousPhase = this.round.phase
 
     this.round = stepRound(this.round, { type: 'TICK', deltaSeconds: delta })
+    // A protected pickup must finish its visible delivery before the round can end.
+    if (this.guaranteedRound && this.lastGrabSucceeded && this.round.phase === 'lost') {
+      this.round = { ...this.round, phase: 'resetting', phaseElapsed: phaseDurations.resetting! - 0.01 }
+    }
     const pickupFrame = previousPhase === 'closing' && this.round.phase === 'lifting'
     if (this.round.phase !== previousPhase) this.handlePhaseChange(previousPhase, this.round.phase)
 
@@ -591,8 +614,8 @@ export class ClawMachineGame {
     this.updatePhysics(delta, pickupFrame)
     if (pickupFrame) this.tryPickup()
     this.advanceGrip(delta)
-    this.clearStaleChutePrizes()
     this.checkForWin()
+    this.clearStaleChutePrizes()
     this.advancePrizeExit(delta)
 
     const displayedSecond = Math.ceil(this.round.timeLeft)
@@ -716,6 +739,10 @@ export class ClawMachineGame {
 
     this.carried = true
     this.lastGrabSucceeded = true
+    if (this.guaranteedRound) {
+      this.guaranteedPrizes ??= new Set()
+      this.guaranteedPrizes.add(selected)
+    }
     this.articulatedClaw.holdCurrentGrip()
     selected.carry.capture(grabPosition)
   }
@@ -723,6 +750,7 @@ export class ClawMachineGame {
   private advanceGrip(delta: number): void {
     if (!this.carried || !this.activePrize
       || (this.round.phase !== 'lifting' && this.round.phase !== 'returning')) return
+    if (this.guaranteedRound) return
     const progress = phaseProgress(this.round)
     const head = this.articulatedClaw.getHeadPosition()
     const returning = this.round.phase === 'returning'
@@ -760,6 +788,7 @@ export class ClawMachineGame {
     this.carried = false
     this.articulatedClaw.releaseGrip()
     this.activePrize.carry.release(true)
+    if (this.guaranteedRound) this.setPrizeSensor(this.activePrize, true)
     this.enteredChute = false
     this.activePrize.body.setLinvel({ x: 0, y: -0.25, z: 0 }, true)
     this.activePrize.body.setAngvel(prizeReleaseAngularVelocity(), true)
@@ -775,6 +804,16 @@ export class ClawMachineGame {
       : 0
     const centerStrength = returnProgress > 0.78 ? smoothStep((returnProgress - 0.78) / 0.22) * 7 : 0
     for (let step = 0; step < steps; step += 1) {
+      if (this.guaranteedRound && !this.carried && this.lastGrabSucceeded && this.activePrize
+        && !this.activePrize.claimed && (this.round.phase === 'releasing' || this.round.phase === 'resetting' || this.round.phase === 'lost')) {
+        const position = this.activePrize.body.translation()
+        const velocity = this.activePrize.body.linvel()
+        this.activePrize.body.setLinvel({
+          x: THREE.MathUtils.clamp((CHUTE.x - position.x) * 3, -1.5, 1.5),
+          y: Math.min(velocity.y, -0.25),
+          z: THREE.MathUtils.clamp((CHUTE.z - position.z) * 3, -1.5, 1.5),
+        }, true)
+      }
       if (this.carried && this.returnDisturbance && this.round.phase === 'returning') {
         const jolt = returnDisturbanceAt(this.returnDisturbance, returnProgress) * 0.3 * this.world.timestep
           * phaseDurations.returning! / roundPhaseDuration(this.round, 'returning')!
@@ -826,39 +865,40 @@ export class ClawMachineGame {
   }
 
   private checkForWin(): void {
-    if (this.carried || this.round.phase === 'won') return
-    if (this.round.phase !== 'releasing' && this.round.phase !== 'resetting'
-      && this.round.phase !== 'lost' && !this.slipped) return
+    if (this.round.phase === 'won') return
+    const candidates = this.activePrize
+      ? [this.activePrize, ...(this.prizes ?? []).filter(prize => prize !== this.activePrize)]
+      : this.prizes ?? []
+    const winner = candidates.find(prize => {
+      if (prize.claimed) return false
+      const position = prize.body.translation()
+      return isPrizeCaptured(position, CHUTE)
+        || (prize === this.activePrize && this.enteredChute && position.y < CHUTE_CAPTURE_Y)
+    })
+    if (!winner) return
 
-    const prize = this.activePrize
-    const position = prize?.body.translation()
-    // Once the chute makes a prize non-colliding, horizontal momentum can carry it past the lip.
-    if (prize && position && !this.stalePrizes?.has(prize)
-      && (isPrizeCaptured(position, CHUTE)
-        || (this.enteredChute && position.y < CHUTE_CAPTURE_Y))) {
-      prize.claimed = true
-      // Leave the prize non-colliding while it visibly falls into the chute.
-      this.setPrizeSensor(prize, true)
-      this.pendingPrizeExit = { prize, elapsed: 0 }
-      this.round = stepRound(this.round, { type: 'PRIZE_DROPPED' })
-      this.publishSnapshot()
-    }
+    // A late drop belongs to the player even after the claw has changed targets.
+    if (this.carried && this.activePrize) this.activePrize.carry.release(true)
+    this.carried = false
+    this.articulatedClaw?.releaseGrip()
+    this.wonWithGuarantee = this.guaranteedPrizes?.has(winner) ?? false
+    this.guaranteedPrizes?.delete(winner)
+    this.activePrize = winner
+    winner.claimed = true
+    this.stalePrizes?.delete(winner)
+    this.setPrizeSensor(winner, true)
+    this.pendingPrizeExit = { prize: winner, elapsed: 0 }
+    this.round = stepRound(this.round, { type: 'PRIZE_DROPPED' })
+    this.publishSnapshot()
   }
 
   private clearStaleChutePrizes(): void {
     for (const prize of this.stalePrizes ?? []) {
       const position = prize.body.translation()
-      if (isPrizeCaptured(position, CHUTE)) {
-        prize.claimed = true
-        prize.carry.release()
-        prize.mesh.visible = false
-        prize.body.setEnabled(false)
-        this.stalePrizes.delete(prize)
-      } else if (position.y < 0.95 && !isPrizeEnteringChute(position, CHUTE)) {
+      // Captured prizes are settled by checkForWin, never silently discarded here.
+      if (!isPrizeCaptured(position, CHUTE) && position.y < 0.95 && !isPrizeEnteringChute(position, CHUTE)) {
         const velocity = prize.body.linvel()
-        if (Math.hypot(velocity.x, velocity.y, velocity.z) < 0.25) {
-          this.stalePrizes.delete(prize)
-        }
+        if (Math.hypot(velocity.x, velocity.y, velocity.z) < 0.25) this.stalePrizes.delete(prize)
       }
     }
   }
@@ -1463,6 +1503,7 @@ export class ClawMachineGame {
       isReady: this.round.phase === 'ready',
       phase: this.round.phase,
       result: this.round.phase === 'won' || this.round.phase === 'lost' ? this.round.phase : undefined,
+      wonWithGuarantee: this.round.phase === 'won' && this.wonWithGuarantee,
       wonPrizeIndex: this.round.phase === 'won' && this.activePrize?.claimed
         ? this.prizes.indexOf(this.activePrize) : undefined,
       status: showingSlip ? messages.slipped

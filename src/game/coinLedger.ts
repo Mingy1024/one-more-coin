@@ -49,6 +49,10 @@ export class CoinLedger {
     }
   }
 
+  restoreGuaranteedSpend(amount: number): void {
+    if (Number.isFinite(amount) && amount >= 0) this.amount = Math.floor(amount / COIN_VALUE) * COIN_VALUE
+  }
+
   insertCoin(): SpendSnapshot {
     this.amount += COIN_VALUE
     const currentTitle = this.currentTitle()

@@ -211,63 +211,61 @@ describe('claw machine session', () => {
     expect((game as unknown as { round: RoundState }).round.phase).toBe('won')
   })
 
-  it('does not award the next round for a still-falling doll from the previous one', () => {
+  it.each(['ready', 'aiming', 'lowering', 'lost'] as const)('awards a previously stuck doll that falls into the chute during %s', phase => {
     const prize = {
-      claimed: false,
-      body: { translation: () => ({ x: -1.2, y: -0.72, z: 0.96 }), setEnabled: vi.fn() },
-      collider: { setSensor: vi.fn() },
-      carry: { release: vi.fn() },
-      mesh: { visible: true },
+      claimed: false, body: { translation: () => ({ x: -1.2, y: -0.72, z: 0.96 }) },
+      collider: { setSensor: vi.fn() }, carry: { release: vi.fn() }, mesh: { visible: true },
     }
+    const publishSnapshot = vi.fn()
     const game = Object.assign(Object.create(ClawMachineGame.prototype), {
-      round: { ...createRound(), phase: 'releasing' },
-      carried: false,
-      activePrize: prize,
-      prizes: [prize],
-      stalePrizes: new Set([prize]),
-      publishSnapshot: vi.fn(),
+      round: { ...createRound(), phase }, carried: false, prizes: [prize],
+      stalePrizes: new Set([prize]), publishSnapshot,
     }) as ClawMachineGame
-    const internals = game as unknown as { checkForWin(): void; clearStaleChutePrizes(): void; round: RoundState }
-
-    internals.checkForWin()
-    expect(internals.round.phase).toBe('releasing')
-    internals.clearStaleChutePrizes()
+    ;(game as unknown as { checkForWin(): void }).checkForWin()
     expect(prize.claimed).toBe(true)
-    expect(prize.mesh.visible).toBe(false)
-    expect(prize.body.setEnabled).toHaveBeenCalledWith(false)
-    expect(internals.round.phase).toBe('releasing')
+    expect((game as unknown as { round: RoundState }).round.phase).toBe('won')
+    expect((game as unknown as { activePrize: unknown }).activePrize).toBe(prize)
+    expect(publishSnapshot).toHaveBeenCalledOnce()
   })
 
-  it('retires a still-carried doll when restarting and clears it if it later reaches the chute', () => {
-    let position = { x: -1.2, y: 2.2, z: 0.96 }
-    const prize = {
-      claimed: false,
-      body: {
-        translation: () => position,
-        linvel: () => ({ x: 0, y: -1, z: 0 }),
-        setEnabled: vi.fn(),
-      },
-      carry: { release: vi.fn() },
-      mesh: { visible: true },
-    }
+  it('releases another held doll and reports the actual late-falling winner', () => {
+    const winner = { claimed: false, body: { translation: () => ({ x: -1.2, y: -0.72, z: 0.96 }) },
+      collider: { setSensor: vi.fn() }, carry: { release: vi.fn() } }
+    const held = { claimed: false, body: { translation: () => ({ x: 0, y: 2, z: 0 }) }, carry: { release: vi.fn() } }
     const game = Object.assign(Object.create(ClawMachineGame.prototype), {
-      round: { ...createRound(), phase: 'lost' },
-      carried: true, activePrize: prize, prizes: [prize],
-      articulatedClaw: { reset: vi.fn() },
+      round: { ...createRound(), phase: 'lifting' }, carried: true, activePrize: held,
+      prizes: [held, winner], articulatedClaw: { releaseGrip: vi.fn() },
+      stalePrizes: new Set([winner]), publishSnapshot: vi.fn(),
+    }) as ClawMachineGame
+    ;(game as unknown as { checkForWin(): void }).checkForWin()
+    expect(winner.claimed).toBe(true)
+    expect(held.claimed).toBe(false)
+    expect(held.carry.release).toHaveBeenCalledOnce()
+    expect((game as unknown as { activePrize: unknown }).activePrize).toBe(winner)
+  })
+
+  it('reports guarantee use for the winning doll even if it came from a previous attempt', () => {
+    const prize = { claimed: false, body: { translation: () => ({ x: -1.2, y: -0.72, z: 0.96 }) },
+      collider: { setSensor: vi.fn() }, carry: { release: vi.fn() } }
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round: { ...createRound(), phase: 'aiming' }, carried: false, prizes: [prize],
+      guaranteedPrizes: new Set([prize]), guaranteedRound: false,
       publishSnapshot: vi.fn(),
     }) as ClawMachineGame
-    const internals = game as unknown as { stalePrizes: Set<typeof prize>; clearStaleChutePrizes(): void }
+    ;(game as unknown as { checkForWin(): void }).checkForWin()
+    expect((game as unknown as { wonWithGuarantee: boolean }).wonWithGuarantee).toBe(true)
+  })
 
-    game.restart()
-    expect(prize.carry.release).toHaveBeenCalled()
-    expect(internals.stalePrizes.has(prize)).toBe(true)
-
-    position = { x: -1.2, y: -0.72, z: 0.96 }
-    internals.clearStaleChutePrizes()
-    expect(prize.claimed).toBe(true)
-    expect(prize.mesh.visible).toBe(false)
-    expect(prize.body.setEnabled).toHaveBeenCalledWith(false)
-    expect(internals.stalePrizes.has(prize)).toBe(false)
+  it.each([false, true])('includes accurate guarantee attribution in a winning snapshot: %s', protectedPrize => {
+    const prize = { claimed: false, body: { translation: () => ({ x: -1.2, y: -0.72, z: 0.96 }) },
+      collider: { setSensor: vi.fn() }, carry: { release: vi.fn() } }
+    const onSnapshot = vi.fn()
+    const game = Object.assign(Object.create(ClawMachineGame.prototype), {
+      round: { ...createRound(), phase: 'aiming' }, carried: false, prizes: [prize],
+      guaranteedPrizes: new Set(protectedPrize ? [prize] : []), onSnapshot,
+    }) as ClawMachineGame
+    ;(game as unknown as { checkForWin(): void }).checkForWin()
+    expect(onSnapshot).toHaveBeenLastCalledWith(expect.objectContaining({ result: 'won', wonPrizeIndex: 0, wonWithGuarantee: protectedPrize }))
   })
 
   it('does not advance a paid round while the title gallery is open', () => {

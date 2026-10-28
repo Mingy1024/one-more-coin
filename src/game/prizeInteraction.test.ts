@@ -30,6 +30,12 @@ describe('prize drop', () => {
     expect(isPrizeCaptured({ x: -1.2, y: -0.72, z: 0.96 }, chute)).toBe(true)
   })
 
+  it('awards a doll fully inside the chute well even when it hugs an inner wall', () => {
+    expect(isPrizeCaptured({ x: chute.x + 0.67, y: -0.75, z: chute.z }, chute)).toBe(true)
+    expect(isPrizeCaptured({ x: chute.x, y: -0.75, z: chute.z + 0.69 }, chute)).toBe(true)
+    expect(isPrizeCaptured({ x: chute.x + 0.72, y: -0.75, z: chute.z }, chute)).toBe(false)
+  })
+
   it('does not report a protruding doll as captured', () => {
     expect(isPrizeCaptured({ x: -1.2, y: -0.42, z: 0.96 }, chute)).toBe(false)
   })

@@ -99,6 +99,10 @@ describe('claw machine round', () => {
     expect(round.phase).toBe('won')
   })
 
+  it('awards a late physical drop before another coin is inserted', () => {
+    expect(stepRound(createRound(), { type: 'PRIZE_DROPPED' }).phase).toBe('won')
+  })
+
   it('finishes when the timer reaches zero', () => {
     const started = stepRound(createRound(0.1), { type: 'START' })
     const round = stepRound(started, {

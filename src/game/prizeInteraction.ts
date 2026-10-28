@@ -30,8 +30,8 @@ export function canPickupPrize(position: PrizePosition, grabPosition: PrizePosit
 }
 
 export function isPrizeCaptured(position: PrizePosition, chute: ChutePosition): boolean {
-  return Math.abs(position.x - chute.x) < CHUTE_OPENING_HALF_X - 0.08
-    && Math.abs(position.z - chute.z) < CHUTE_OPENING_HALF_Z - 0.08
+  return Math.abs(position.x - chute.x) < CHUTE_OPENING_HALF_X - 0.01
+    && Math.abs(position.z - chute.z) < CHUTE_OPENING_HALF_Z - 0.01
     && position.y < CHUTE_CAPTURE_Y
 }
 
