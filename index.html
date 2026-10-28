@@ -144,14 +144,11 @@
         <span id="status-text">移動搖桿，對準禮物</span>
       </section>
 
-      <section id="start-panel" class="start-panel" aria-label="開始遊戲" data-i18n-aria="startAria">
-        <button id="start-button" type="button" aria-label="投入 10 元，開始挑戰" data-i18n-aria="insertCoinAria">
-          <span class="coin-mark" aria-hidden="true"><img src="/images/ui/coin-token.webp" alt="" width="40" height="40"></span>
-          <strong data-i18n="insertCoin">投入 10 元・開始挑戰</strong>
-        </button>
-      </section>
-
       <section id="achievement-toast" class="achievement-toast" role="status" aria-live="assertive" hidden>
+        <div class="collection-fanfare" aria-hidden="true">
+          <img class="collection-wreath" src="/images/events/collection-triumph.png" alt="" width="384" height="384" decoding="async">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
         <div class="achievement-rays" aria-hidden="true"></div>
         <div class="achievement-panel">
           <img id="achievement-icon" class="achievement-icon" src="/images/titles/title-10.webp" alt="" width="56" height="56" decoding="async">
@@ -172,13 +169,21 @@
       <section id="game-controls" class="controls is-locked" aria-label="遊戲控制" data-i18n-aria="controlsAria">
         <div class="joystick-wrap">
           <div id="joystick" class="joystick" role="group" aria-label="移動夾爪" aria-disabled="true" data-i18n-aria="moveClawAria">
+            <svg class="joystick-directions" viewBox="0 0 94 94" aria-hidden="true"><path d="m42 12 5-5 5 5M42 82l5 5 5-5M12 42l-5 5 5 5M82 42l5 5-5 5"/></svg>
             <div id="joystick-knob" class="joystick-knob"></div>
           </div>
           <span data-i18n="move">移動</span>
         </div>
 
+        <section id="start-panel" class="start-panel" aria-label="開始遊戲" data-i18n-aria="startAria">
+        <button id="start-button" type="button" aria-label="投入 10 元，開始挑戰" data-i18n-aria="insertCoinAria">
+          <span class="coin-mark" aria-hidden="true"><img src="/images/ui/coin-token.webp" alt="" width="40" height="40"></span>
+          <strong data-i18n="insertCoin">投入 10 元・開始挑戰</strong>
+        </button>
+        </section>
+
         <button id="grab-button" class="grab-button" type="button">
-          <span class="grab-icon" aria-hidden="true">⌄</span>
+          <svg class="grab-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3v8M10 12h12M10 12l-5 9 5 6M22 12l5 9-5 6M16 12v12"/></svg>
           <span id="grab-label">出爪</span>
         </button>
       </section>
@@ -210,7 +215,7 @@
           </div>
           <p id="result-copy">禮物已安全抵達取物口。</p>
           <p id="result-spend" class="result-spend">本次投入 NT$10</p>
-          <button id="restart-button" type="button" data-i18n="playAgain">再玩一次</button>
+          <button id="restart-button" type="button">再玩一次</button>
           <button id="result-clerk-button" class="result-clerk-button" type="button" data-i18n="callClerk">呼叫店員</button>
         </div>
       </section>
@@ -263,7 +268,7 @@
         <h2 id="clerk-call-title" data-i18n="callClerk">呼叫店員</h2>
         <p id="clerk-call-copy" data-i18n="clerkCallCopy">這位客人，請問需要什麼協助？</p>
         <div class="clerk-call-options">
-          <button id="clerk-rescue-button" class="clerk-choice" type="button" data-i18n="clerkRescue">🧸 娃娃卡在洞口，幫我拿取</button>
+          <button id="clerk-rescue-button" class="clerk-choice" type="button" data-i18n="clerkRescue">🧸 檢查洞口／夾爪卡住的娃娃</button>
           <button id="clerk-placement-button" class="clerk-choice" type="button" data-i18n="clerkPlacement">↔ 請幫忙擺娃娃位置</button>
         </div>
         <p id="clerk-call-feedback" class="clerk-call-feedback" role="status" aria-live="polite" hidden></p>

@@ -37,3 +37,11 @@ Use case: stylized-concept. Asset type: square transparent PNG arcade game achie
 ## title-300
 
 Use case: stylized-concept. Asset type: square transparent PNG arcade game achievement icon. Reference image is a style reference. A golden crescent moon with comically wide sleepless eyes hugging a tiny teal plush bear, coral tiny alarm clock beside it, all-night claw-game challenger badge. Match the reference manga ink style: thick dark navy outlines, polished golden highlights, teal and coral accents, warm cream, crisp cel shading and restrained halftone texture. Bold compact silhouette readable at 48 pixels. Centered composition, subject fully inside frame, 10 percent transparent margin. Real transparent alpha background. No text, numbers, labels, captions, watermark, frame, or rectangular background. One emblem only.
+
+## title-collection
+
+Generated with built-in image_gen using title-150 as a style reference. A crowned teal arcade machine with a claw, six colorful plush animals, gold laurels and sparkles; transparent PNG.
+
+## collection-triumph
+
+Generated with built-in image_gen: a transparent crown and laurel frame, coral ribbons, sparkles and manga impact rays. Stored in ../events/collection-triumph.png (512px), used in the six-second collection achievement animation.

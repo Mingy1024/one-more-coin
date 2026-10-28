@@ -2,7 +2,8 @@ import './style.css'
 
 import { ClawMachineGame, type GameSnapshot } from './game/ClawMachineGame'
 import { BanterPresenter, type BanterRender } from './game/banterPresenter'
-import { CoinLedger, spendTitles, type SpendSnapshot, type SpendTitle } from './game/coinLedger'
+import { PrizeCollection } from './game/prizeCollection'
+import { CoinLedger, spendTitles, type SpendSnapshot } from './game/coinLedger'
 import { ClerkAssistTrigger } from './game/clerkAssist'
 import { HiddenEventSequence, type HiddenResultEvent } from './game/hiddenEvents'
 import { GameAudio } from './game/audio'
@@ -95,6 +96,7 @@ const achievementTitle = requireElement<HTMLElement>('achievement-title')
 const achievementCopy = requireElement<HTMLElement>('achievement-copy')
 const banterPresenter = new BanterPresenter(renderBanter, undefined, hideBanter)
 const coinLedger = new CoinLedger()
+const prizeCollection = new PrizeCollection()
 const clerkAssist = new ClerkAssistTrigger()
 const hiddenEvents = new HiddenEventSequence()
 const gameAudio = new GameAudio()
@@ -187,7 +189,8 @@ try {
   throw error
 }
 
-canvas.addEventListener('webglcontextlost', () => {
+canvas.addEventListener('webglcontextlost', (event) => {
+  event.preventDefault()
   contextLost = true
   showLoading(getMessages().dynamic.contextLost)
 })
@@ -330,9 +333,23 @@ window.addEventListener('blur', () => {
   updateMovement()
 })
 
-grabButton.addEventListener('click', () => game.grab())
+let lastGrabPointerPress = -Infinity
+grabButton.addEventListener('pointerdown', event => {
+  if (grabButton.disabled || (event.pointerType === 'mouse' && event.button !== 0)) return
+  lastGrabPointerPress = performance.now()
+  event.preventDefault()
+  game.grab()
+})
+grabButton.addEventListener('keydown', () => { lastGrabPointerPress = -Infinity })
+grabButton.addEventListener('click', event => {
+  const followsPointerPress = performance.now() - lastGrabPointerPress < 1000
+  lastGrabPointerPress = -Infinity
+  if (!followsPointerPress && event.detail === 0) game.grab()
+})
 resetButton.addEventListener('click', () => {
+  if (!currentSnapshot?.isReady) return
   game.resetPrizes()
+  prizeCollection.reset()
   statusText.textContent = getMessages().dynamic.prizesReset
 })
 titlesButton.addEventListener('click', () => {
@@ -408,11 +425,12 @@ startButton.addEventListener('click', () => {
   gameAudio.playEffect('coinInsert')
   const spend = coinLedger.insertCoin()
   renderSpend(spend)
-  if (spend.achievement) showAchievement(spend.achievement, spend.amount)
+  if (spend.achievement) showAchievement(spend.achievement.threshold, spend.amount)
   game.startRound()
   grabButton.focus({ preventScroll: true })
 })
 restartButton.addEventListener('click', () => {
+  const machineCleared = game.isMachineCleared()
   resultModal.hidden = true
   activeHiddenResultEvent = undefined
   renderHiddenResultEvent()
@@ -420,6 +438,10 @@ restartButton.addEventListener('click', () => {
   lastResult = undefined
   lastResultSpend = undefined
   game.restart()
+  if (machineCleared) {
+    game.resetPrizes()
+    prizeCollection.reset()
+  }
   startButton.focus({ preventScroll: true })
 })
 
@@ -457,8 +479,10 @@ function setupJoystick(): void {
     const y = rawY * scale
 
     knob.style.transform = `translate(${x}px, ${y}px)`
-    joystickAxis.x = x / maxDistance
-    joystickAxis.z = y / maxDistance
+    const magnitude = Math.min(1, distance / maxDistance)
+    const response = magnitude < 0.08 ? 0 : (magnitude - 0.08) / 0.92
+    joystickAxis.x = distance > 0 ? rawX / distance * response : 0
+    joystickAxis.z = distance > 0 ? rawY / distance * response : 0
     updateMovement()
   }
 
@@ -467,6 +491,7 @@ function setupJoystick(): void {
     const pointerId = activePointerId
     activePointerId = undefined
     if (joystick.hasPointerCapture(pointerId)) joystick.releasePointerCapture(pointerId)
+    joystick.classList.remove('is-dragging')
     knob.style.transform = 'translate(0, 0)'
     joystickAxis.x = 0
     joystickAxis.z = 0
@@ -477,12 +502,14 @@ function setupJoystick(): void {
   }
 
   joystick.addEventListener('pointerdown', (event) => {
-    if (activePointerId !== undefined) return
+    if (activePointerId !== undefined || (event.pointerType === 'mouse' && event.button !== 0) || currentSnapshot?.phase !== 'aiming') return
+    if (event.cancelable) event.preventDefault()
     const bounds = joystick.getBoundingClientRect()
     centerX = bounds.left + bounds.width / 2
     centerY = bounds.top + bounds.height / 2
     maxDistance = Math.max(1, (bounds.width - knob.offsetWidth) / 2 - 4)
     activePointerId = event.pointerId
+    joystick.classList.add('is-dragging')
     joystick.setPointerCapture(event.pointerId)
     move(event)
   })
@@ -526,7 +553,7 @@ function updateHud(snapshot: GameSnapshot): void {
   grabLabel.textContent = snapshot.grabLabel
   startPanel.hidden = !snapshot.isReady
   gameControls.classList.toggle('is-locked', snapshot.isReady)
-  joystick.setAttribute('aria-disabled', String(snapshot.isReady))
+  joystick.setAttribute('aria-disabled', String(snapshot.phase !== 'aiming'))
 
   if (achievementToast.hidden) {
     banterPresenter.show(snapshot.banter, {
@@ -541,8 +568,13 @@ function updateHud(snapshot: GameSnapshot): void {
     const won = snapshot.result === 'won'
     if (snapshot.result !== lastResult) {
       const spend = won ? coinLedger.settleWin() : coinLedger.snapshot()
-      const stuckAtChute = !won && game.hasStuckPrizeAtChute()
-      if (won) hiddenEvents.onWin()
+      const stuckAtChute = !won && game.hasStuckPrizeForClerk()
+      if (won) {
+        hiddenEvents.onWin()
+        if (snapshot.wonPrizeIndex !== undefined && prizeCollection.record(snapshot.wonPrizeIndex)) {
+          showAchievement(-1, 0)
+        }
+      }
       activeHiddenResultEvent = won || stuckAtChute ? undefined : hiddenEvents.onLoss()
       renderHiddenResultEvent()
       const shouldOfferHelp = stuckAtChute
@@ -567,14 +599,16 @@ function updateHud(snapshot: GameSnapshot): void {
     resultSpend.textContent = format(won ? copy.spendWon : copy.spendLost, {
       amount: spend.amount, title: titleForAmount(spend.amount),
     })
-    resultTitle.textContent = won ? copy.resultWon : copy.resultLost
+    const machineCleared = game.isMachineCleared()
+    restartButton.textContent = machineCleared ? getMessages().ui.restartMachine : getMessages().ui.playAgain
+    resultTitle.textContent = machineCleared ? copy.machineCleared : won ? copy.resultWon : copy.resultLost
     const prizeIndex = snapshot.wonPrizeIndex
     resultPrize.hidden = !won || prizeIndex === undefined || prizeIndex < 0
     if (!resultPrize.hidden) {
       resultPrizePortrait.src = game.prizePortrait(prizeIndex!)
       resultPrizeName.textContent = getMessages().prizes[prizeIndex!] ?? ''
     }
-    resultCopy.textContent = !won && game.hasStuckPrizeAtChute()
+    resultCopy.textContent = !won && game.hasStuckPrizeForClerk()
       ? copy.stuckAtChute
       : snapshot.banter.text
     resultClerkButton.hidden = won
@@ -655,10 +689,11 @@ function titleForAmount(amount: number): string {
 
 function renderTitleGallery(): void {
   const unlocked = coinLedger.unlockedTitles()
+  const collectionComplete = prizeCollection.isComplete()
   titlesCount.textContent = format(getMessages().dynamic.titlesCount, {
-    count: unlocked.length, total: spendTitles.length,
+    count: unlocked.length + Number(collectionComplete), total: spendTitles.length + 1,
   })
-  titlesEmpty.hidden = unlocked.length > 0
+  titlesEmpty.hidden = unlocked.length > 0 || collectionComplete
   titlesList.replaceChildren(...unlocked.map((title) => {
     const item = document.createElement('li')
     item.className = 'title-entry'
@@ -683,15 +718,38 @@ function renderTitleGallery(): void {
     item.append(icon, copy)
     return item
   }))
+  if (collectionComplete) {
+    const item = document.createElement('li')
+    item.className = 'title-entry'
+    const icon = document.createElement('img')
+    icon.className = 'title-entry-icon'
+    icon.src = '/images/titles/title-collection.png'
+    icon.alt = ''
+    icon.width = 56
+    icon.height = 56
+    icon.decoding = 'async'
+    const copy = document.createElement('div')
+    copy.className = 'title-entry-copy'
+    const name = document.createElement('strong')
+    name.textContent = getMessages().dynamic.collectionTitle
+    const detail = document.createElement('p')
+    detail.textContent = getMessages().dynamic.collectionDescription
+    const requirement = document.createElement('small')
+    requirement.textContent = getMessages().dynamic.collectionRequirement
+    copy.append(name, detail, requirement)
+    item.append(icon, copy)
+    titlesList.append(item)
+  }
 }
 
-function showAchievement(title: SpendTitle, amount: number): void {
+function showAchievement(threshold: number, amount: number): void {
   if (achievementTimeout !== undefined) clearTimeout(achievementTimeout)
   window.setTimeout(() => gameAudio.playEffect('titleUnlock'), 280)
   banterPresenter.clear()
-  activeAchievement = { threshold: title.threshold, amount }
-  renderAchievement(title.threshold, amount)
+  activeAchievement = { threshold, amount }
+  renderAchievement(threshold, amount)
   achievementToast.hidden = false
+  achievementToast.classList.toggle('is-collection', threshold === -1)
   achievementToast.classList.remove('is-showing')
   document.querySelector('.game-shell')?.classList.remove('is-achievement')
 
@@ -709,10 +767,16 @@ function showAchievement(title: SpendTitle, amount: number): void {
     if (currentSnapshot && !currentSnapshot.isReady && !currentSnapshot.result) {
       banterPresenter.show(currentSnapshot.banter)
     }
-  }, 3_200)
+  }, threshold === -1 ? 6_000 : 3_200)
 }
 
 function renderAchievement(threshold: number, amount: number): void {
+  if (threshold === -1) {
+    achievementIcon.src = '/images/titles/title-collection.png'
+    achievementTitle.textContent = getMessages().dynamic.collectionTitle
+    achievementCopy.textContent = getMessages().dynamic.collectionRequirement
+    return
+  }
   const index = spendTitles.findIndex((title) => title.threshold === threshold)
   if (index < 0) return
   achievementIcon.src = `/images/titles/title-${threshold}.webp`
