@@ -11,9 +11,10 @@ import { createSnoopyModel } from './snoopyModel'
 import { createSlowpokeModel } from './slowpokeModel'
 import { createBulbasaurModel } from './bulbasaurModel'
 import { createAlienModel } from './alienModel'
+import { createLucaModel } from './lucaModel'
 
 beforeAll(async () => { await RAPIER.init() })
-const factories = [createPrizeModel, createArcanineModel, createSnoopyModel, createSlowpokeModel, createBulbasaurModel, createAlienModel]
+const factories = [createPrizeModel, createArcanineModel, createSnoopyModel, createSlowpokeModel, createBulbasaurModel, createAlienModel, createLucaModel]
 it.each(factories.map((factory, index) => ({ factory, index })))('can swap $factory.name to a leaning guard pose in the complete cabinet', ({ index }) => {
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
   try {

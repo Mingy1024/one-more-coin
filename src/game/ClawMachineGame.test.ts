@@ -23,8 +23,8 @@ describe('claw machine session', () => {
     expect(stick.rotation.x).toBeCloseTo(0, 3)
     expect(stick.rotation.z).toBeCloseTo(0, 3)
   })
-  it('recognizes an empty machine only after all six prizes are claimed and refills them on reset', () => {
-    const prizes = Array.from({length: 6}, () => ({ claimed: true, mesh: {visible: false, position: {set: vi.fn()}, quaternion: {set: vi.fn()}},
+  it('recognizes an empty machine only after all seven prizes are claimed and refills them on reset', () => {
+    const prizes = Array.from({length: PRIZE_NAMES.length}, () => ({ claimed: true, mesh: {visible: false, position: {set: vi.fn()}, quaternion: {set: vi.fn()}},
       body: {setEnabled: vi.fn(), setTranslation: vi.fn(), setRotation: vi.fn(), setLinvel: vi.fn(), setAngvel: vi.fn()},
       carry: {release: vi.fn()}, collider: {setSensor: vi.fn()},
       start: {position: {x: 0,y: 0.6,z: 0}, rotation: {x: 0,y: 0,z: 0,w: 1}},
@@ -428,18 +428,19 @@ describe('claw machine session', () => {
     expect(state.closingHeight).toBeGreaterThan(MACHINE_DIMENSIONS.clawLowY)
   })
 
-  it('names all six dolls and excludes already won prizes from the clerk choices', () => {
+  it('names all seven dolls and excludes already won prizes from the clerk choices', () => {
     const game = Object.assign(Object.create(ClawMachineGame.prototype), {
-      prizes: [{ claimed: false }, { claimed: true }, { claimed: false }, { claimed: false }, { claimed: false }, { claimed: false }],
+      prizes: PRIZE_NAMES.map((_, index) => ({ claimed: index === 1 })),
     }) as ClawMachineGame
 
-    expect(PRIZE_NAMES).toHaveLength(6)
+    expect(PRIZE_NAMES).toHaveLength(7)
     expect(game.availablePrizesForClerk()).toEqual([
       { index: 0, name: '哆啦A夢' },
       { index: 2, name: '史努比' },
       { index: 3, name: '呆呆獸' },
       { index: 4, name: '妙蛙種子' },
       { index: 5, name: '三眼怪' },
+      { index: 6, name: '路卡' },
     ])
   })
 

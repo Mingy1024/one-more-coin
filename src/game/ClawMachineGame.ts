@@ -42,6 +42,7 @@ import { createSnoopyModel } from './snoopyModel'
 import { createSlowpokeModel } from './slowpokeModel'
 import { createBulbasaurModel } from './bulbasaurModel'
 import { createAlienModel } from './alienModel'
+import { createLucaModel } from './lucaModel'
 import { selectPrizeForAim } from './prizeSelection'
 import { createGantryAssembly } from './gantry'
 import { createArcadeRoom } from './arcadeRoom'
@@ -117,6 +118,7 @@ export const INITIAL_PRIZE_PLACEMENTS = [
   prizePlacement(-1.0, 0.68, -0.35, 0.2, 0.08, -0.16),
   prizePlacement(-0.15, 0.68, -0.74, 0.18, 0.22, 0.12),
   prizePlacement(1.05, 0.62, 0.02, 0, -0.1),
+  prizePlacement(-0.05, 0.7, -0.02, -0.08, 0.15, -0.1),
 ] as const
 export const PRIZE_NAMES = zhHant.prizes
 // Round, bulky plushes retain less grip; these tune difficulty without rolling a win probability.
@@ -127,6 +129,7 @@ const PRIZE_GRIP_PROFILES = [
   { retention: 0.84, mass: 0.8 },
   { retention: 0.82, mass: 0.75 },
   { retention: 0.94, mass: 0.45 },
+  { retention: 0.92, mass: 0.5 },
 ] as const
 const ROPE_ANCHOR_Y = MACHINE_DIMENSIONS.ropeAnchorY
 const PHYSICS_STEP = 1 / 120
@@ -185,7 +188,7 @@ export class ClawMachineGame {
   private machineButtonCap?: THREE.Mesh
   private machineButtonPulse = 0
 
-  private constructor(canvas: HTMLCanvasElement, onSnapshot: (snapshot: GameSnapshot) => void) {
+  private constructor(canvas: HTMLCanvasElement, onSnapshot: (snapshot: GameSnapshot) => void, lucaUnlocked = false) {
     this.canvas = canvas
     this.onSnapshot = onSnapshot
     this.compactDisplay = Math.min(window.innerWidth, window.innerHeight) <= 600
@@ -218,6 +221,7 @@ export class ClawMachineGame {
       this.createPrize(INITIAL_PRIZE_PLACEMENTS[3], createSlowpokeModel()),
       this.createPrize(INITIAL_PRIZE_PLACEMENTS[4], createBulbasaurModel()),
       this.createPrize(INITIAL_PRIZE_PLACEMENTS[5], createAlienModel()),
+      ...(lucaUnlocked ? [this.createPrize(INITIAL_PRIZE_PLACEMENTS[6], createLucaModel())] : []),
     ]
     this.settleInitialPrizes()
 
@@ -236,9 +240,10 @@ export class ClawMachineGame {
   static async create(
     canvas: HTMLCanvasElement,
     onSnapshot: (snapshot: GameSnapshot) => void,
+    lucaUnlocked = false,
   ): Promise<ClawMachineGame> {
     await RAPIER.init()
-    return new ClawMachineGame(canvas, onSnapshot)
+    return new ClawMachineGame(canvas, onSnapshot, lucaUnlocked)
   }
 
   private settleInitialPrizes(): void {
@@ -374,6 +379,17 @@ export class ClawMachineGame {
     this.publishSnapshot()
   }
 
+  /** Stage the new arrival for the next refill without changing the just-cleared result. */
+  unlockLuca(): void {
+    if (this.prizes.length > 6) return
+    const prize = this.createPrize(INITIAL_PRIZE_PLACEMENTS[6], createLucaModel())
+    prize.claimed = true
+    prize.mesh.visible = false
+    prize.body.setEnabled(false)
+    this.prizes.push(prize)
+    this.prizePortraits = undefined
+  }
+
   resetPrizes(): void {
     if (this.round.phase !== 'ready') return
     this.pendingPrizeExit = undefined
@@ -458,6 +474,7 @@ export class ClawMachineGame {
         const model = prize.mesh.clone(true)
         model.position.set(0, 0, 0)
         model.quaternion.identity()
+        model.visible = true
         model.traverse((part) => {
           if (part instanceof THREE.Light) part.visible = false
           if (!(part instanceof THREE.Mesh || part instanceof THREE.LineSegments)) return

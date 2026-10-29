@@ -10,6 +10,7 @@ import { createSnoopyModel } from './snoopyModel'
 import { createSlowpokeModel } from './slowpokeModel'
 import { createBulbasaurModel } from './bulbasaurModel'
 import { createAlienModel } from './alienModel'
+import { createLucaModel } from './lucaModel'
 
 import { MACHINE_DIMENSIONS } from './machineDimensions'
 
@@ -32,7 +33,7 @@ it('settles the real prize colliders before display and saves grounded reset pos
     anchorY: MACHINE_DIMENSIONS.ropeAnchorY, headY: MACHINE_DIMENSIONS.clawTopY, x: -1.2, z: 0.96,
   })
   game.prizes = INITIAL_PRIZE_PLACEMENTS.map((placement, index) =>
-    game.createPrize(placement, [createPrizeModel, createArcanineModel, createSnoopyModel, createSlowpokeModel, createBulbasaurModel, createAlienModel][index]!()))
+    game.createPrize(placement, [createPrizeModel, createArcanineModel, createSnoopyModel, createSlowpokeModel, createBulbasaurModel, createAlienModel, createLucaModel][index]!()))
 
   game.settleInitialPrizes()
 

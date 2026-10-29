@@ -6,6 +6,7 @@ import { createArcanineModel } from './arcanineModel'
 import { createSnoopyModel } from './snoopyModel'
 import { createSlowpokeModel } from './slowpokeModel'
 import { createAlienModel } from './alienModel'
+import { createLucaModel } from './lucaModel'
 import { createBulbasaurModel } from './bulbasaurModel'
 import { prizeCollisionVertices } from './prizeCollision'
 import { PrizeCarryController } from './PrizeCarryController'
@@ -13,7 +14,7 @@ import { PrizeCarryController } from './PrizeCarryController'
 beforeAll(async () => { await RAPIER.init() })
 
 describe('rotated plush collision and release', () => {
-  it.each([createPrizeModel, createArcanineModel, createSnoopyModel, createSlowpokeModel, createBulbasaurModel, createAlienModel].flatMap(factory => [0, 0.8, 1.57, 2.4].map(angle => ({ factory, angle }))))('keeps machine collisions and clears the claw for $factory.name at $angle', ({ factory, angle }) => {
+  it.each([createPrizeModel, createArcanineModel, createSnoopyModel, createSlowpokeModel, createBulbasaurModel, createAlienModel, createLucaModel].flatMap(factory => [0, 0.8, 1.57, 2.4].map(angle => ({ factory, angle }))))('keeps machine collisions and clears the claw for $factory.name at $angle', ({ factory, angle }) => {
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
     try {
       world.timestep = 1 / 120

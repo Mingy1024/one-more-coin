@@ -9,10 +9,11 @@ import { createSnoopyModel } from './snoopyModel'
 import { createSlowpokeModel } from './slowpokeModel'
 import { createBulbasaurModel } from './bulbasaurModel'
 import { createAlienModel } from './alienModel'
+import { createLucaModel } from './lucaModel'
 
 beforeAll(async () => { await RAPIER.init() })
 
-it.each([createPrizeModel, createArcanineModel, createSnoopyModel, createSlowpokeModel, createBulbasaurModel, createAlienModel])('keeps $name leaning against the real guard after gravity settles', factory => {
+it.each([createPrizeModel, createArcanineModel, createSnoopyModel, createSlowpokeModel, createBulbasaurModel, createAlienModel, createLucaModel])('keeps $name leaning against the real guard after gravity settles', factory => {
   for (const guard of ['right', 'back'] as const) {
     const model = factory()
     const pose = clerkLeanPose(model, guard, guard === 'right' ? 0.65 : -1.02)!

@@ -11,6 +11,7 @@ import { createSnoopyModel } from './snoopyModel'
 import { createSlowpokeModel } from './slowpokeModel'
 import { createBulbasaurModel } from './bulbasaurModel'
 import { createAlienModel } from './alienModel'
+import { createLucaModel } from './lucaModel'
 
 import { prizeCollisionVertices } from './prizeCollision'
 import { CLAW_TRAVEL_BOUNDS } from './clawWorkspace'
@@ -34,7 +35,7 @@ describe('cabinet containment and chute', () => {
       createPrize(placement: typeof INITIAL_PRIZE_PLACEMENTS[number], mesh: THREE.Group, kind?: 'slowpoke'): { body: RAPIER.RigidBody }
       settleInitialPrizes(): void
     }
-    const prizes = INITIAL_PRIZE_PLACEMENTS.map((placement, index) => internals.createPrize(placement, [createPrizeModel, createArcanineModel, createSnoopyModel, createSlowpokeModel, createBulbasaurModel, createAlienModel][index]!()))
+    const prizes = INITIAL_PRIZE_PLACEMENTS.map((placement, index) => internals.createPrize(placement, [createPrizeModel, createArcanineModel, createSnoopyModel, createSlowpokeModel, createBulbasaurModel, createAlienModel, createLucaModel][index]!()))
     Object.assign(game, {
       prizes,
       articulatedClaw: new ArticulatedClaw(world, scene, {
@@ -181,7 +182,7 @@ describe('cabinet containment and chute', () => {
       if (y > 0 && y < 0.3 && (Math.abs(x + 0.5) < 0.15 || Math.abs(z - 0.24) < 0.15)) guards.push(collider)
     })
     for (const [index, placement] of INITIAL_PRIZE_PLACEMENTS.entries()) {
-      const model = [createPrizeModel, createArcanineModel, createSnoopyModel, createSlowpokeModel, createBulbasaurModel, createAlienModel][index]!()
+      const model = [createPrizeModel, createArcanineModel, createSnoopyModel, createSlowpokeModel, createBulbasaurModel, createAlienModel, createLucaModel][index]!()
       const { vertices } = prizeCollisionVertices(model)
       const overlaps: RAPIER.Collider[] = []
       world.intersectionsWithShape(

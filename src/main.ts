@@ -104,6 +104,31 @@ const achievementCopy = requireElement<HTMLElement>('achievement-copy')
 const banterPresenter = new BanterPresenter(renderBanter, undefined, hideBanter)
 const coinLedger = new CoinLedger()
 const prizeCollection = new PrizeCollection()
+const lucaUnlockDialog = requireElement<HTMLDialogElement>('luca-unlock-dialog')
+const lucaUnlockPortrait = requireElement<HTMLImageElement>('luca-unlock-portrait')
+const lucaUnlockConfirm = requireElement<HTMLButtonElement>('luca-unlock-confirm')
+function renderLucaUnlock(): void {
+  const copy = getMessages().dynamic
+  requireElement('luca-unlock-title').textContent = copy.lucaUnlockTitle
+  requireElement('luca-unlock-copy').textContent = copy.lucaUnlockCopy
+  lucaUnlockConfirm.textContent = copy.lucaUnlockConfirm
+}
+function showLucaUnlock(): void {
+  if (!prizeCollection.needsLucaReveal() || !achievementToast.hidden || !hasEnteredGame || lucaUnlockDialog.open) return
+  // Native top layer keeps the result window underneath; never overlaps the title fanfare.
+  game.unlockLuca()
+  renderLucaUnlock()
+  lucaUnlockPortrait.src = game.prizePortrait(6)
+  lucaUnlockDialog.showModal()
+  gameAudio.playEffect('titleUnlock')
+  lucaUnlockConfirm.focus({ preventScroll: true })
+}
+lucaUnlockConfirm.addEventListener('click', () => lucaUnlockDialog.close())
+lucaUnlockDialog.addEventListener('close', () => {
+  prizeCollection.acknowledgeLucaReveal()
+  if (!resultModal.hidden) restartButton.focus({ preventScroll: true })
+  else startButton.focus({ preventScroll: true })
+})
 const GUARANTEE_STORAGE_KEY = 'one-more-coin:guarantee'
 let guaranteeActive = false
 let guaranteeAnnouncementVisible = false
@@ -201,11 +226,12 @@ function finishLoading(): void {
   }
   hideLoading()
   if (!hasEnteredGame) introEnter.focus({ preventScroll: true })
+  else showLucaUnlock()
 }
 
 let game: ClawMachineGame
 try {
-  game = await ClawMachineGame.create(canvas, updateHud)
+  game = await ClawMachineGame.create(canvas, updateHud, prizeCollection.isLucaUnlocked())
 } catch (error) {
   loadingCopy.textContent = getMessages().dynamic.loadingFailed
   throw error
@@ -230,6 +256,7 @@ function changeLocale(locale: Locale): void {
   applyStaticTranslations()
   renderSpend(lastResultSpend ?? coinLedger.snapshot())
   if (activeAchievement) renderAchievement(activeAchievement.threshold, activeAchievement.amount)
+  if (lucaUnlockDialog.open) renderLucaUnlock()
   renderHiddenResultEvent()
   renderChangelog()
   banterPresenter.clear()
@@ -308,6 +335,7 @@ introEnter.addEventListener('click', () => {
   introReturnFocus = undefined
   if (returnToHelp) focusTopbarAction(introHelpButton)
   else startButton.focus({ preventScroll: true })
+  showLucaUnlock()
 })
 document.addEventListener('pointerdown', (event) => {
   if (!localeButton.parentElement?.contains(event.target as Node)) closeLocaleMenu()
@@ -481,6 +509,7 @@ startButton.addEventListener('click', () => {
   grabButton.focus({ preventScroll: true })
 })
 restartButton.addEventListener('click', () => {
+  if (activeAchievement?.threshold === -1 || lucaUnlockDialog.open) return
   const machineCleared = game.isMachineCleared()
   resultModal.hidden = true
   activeHiddenResultEvent = undefined
@@ -637,6 +666,7 @@ function updateHud(snapshot: GameSnapshot): void {
       if (won) {
         hiddenEvents.onWin()
         if (snapshot.wonPrizeIndex !== undefined && prizeCollection.record(snapshot.wonPrizeIndex)) {
+          game.unlockLuca()
           showAchievement(-1, 0)
         }
       }
@@ -665,6 +695,7 @@ function updateHud(snapshot: GameSnapshot): void {
       amount: spend.amount, title: titleForAmount(spend.amount),
     })
     const machineCleared = game.isMachineCleared()
+    restartButton.disabled = activeAchievement?.threshold === -1 || lucaUnlockDialog.open
     restartButton.textContent = machineCleared ? getMessages().ui.restartMachine : getMessages().ui.playAgain
     resultTitle.textContent = machineCleared ? copy.machineCleared : won ? copy.resultWon : copy.resultLost
     const prizeIndex = snapshot.wonPrizeIndex
@@ -837,7 +868,8 @@ function showAchievement(threshold: number, amount: number): void {
     document.querySelector('.game-shell')?.classList.remove('is-achievement')
     achievementTimeout = undefined
     activeAchievement = undefined
-    if (currentSnapshot && !currentSnapshot.isReady && !currentSnapshot.result) {
+    showLucaUnlock()
+    if (!lucaUnlockDialog.open && currentSnapshot && !currentSnapshot.isReady && !currentSnapshot.result) {
       banterPresenter.show(currentSnapshot.banter)
     }
   }, threshold === -1 ? 6_000 : 3_200)
